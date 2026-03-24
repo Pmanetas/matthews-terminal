@@ -1,75 +1,102 @@
 import * as vscode from 'vscode';
 import { BridgeClient } from './bridge-client';
-
-const TERMINAL_NAME = 'VOICE AGENT';
+import { spawn, ChildProcess } from 'child_process';
 
 export class CommandHandler {
-    private terminal: vscode.Terminal | undefined;
-    private disposables: vscode.Disposable[] = [];
-
-    constructor() {
-        // Clean up reference if terminal is closed
-        this.disposables.push(
-            vscode.window.onDidCloseTerminal((closed) => {
-                if (closed === this.terminal) {
-                    this.terminal = undefined;
-                }
-            })
-        );
-    }
+    private isProcessing = false;
+    private activeProcess: ChildProcess | undefined;
 
     /**
-     * Sends voice command text into the Claude Code interactive terminal.
-     * User sees everything happening in VS Code — Claude thinking, editing, creating files.
-     * Phone is just a voice remote.
+     * Runs voice command through Claude Code CLI and streams the response
+     * back to the phone. Claude can read/write files, run commands, etc.
+     * Changes appear in VS Code's explorer in real-time.
      */
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
+        if (this.isProcessing) {
+            client.sendStatus('Still working on the last command...');
+            return;
+        }
+
+        this.isProcessing = true;
+        client.sendStatus('Thinking...');
+
         try {
-            const terminal = this.getOrCreateClaudeTerminal();
-            terminal.show(true);
-
-            // Send the voice text directly into the Claude terminal
-            terminal.sendText(text);
-
-            client.sendStatus(`Sent to Claude: "${text}"`);
-            client.sendResult(`Command sent to Claude Code — check VS Code to see it working.`);
+            const response = await this.runClaude(text, client);
+            client.sendResult(response);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             client.sendResult(`Error: ${msg}`);
+        } finally {
+            this.isProcessing = false;
+            this.activeProcess = undefined;
         }
     }
 
-    /**
-     * Gets or creates a terminal running `claude` in interactive mode.
-     */
-    private getOrCreateClaudeTerminal(): vscode.Terminal {
-        // Reuse existing terminal if still alive
-        if (this.terminal) {
-            return this.terminal;
-        }
+    private runClaude(prompt: string, client: BridgeClient): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-        // Look for existing VOICE AGENT terminal
-        const existing = vscode.window.terminals.find(t => t.name === TERMINAL_NAME);
-        if (existing) {
-            this.terminal = existing;
-            return this.terminal;
-        }
+            // Resolve claude binary path
+            const claudePath = process.platform === 'win32'
+                ? `${process.env.APPDATA}\\npm\\claude.cmd`
+                : 'claude';
 
-        // Create new terminal running claude in interactive mode
-        this.terminal = vscode.window.createTerminal({
-            name: TERMINAL_NAME,
-            shellPath: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
-            shellArgs: process.platform === 'win32' ? ['/c', 'claude'] : ['-c', 'claude'],
+            this.activeProcess = spawn(claudePath, ['--print', prompt], {
+                cwd,
+                shell: true,
+                env: { ...process.env },
+            });
+
+            let fullOutput = '';
+            let lastChunkTime = Date.now();
+
+            // Stream stdout chunks back to phone as status updates
+            this.activeProcess.stdout?.on('data', (data: Buffer) => {
+                const chunk = data.toString();
+                fullOutput += chunk;
+                lastChunkTime = Date.now();
+                // Send partial response so phone sees it building up
+                client.sendStatus(fullOutput);
+            });
+
+            this.activeProcess.stderr?.on('data', (data: Buffer) => {
+                const err = data.toString();
+                // Don't send stderr noise to phone unless it's meaningful
+                if (err.trim().length > 0) {
+                    console.error('[Matthews Terminal] Claude stderr:', err);
+                }
+            });
+
+            this.activeProcess.on('error', (err) => {
+                if (err.message.includes('ENOENT')) {
+                    reject(new Error('Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code'));
+                } else {
+                    reject(err);
+                }
+            });
+
+            this.activeProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve(fullOutput.trim() || 'Done.');
+                } else {
+                    reject(new Error(fullOutput.trim() || `Claude exited with code ${code}`));
+                }
+            });
+
+            // Timeout after 2 minutes
+            setTimeout(() => {
+                if (this.isProcessing && this.activeProcess) {
+                    this.activeProcess.kill();
+                    reject(new Error('Claude took too long (2 min timeout).'));
+                }
+            }, 120_000);
         });
-        this.terminal.show(true);
-
-        return this.terminal;
     }
 
     dispose(): void {
-        for (const d of this.disposables) {
-            d.dispose();
+        if (this.activeProcess) {
+            this.activeProcess.kill();
         }
-        this.disposables = [];
     }
 }

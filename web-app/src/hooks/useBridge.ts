@@ -41,15 +41,26 @@ export function useBridge() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          if (data.type === 'status' || data.type === 'result') {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: 'assistant' as const,
-                text: data.text,
-                timestamp: Date.now(),
-              },
-            ])
+          if (data.type === 'status') {
+            // Streaming: update the last assistant message in-place (or create one)
+            setMessages((prev) => {
+              const last = prev[prev.length - 1]
+              if (last && last.role === 'assistant' && last.streaming) {
+                // Replace the streaming message
+                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
+              }
+              // Create new streaming message
+              return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
+            })
+          } else if (data.type === 'result') {
+            // Final response: replace streaming message or add new one
+            setMessages((prev) => {
+              const last = prev[prev.length - 1]
+              if (last && last.role === 'assistant' && last.streaming) {
+                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
+              }
+              return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
+            })
           }
         } catch {
           // ignore malformed messages
