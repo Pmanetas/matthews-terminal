@@ -7,11 +7,13 @@ import { MarkdownMessage } from '@/components/MarkdownMessage'
 import { useBridge, sharedAudio } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
-// Stop any playing audio (call before starting mic)
-function stopAudio() {
-  if (sharedAudio && !sharedAudio.paused) {
+// Fully release audio so microphone can be used on iOS
+function stopAndReleaseAudio() {
+  if (sharedAudio) {
     sharedAudio.pause()
     sharedAudio.currentTime = 0
+    sharedAudio.src = ''
+    sharedAudio.load() // force release the audio session
   }
 }
 
@@ -20,10 +22,11 @@ export function VoiceChat() {
   const autoListenRef = useRef<(() => void) | null>(null)
 
   const { status, messages, sendCommand } = useBridge(() => {
-    // Called when ElevenLabs audio finishes — auto-start listening
+    // Called when ElevenLabs audio finishes — release audio then auto-listen
+    stopAndReleaseAudio()
     setTimeout(() => {
       autoListenRef.current?.()
-    }, 300) // small delay to avoid mic picking up tail end of audio
+    }, 500) // delay to let iOS release mic hardware
   })
 
   const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported } =
@@ -48,10 +51,14 @@ export function VoiceChat() {
   }, [isListening, transcript, sendCommand])
 
   const handleMicClick = () => {
-    // Stop any playing audio before toggling mic
-    stopAudio()
-    if (isListening) stopListening()
-    else startListening()
+    // Fully release audio so mic can access the hardware
+    stopAndReleaseAudio()
+    if (isListening) {
+      stopListening()
+    } else {
+      // Small delay after releasing audio to let iOS free the mic
+      setTimeout(() => startListening(), 200)
+    }
   }
 
   const statusColor =
