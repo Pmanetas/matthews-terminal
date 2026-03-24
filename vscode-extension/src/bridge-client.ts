@@ -5,7 +5,7 @@ import { CommandHandler } from './command-handler';
 // Default to local. Set via VS Code setting or env var to point to Render.
 function getBridgeUrl(): string {
     const config = vscode.workspace.getConfiguration('matthewsTerminal');
-    return config.get<string>('bridgeUrl') || process.env.MT_BRIDGE_URL || 'ws://localhost:4800';
+    return config.get<string>('bridgeUrl') || process.env.MT_BRIDGE_URL || 'wss://matthews-terminal.onrender.com';
 }
 
 const RECONNECT_INTERVAL = 5000;

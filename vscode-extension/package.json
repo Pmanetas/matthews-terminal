@@ -23,7 +23,7 @@
       "properties": {
         "matthewsTerminal.bridgeUrl": {
           "type": "string",
-          "default": "ws://localhost:4800",
+          "default": "wss://matthews-terminal.onrender.com",
           "description": "WebSocket URL of the voice bridge server (e.g. wss://your-app.onrender.com)"
         }
       }
