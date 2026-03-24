@@ -18,7 +18,7 @@ function ensureAnalyser() {
     analyser = audioContext.createAnalyser()
     analyser.fftSize = 256
     analyser.smoothingTimeConstant = 0.7
-    analyserData = new Uint8Array(analyser.frequencyBinCount)
+    analyserData = new Uint8Array(analyser.frequencyBinCount as number)
     if (!sourceConnected) {
       const source = audioContext.createMediaElementSource(sharedAudio)
       source.connect(analyser)
