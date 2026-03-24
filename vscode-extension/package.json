@@ -3,10 +3,17 @@
   "displayName": "Matthews Terminal - Voice Bridge",
   "description": "Voice bridge extension for Matthews Terminal",
   "version": "0.1.0",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "activationEvents": [],
-  "main": "./out/extension.js",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:matthewsTerminal.connect",
+    "onCommand:matthewsTerminal.disconnect"
+  ],
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -31,12 +38,14 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
+    "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
     "watch": "tsc -watch -p ./",
-    "package": "npx @vscode/vsce package --no-dependencies"
+    "package": "npm run bundle && npx @vscode/vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
     "@types/ws": "^8.5.10",
+    "esbuild": "^0.27.4",
     "typescript": "^5.4.0"
   },
   "dependencies": {
