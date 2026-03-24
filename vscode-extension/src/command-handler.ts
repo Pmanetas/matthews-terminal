@@ -1,86 +1,75 @@
 import * as vscode from 'vscode';
 import { BridgeClient } from './bridge-client';
-import { exec, ChildProcess } from 'child_process';
+
+const TERMINAL_NAME = 'VOICE AGENT';
 
 export class CommandHandler {
-    private isProcessing = false;
-    private activeProcess: ChildProcess | undefined;
+    private terminal: vscode.Terminal | undefined;
+    private disposables: vscode.Disposable[] = [];
+
+    constructor() {
+        // Clean up reference if terminal is closed
+        this.disposables.push(
+            vscode.window.onDidCloseTerminal((closed) => {
+                if (closed === this.terminal) {
+                    this.terminal = undefined;
+                }
+            })
+        );
+    }
 
     /**
-     * Routes an incoming voice command to Claude Code CLI.
-     * Claude handles everything — coding, file ops, terminal commands, questions.
+     * Sends voice command text into the Claude Code interactive terminal.
+     * User sees everything happening in VS Code — Claude thinking, editing, creating files.
+     * Phone is just a voice remote.
      */
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
-        if (this.isProcessing) {
-            client.sendStatus('Still working on the last command...');
-            return;
-        }
-
-        this.isProcessing = true;
-        client.sendStatus('Thinking...');
-
         try {
-            const response = await this.runClaude(text, client);
-            client.sendResult(response);
+            const terminal = this.getOrCreateClaudeTerminal();
+            terminal.show(true);
+
+            // Send the voice text directly into the Claude terminal
+            terminal.sendText(text);
+
+            client.sendStatus(`Sent to Claude: "${text}"`);
+            client.sendResult(`Command sent to Claude Code — check VS Code to see it working.`);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             client.sendResult(`Error: ${msg}`);
-        } finally {
-            this.isProcessing = false;
-            this.activeProcess = undefined;
         }
     }
 
     /**
-     * Runs `claude --print` with the given prompt and returns the response.
-     * --print runs Claude non-interactively and outputs the response to stdout.
+     * Gets or creates a terminal running `claude` in interactive mode.
      */
-    private runClaude(prompt: string, client: BridgeClient): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    private getOrCreateClaudeTerminal(): vscode.Terminal {
+        // Reuse existing terminal if still alive
+        if (this.terminal) {
+            return this.terminal;
+        }
 
-            // Escape the prompt for shell safety
-            const escaped = prompt.replace(/"/g, '\\"');
-            // Use full path on Windows since extension env may not have npm globals in PATH
-            const claudeBin = process.platform === 'win32'
-                ? `"${process.env.APPDATA}\\npm\\claude.cmd"`
-                : 'claude';
-            const command = `${claudeBin} --print "${escaped}"`;
+        // Look for existing VOICE AGENT terminal
+        const existing = vscode.window.terminals.find(t => t.name === TERMINAL_NAME);
+        if (existing) {
+            this.terminal = existing;
+            return this.terminal;
+        }
 
-            this.activeProcess = exec(command, {
-                cwd,
-                timeout: 120_000, // 2 min timeout
-                maxBuffer: 1024 * 1024, // 1MB output buffer
-                shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
-            }, (error, stdout, stderr) => {
-                clearInterval(statusTimer);
-
-                if (error) {
-                    // If claude CLI not found, give helpful message
-                    if (error.message.includes('not recognized') || error.message.includes('not found')) {
-                        reject(new Error('Claude CLI not found. Make sure Claude Code is installed globally.'));
-                        return;
-                    }
-                    reject(new Error(stderr || error.message));
-                    return;
-                }
-                const output = stdout.trim();
-                resolve(output || 'Done — no output.');
-            });
-
-            // Send periodic status updates while Claude is working
-            const statusTimer = setInterval(() => {
-                if (this.isProcessing) {
-                    client.sendStatus('Still thinking...');
-                }
-            }, 10_000);
+        // Create new terminal running claude in interactive mode
+        this.terminal = vscode.window.createTerminal({
+            name: TERMINAL_NAME,
+            shellPath: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
+            shellArgs: process.platform === 'win32' ? ['/c', 'claude'] : ['-c', 'claude'],
         });
+        this.terminal.show(true);
+
+        return this.terminal;
     }
 
     dispose(): void {
-        if (this.activeProcess) {
-            this.activeProcess.kill();
+        for (const d of this.disposables) {
+            d.dispose();
         }
+        this.disposables = [];
     }
 }
