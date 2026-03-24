@@ -15,18 +15,27 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 interface GeometricSphereProps {
   isActive?: boolean;
   size?: number;
+  /** Returns 0–1 audio amplitude for voice-reactive animation */
+  getAudioLevel?: () => number;
 }
 
-export function GeometricSphere({ isActive = false, size = 400 }: GeometricSphereProps) {
+export function GeometricSphere({ isActive = false, size = 400, getAudioLevel }: GeometricSphereProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const targetMouse = useRef({ x: 0, y: 0 });
   const currentMouse = useRef({ x: 0, y: 0 });
+  const currentAudioLevel = useRef(0);
   const rafRef = useRef<number>(0);
+  const getAudioLevelRef = useRef(getAudioLevel);
+  getAudioLevelRef.current = getAudioLevel;
 
-  // Smooth mouse parallax via rAF — no React state, no re-renders
+  // Smooth mouse parallax + audio reactivity via rAF — no React state, no re-renders
   const tick = useCallback(() => {
     currentMouse.current.x = lerp(currentMouse.current.x, targetMouse.current.x, CONFIG.lerpFactor);
     currentMouse.current.y = lerp(currentMouse.current.y, targetMouse.current.y, CONFIG.lerpFactor);
+
+    // Smooth audio level (lerp toward target)
+    const rawLevel = getAudioLevelRef.current?.() ?? 0;
+    currentAudioLevel.current = lerp(currentAudioLevel.current, rawLevel, 0.15);
 
     const el = wrapperRef.current;
     if (el) {
@@ -34,6 +43,7 @@ export function GeometricSphere({ isActive = false, size = 400 }: GeometricSpher
       const rotY = -currentMouse.current.x * 5;
       el.style.setProperty("--tilt-x", `${rotX}deg`);
       el.style.setProperty("--tilt-y", `${rotY}deg`);
+      el.style.setProperty("--audio-level", `${currentAudioLevel.current}`);
     }
 
     rafRef.current = requestAnimationFrame(tick);
@@ -66,8 +76,8 @@ export function GeometricSphere({ isActive = false, size = 400 }: GeometricSpher
   return (
     <div
       ref={wrapperRef}
-      className={`sphere-wrapper ${isActive ? "sphere-active" : ""}`}
-      style={{ width: size, height: size } as React.CSSProperties}
+      className={`sphere-wrapper ${isActive ? "sphere-active" : ""} ${getAudioLevel ? "sphere-has-audio" : ""}`}
+      style={{ width: size, height: size, '--audio-level': '0' } as React.CSSProperties}
     >
       {/* Core glow — transitions via CSS class */}
       <div className="sphere-core-light" />

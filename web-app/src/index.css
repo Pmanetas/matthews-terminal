@@ -137,6 +137,31 @@ body {
   animation: spherePulse 2.5s ease-out 1.25s infinite;
 }
 
+/* ---- Audio-reactive speaking animation ---- */
+/* The --audio-level CSS var (0–1) is set 60fps by JS from Web Audio analyser */
+.sphere-has-audio .sphere-spin-container {
+  /* Scale reacts to voice amplitude — pulsing like a mouth */
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y))
+    scale(calc(1 + var(--audio-level) * 0.15));
+}
+
+.sphere-has-audio .sphere-core-light {
+  /* Glow intensifies with voice */
+  opacity: calc(0.9 + var(--audio-level) * 0.1);
+  filter: blur(calc(200px - var(--audio-level) * 40px));
+  box-shadow:
+    0 0 calc(100px + var(--audio-level) * 80px) calc(30px + var(--audio-level) * 30px) rgba(59, 130, 246, calc(0.15 + var(--audio-level) * 0.25)),
+    0 0 calc(200px + var(--audio-level) * 100px) calc(50px + var(--audio-level) * 40px) rgba(139, 92, 246, calc(0.1 + var(--audio-level) * 0.2));
+}
+
+.sphere-has-audio .sphere-wireframe-line {
+  /* Wireframe brightens with voice */
+  border-color: rgba(139, 92, 246, calc(0.75 + var(--audio-level) * 0.25));
+  box-shadow:
+    0 0 calc(70px + var(--audio-level) * 60px) rgba(139, 92, 246, calc(0.15 + var(--audio-level) * 0.2)),
+    inset 0 0 calc(70px + var(--audio-level) * 60px) rgba(139, 92, 246, calc(0.08 + var(--audio-level) * 0.12));
+}
+
 /* ---- Keyframes (never changed, never restarted) ---- */
 @keyframes sphereRotate {
   from { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) rotateZ(0deg); }

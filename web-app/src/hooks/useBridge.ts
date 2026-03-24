@@ -5,11 +5,48 @@ import type { ConnectionStatus, Message } from '@/types'
 export const sharedAudio = typeof window !== 'undefined' ? new Audio() : null
 let audioUnlocked = false
 
+// ── Web Audio API analyser for sphere visualisation ──────────────
+let audioContext: AudioContext | null = null
+let analyser: AnalyserNode | null = null
+let analyserData: Uint8Array | null = null
+let sourceConnected = false
+
+function ensureAnalyser() {
+  if (analyser || !sharedAudio) return
+  try {
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    analyser = audioContext.createAnalyser()
+    analyser.fftSize = 256
+    analyser.smoothingTimeConstant = 0.7
+    analyserData = new Uint8Array(analyser.frequencyBinCount)
+    if (!sourceConnected) {
+      const source = audioContext.createMediaElementSource(sharedAudio)
+      source.connect(analyser)
+      analyser.connect(audioContext.destination)
+      sourceConnected = true
+    }
+  } catch (e) {
+    console.error('[Audio] Analyser setup failed:', e)
+  }
+}
+
+/** Returns 0–1 amplitude of current audio playback */
+export function getAudioLevel(): number {
+  if (!analyser || !analyserData) return 0
+  analyser.getByteFrequencyData(analyserData)
+  let sum = 0
+  for (let i = 0; i < analyserData.length; i++) sum += analyserData[i]
+  return Math.min(1, (sum / analyserData.length / 128))
+}
+
 function unlockAudio() {
   if (audioUnlocked || !sharedAudio) return
   // Play a silent buffer to unlock audio on iOS
   sharedAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQAAAAAAAAAAaC0MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=='
   sharedAudio.play().then(() => { audioUnlocked = true }).catch(() => {})
+  // Also init analyser on user gesture (required for AudioContext)
+  ensureAnalyser()
+  audioContext?.resume()
 }
 
 // Call this on any user interaction
@@ -87,6 +124,8 @@ export function useBridge(onAudioDone?: () => void) {
               const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
               if (sharedAudio) {
+                ensureAnalyser()
+                audioContext?.resume()
                 sharedAudio.volume = 1.0
                 sharedAudio.src = url
                 sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))

@@ -4,31 +4,36 @@ import { Mic, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
-// Fully release audio so microphone can be used on iOS
-function stopAndReleaseAudio() {
+// Stop audio playback so microphone can be used
+function stopAudioPlayback() {
   if (sharedAudio) {
     sharedAudio.pause()
     sharedAudio.currentTime = 0
-    sharedAudio.src = ''
-    sharedAudio.load() // force release the audio session
+    // Don't clear src or call load() — that causes a long delay on iOS
   }
 }
 
 export function VoiceChat() {
-  // Track when audio just finished so we can prompt user to tap mic
+  // Track when audio just finished so we can prompt user to tap mic (fallback)
   const [audioJustFinished, setAudioJustFinished] = useState(false)
+  const autoListenRef = useRef<(() => void) | null>(null)
 
   const { status, messages, sendCommand } = useBridge(() => {
-    // Called when ElevenLabs audio finishes — release audio and prompt user
-    stopAndReleaseAudio()
+    // Called when ElevenLabs audio finishes — stop playback and auto-listen
+    stopAudioPlayback()
     setAudioJustFinished(true)
+    // Try auto-listen (works on Android/desktop; iOS may block without gesture)
+    autoListenRef.current?.()
   })
 
   const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported } =
     useVoice()
+
+  // Keep ref updated so the bridge callback can use it
+  autoListenRef.current = startListening
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -51,8 +56,8 @@ export function VoiceChat() {
   }, [isListening, transcript, sendCommand])
 
   const handleMicClick = () => {
-    // Fully release audio so mic can access the hardware
-    stopAndReleaseAudio()
+    // Stop any playing audio so mic can access the hardware
+    stopAudioPlayback()
     setAudioJustFinished(false)
     if (isListening) {
       stopListening()
@@ -82,7 +87,7 @@ export function VoiceChat() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
-          <GeometricSphere isActive={sphereActive} size={140} />
+          <GeometricSphere isActive={sphereActive} size={140} getAudioLevel={getAudioLevel} />
         </motion.div>
         <h1 className="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-white/90 to-white/60 mt-2">
           Matthews Terminal
