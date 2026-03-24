@@ -5,12 +5,13 @@ import { spawn, ChildProcess } from 'child_process';
 export class CommandHandler {
     private isProcessing = false;
     private activeProcess: ChildProcess | undefined;
+    private outputChannel: vscode.OutputChannel;
+    private conversationStarted = false;
 
-    /**
-     * Runs voice command through Claude Code CLI and streams the response
-     * back to the phone. Claude can read/write files, run commands, etc.
-     * Changes appear in VS Code's explorer in real-time.
-     */
+    constructor() {
+        this.outputChannel = vscode.window.createOutputChannel('Matthews Terminal');
+    }
+
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
         if (this.isProcessing) {
             client.sendStatus('Still working on the last command...');
@@ -20,11 +21,18 @@ export class CommandHandler {
         this.isProcessing = true;
         client.sendStatus('Thinking...');
 
+        // Show in VS Code output panel
+        this.outputChannel.show(true);
+        this.outputChannel.appendLine(`\n🎤 You: ${text}`);
+        this.outputChannel.appendLine('⏳ Claude is thinking...\n');
+
         try {
             const response = await this.runClaude(text, client);
+            this.outputChannel.appendLine(`🤖 Claude: ${response}\n`);
             client.sendResult(response);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
+            this.outputChannel.appendLine(`❌ Error: ${msg}\n`);
             client.sendResult(`Error: ${msg}`);
         } finally {
             this.isProcessing = false;
@@ -37,46 +45,54 @@ export class CommandHandler {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-            // Resolve claude binary path
             const claudePath = process.platform === 'win32'
                 ? `${process.env.APPDATA}\\npm\\claude.cmd`
                 : 'claude';
 
-            this.activeProcess = spawn(claudePath, ['--print', prompt], {
+            // Build args: --print for non-interactive, --continue to keep conversation
+            const args = ['--print'];
+            if (this.conversationStarted) {
+                args.push('--continue');
+            }
+            // Pass prompt via stdin to avoid shell escaping issues
+            args.push('-');
+
+            this.activeProcess = spawn(claudePath, args, {
                 cwd,
                 shell: true,
                 env: { ...process.env },
             });
 
             let fullOutput = '';
-            let lastChunkTime = Date.now();
 
-            // Stream stdout chunks back to phone as status updates
             this.activeProcess.stdout?.on('data', (data: Buffer) => {
                 const chunk = data.toString();
                 fullOutput += chunk;
-                lastChunkTime = Date.now();
-                // Send partial response so phone sees it building up
                 client.sendStatus(fullOutput);
+                this.outputChannel.append(chunk);
             });
 
             this.activeProcess.stderr?.on('data', (data: Buffer) => {
-                const err = data.toString();
-                // Don't send stderr noise to phone unless it's meaningful
-                if (err.trim().length > 0) {
-                    console.error('[Matthews Terminal] Claude stderr:', err);
+                const err = data.toString().trim();
+                if (err.length > 0) {
+                    console.error('[Matthews Terminal] stderr:', err);
                 }
             });
 
+            // Write the prompt to stdin and close it
+            this.activeProcess.stdin?.write(prompt);
+            this.activeProcess.stdin?.end();
+
             this.activeProcess.on('error', (err) => {
                 if (err.message.includes('ENOENT')) {
-                    reject(new Error('Claude CLI not found. Install it with: npm install -g @anthropic-ai/claude-code'));
+                    reject(new Error('Claude CLI not found. Install: npm install -g @anthropic-ai/claude-code'));
                 } else {
                     reject(err);
                 }
             });
 
             this.activeProcess.on('close', (code) => {
+                this.conversationStarted = true;
                 if (code === 0) {
                     resolve(fullOutput.trim() || 'Done.');
                 } else {
@@ -84,13 +100,13 @@ export class CommandHandler {
                 }
             });
 
-            // Timeout after 2 minutes
+            // Timeout after 3 minutes for bigger tasks
             setTimeout(() => {
                 if (this.isProcessing && this.activeProcess) {
                     this.activeProcess.kill();
-                    reject(new Error('Claude took too long (2 min timeout).'));
+                    reject(new Error('Claude took too long (3 min timeout).'));
                 }
-            }, 120_000);
+            }, 180_000);
         });
     }
 
@@ -98,5 +114,6 @@ export class CommandHandler {
         if (this.activeProcess) {
             this.activeProcess.kill();
         }
+        this.outputChannel.dispose();
     }
 }
