@@ -1,113 +1,81 @@
 import * as vscode from 'vscode';
 import { BridgeClient } from './bridge-client';
-import { TerminalManager } from './terminal-manager';
+import { exec, ChildProcess } from 'child_process';
 
 export class CommandHandler {
-    private terminalManager: TerminalManager;
-
-    constructor() {
-        this.terminalManager = new TerminalManager();
-    }
+    private isProcessing = false;
+    private activeProcess: ChildProcess | undefined;
 
     /**
-     * Routes an incoming command string to the appropriate action.
+     * Routes an incoming voice command to Claude Code CLI.
+     * Claude handles everything — coding, file ops, terminal commands, questions.
      */
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
-        const trimmed = text.trim().toLowerCase();
-
-        try {
-            if (trimmed.startsWith('open ')) {
-                await this.handleOpen(text.trim().substring(5), client);
-            } else if (trimmed === 'current file' || trimmed === 'what file') {
-                this.handleCurrentFile(client);
-            } else if (trimmed === 'status' || trimmed === "what's happening") {
-                this.handleStatus(client);
-            } else {
-                this.handleTerminalCommand(text.trim(), client);
-            }
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            client.sendResult(`Error: ${msg}`);
-        }
-    }
-
-    /**
-     * Opens a file by path in the editor.
-     */
-    private async handleOpen(filePath: string, client: BridgeClient): Promise<void> {
-        client.sendStatus(`Opening ${filePath}...`);
-
-        // Try to resolve the path relative to the workspace
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        let uri: vscode.Uri;
-
-        if (filePath.match(/^[a-zA-Z]:\\/) || filePath.startsWith('/')) {
-            // Absolute path
-            uri = vscode.Uri.file(filePath);
-        } else if (workspaceFolders && workspaceFolders.length > 0) {
-            // Relative to workspace root
-            uri = vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
-        } else {
-            client.sendResult(`Cannot resolve relative path: no workspace folder open.`);
+        if (this.isProcessing) {
+            client.sendStatus('Still working on the last command...');
             return;
         }
 
-        const doc = await vscode.workspace.openTextDocument(uri);
-        await vscode.window.showTextDocument(doc);
-        client.sendResult(`Opened ${filePath}`);
-    }
+        this.isProcessing = true;
+        client.sendStatus('Thinking...');
 
-    /**
-     * Reports the currently active file.
-     */
-    private handleCurrentFile(client: BridgeClient): void {
-        const editor = vscode.window.activeTextEditor;
-        if (editor) {
-            const name = editor.document.fileName;
-            client.sendResult(`Current file: ${name}`);
-        } else {
-            client.sendResult('No file is currently open.');
+        try {
+            const response = await this.runClaude(text, client);
+            client.sendResult(response);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            client.sendResult(`Error: ${msg}`);
+        } finally {
+            this.isProcessing = false;
+            this.activeProcess = undefined;
         }
     }
 
     /**
-     * Reports current workspace status.
+     * Runs `claude --print` with the given prompt and returns the response.
+     * --print runs Claude non-interactively and outputs the response to stdout.
      */
-    private handleStatus(client: BridgeClient): void {
-        const editor = vscode.window.activeTextEditor;
-        const folders = vscode.workspace.workspaceFolders;
-        const parts: string[] = [];
+    private runClaude(prompt: string, client: BridgeClient): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-        if (folders && folders.length > 0) {
-            parts.push(`Workspace: ${folders[0].name}`);
-        } else {
-            parts.push('No workspace open');
-        }
+            // Escape the prompt for shell safety
+            const escaped = prompt.replace(/"/g, '\\"');
+            const command = `claude --print "${escaped}"`;
 
-        if (editor) {
-            parts.push(`Active file: ${editor.document.fileName}`);
-            parts.push(`Language: ${editor.document.languageId}`);
-            parts.push(`Line ${editor.selection.active.line + 1}, Col ${editor.selection.active.character + 1}`);
-        } else {
-            parts.push('No active editor');
-        }
+            this.activeProcess = exec(command, {
+                cwd,
+                timeout: 120_000, // 2 min timeout
+                maxBuffer: 1024 * 1024, // 1MB output buffer
+            }, (error, stdout, stderr) => {
+                clearInterval(statusTimer);
 
-        parts.push(`Open terminals: ${vscode.window.terminals.length}`);
+                if (error) {
+                    // If claude CLI not found, give helpful message
+                    if (error.message.includes('not recognized') || error.message.includes('not found')) {
+                        reject(new Error('Claude CLI not found. Make sure Claude Code is installed globally.'));
+                        return;
+                    }
+                    reject(new Error(stderr || error.message));
+                    return;
+                }
+                const output = stdout.trim();
+                resolve(output || 'Done — no output.');
+            });
 
-        client.sendResult(parts.join(' | '));
-    }
-
-    /**
-     * Sends an unrecognized command to the VOICE AGENT terminal.
-     * v1 limitation: we cannot read terminal output, so we just acknowledge the send.
-     */
-    private handleTerminalCommand(text: string, client: BridgeClient): void {
-        client.sendStatus(`Sending to terminal: ${text}`);
-        this.terminalManager.sendCommand(text);
-        client.sendResult(`Command sent to terminal: ${text}`);
+            // Send periodic status updates while Claude is working
+            const statusTimer = setInterval(() => {
+                if (this.isProcessing) {
+                    client.sendStatus('Still thinking...');
+                }
+            }, 10_000);
+        });
     }
 
     dispose(): void {
-        this.terminalManager.dispose();
+        if (this.activeProcess) {
+            this.activeProcess.kill();
+        }
     }
 }
