@@ -5,12 +5,11 @@ import { spawn, ChildProcess } from 'child_process';
 const TERMINAL_NAME = 'VOICE AGENT';
 
 export class CommandHandler {
-    private claudeProcess: ChildProcess | undefined;
     private terminal: vscode.Terminal | undefined;
     private writeEmitter = new vscode.EventEmitter<string>();
-    private client: BridgeClient | undefined;
-    private currentResponse = '';
-    private responseTimer: ReturnType<typeof setTimeout> | undefined;
+    private isProcessing = false;
+    private activeProcess: ChildProcess | undefined;
+    private conversationStarted = false;
     private disposables: vscode.Disposable[] = [];
 
     constructor() {
@@ -18,135 +17,134 @@ export class CommandHandler {
             vscode.window.onDidCloseTerminal((closed) => {
                 if (closed === this.terminal) {
                     this.terminal = undefined;
-                    this.claudeProcess?.kill();
-                    this.claudeProcess = undefined;
                 }
             })
         );
     }
 
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
-        this.client = client;
-
-        // Start Claude process if not running
-        if (!this.claudeProcess || this.claudeProcess.killed) {
-            this.startClaude();
+        if (this.isProcessing) {
+            client.sendStatus('Still working on the last command...');
+            return;
         }
 
-        // Show the terminal
+        // Ensure terminal exists
+        this.ensureTerminal();
         this.terminal?.show(true);
 
-        // Display what the user said
-        this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n\r\n`);
+        this.isProcessing = true;
+
+        // Show user message in terminal
+        this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
+        this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
 
-        // Reset response tracking
-        this.currentResponse = '';
-        if (this.responseTimer) clearTimeout(this.responseTimer);
-
-        // Send the text to Claude's stdin
-        if (this.claudeProcess?.stdin?.writable) {
-            this.claudeProcess.stdin.write(text + '\n');
-        } else {
-            client.sendResult('Error: Claude process not ready. Try again.');
+        try {
+            const response = await this.runClaude(text, client);
+            // Show response in terminal
+            this.writeEmitter.fire(`\x1b[36m🤖 Claude:\x1b[0m\r\n`);
+            this.writeEmitter.fire(response.replace(/\n/g, '\r\n'));
+            this.writeEmitter.fire('\r\n');
+            // Send final response to phone
+            client.sendResult(response);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            this.writeEmitter.fire(`\r\n\x1b[31m❌ Error: ${msg}\x1b[0m\r\n`);
+            client.sendResult(`Error: ${msg}`);
+        } finally {
+            this.isProcessing = false;
+            this.activeProcess = undefined;
         }
     }
 
-    private startClaude(): void {
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+    private runClaude(prompt: string, client: BridgeClient): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
 
-        const claudePath = process.platform === 'win32'
-            ? `${process.env.APPDATA}\\npm\\claude.cmd`
-            : 'claude';
+            const claudePath = process.platform === 'win32'
+                ? `${process.env.APPDATA}\\npm\\claude.cmd`
+                : 'claude';
 
-        // Spawn claude in interactive mode with dangerously-skip-permissions
-        this.claudeProcess = spawn(claudePath, ['--dangerously-skip-permissions'], {
-            cwd,
-            shell: true,
-            env: { ...process.env, FORCE_COLOR: '0' },
+            const args = ['--print', '--dangerously-skip-permissions'];
+            if (this.conversationStarted) {
+                args.push('--continue');
+            }
+
+            this.activeProcess = spawn(claudePath, args, {
+                cwd,
+                shell: true,
+                env: { ...process.env },
+            });
+
+            let fullOutput = '';
+
+            this.activeProcess.stdout?.on('data', (data: Buffer) => {
+                const chunk = data.toString();
+                fullOutput += chunk;
+                // Stream to terminal
+                this.writeEmitter.fire(chunk.replace(/\n/g, '\r\n'));
+                // Stream to phone
+                client.sendStatus(fullOutput);
+            });
+
+            this.activeProcess.stderr?.on('data', (data: Buffer) => {
+                const err = data.toString().trim();
+                if (err.length > 0) {
+                    console.error('[Matthews Terminal] stderr:', err);
+                }
+            });
+
+            // Write prompt via stdin to avoid shell escaping issues
+            this.activeProcess.stdin?.write(prompt);
+            this.activeProcess.stdin?.end();
+
+            this.activeProcess.on('error', (err) => {
+                if (err.message.includes('ENOENT')) {
+                    reject(new Error('Claude CLI not found. Install: npm install -g @anthropic-ai/claude-code'));
+                } else {
+                    reject(err);
+                }
+            });
+
+            this.activeProcess.on('close', (code) => {
+                this.conversationStarted = true;
+                if (code === 0) {
+                    resolve(fullOutput.trim() || 'Done.');
+                } else {
+                    reject(new Error(fullOutput.trim() || `Claude exited with code ${code}`));
+                }
+            });
+
+            // Timeout after 3 minutes
+            setTimeout(() => {
+                if (this.isProcessing && this.activeProcess) {
+                    this.activeProcess.kill();
+                    reject(new Error('Timed out after 3 minutes.'));
+                }
+            }, 180_000);
         });
+    }
 
-        // Create a pseudoterminal that shows Claude's output in VS Code
-        const writeEmitter = this.writeEmitter;
+    private ensureTerminal(): void {
+        if (this.terminal) return;
 
         const pty: vscode.Pseudoterminal = {
-            onDidWrite: writeEmitter.event,
+            onDidWrite: this.writeEmitter.event,
             open: () => {
-                writeEmitter.fire('\x1b[36mMatthews Terminal — Voice Agent\x1b[0m\r\n');
-                writeEmitter.fire('Speak from your phone to send commands to Claude.\r\n\r\n');
+                this.writeEmitter.fire('\x1b[36mMatthews Terminal — Voice Agent\x1b[0m\r\n');
+                this.writeEmitter.fire('\x1b[2mSpeak from your phone to send commands to Claude.\x1b[0m\r\n');
             },
             close: () => {
-                this.claudeProcess?.kill();
-                this.claudeProcess = undefined;
-            },
-            handleInput: (data: string) => {
-                // Allow typing directly in the terminal too
-                if (data === '\r') {
-                    // Enter key — handled by Claude's stdin
-                } else if (this.claudeProcess?.stdin?.writable) {
-                    this.claudeProcess.stdin.write(data);
-                    writeEmitter.fire(data);
-                }
+                this.activeProcess?.kill();
             },
         };
 
-        // Close existing terminal
-        if (this.terminal) {
-            this.terminal.dispose();
-        }
-
-        this.terminal = vscode.window.createTerminal({
-            name: TERMINAL_NAME,
-            pty,
-        });
-        this.terminal.show(true);
-
-        // Capture stdout — display in terminal AND send to phone
-        this.claudeProcess.stdout?.on('data', (data: Buffer) => {
-            const text = data.toString();
-            // Show in VS Code terminal (convert \n to \r\n for terminal)
-            writeEmitter.fire(text.replace(/\n/g, '\r\n'));
-
-            // Accumulate response for phone
-            this.currentResponse += text;
-
-            // Send streaming update to phone
-            this.client?.sendStatus(this.cleanAnsi(this.currentResponse));
-
-            // After Claude stops outputting for 1.5s, treat it as the final response
-            if (this.responseTimer) clearTimeout(this.responseTimer);
-            this.responseTimer = setTimeout(() => {
-                if (this.currentResponse.trim()) {
-                    this.client?.sendResult(this.cleanAnsi(this.currentResponse.trim()));
-                    this.currentResponse = '';
-                }
-            }, 1500);
-        });
-
-        this.claudeProcess.stderr?.on('data', (data: Buffer) => {
-            const err = data.toString();
-            writeEmitter.fire(`\x1b[31m${err.replace(/\n/g, '\r\n')}\x1b[0m`);
-        });
-
-        this.claudeProcess.on('error', (err) => {
-            writeEmitter.fire(`\r\n\x1b[31mError: ${err.message}\x1b[0m\r\n`);
-            this.client?.sendResult(`Error: ${err.message}`);
-        });
-
-        this.claudeProcess.on('close', (code) => {
-            writeEmitter.fire(`\r\n\x1b[33mClaude exited (code ${code})\x1b[0m\r\n`);
-        });
-    }
-
-    // Strip ANSI escape codes for clean text on phone
-    private cleanAnsi(text: string): string {
-        return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r/g, '');
+        this.terminal = vscode.window.createTerminal({ name: TERMINAL_NAME, pty });
     }
 
     dispose(): void {
-        if (this.responseTimer) clearTimeout(this.responseTimer);
-        this.claudeProcess?.kill();
+        this.activeProcess?.kill();
         this.terminal?.dispose();
         this.writeEmitter.dispose();
         for (const d of this.disposables) d.dispose();
