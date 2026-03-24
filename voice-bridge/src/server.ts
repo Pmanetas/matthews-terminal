@@ -5,6 +5,51 @@ import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// ── ElevenLabs TTS ────────────────────────────────────────────────
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // default: Adam
+
+async function generateSpeech(text: string): Promise<Buffer | null> {
+  if (!ELEVENLABS_API_KEY) {
+    console.log(`[${new Date().toISOString()}] ElevenLabs: No API key, skipping TTS`);
+    return null;
+  }
+
+  // Trim text for TTS — don't read code blocks aloud
+  const ttsText = text
+    .replace(/```[\s\S]*?```/g, '... code block omitted ...')
+    .slice(0, 2000); // ElevenLabs has char limits
+
+  try {
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'xi-api-key': ELEVENLABS_API_KEY,
+      },
+      body: JSON.stringify({
+        text: ttsText,
+        model_id: 'eleven_turbo_v2_5',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[${new Date().toISOString()}] ElevenLabs error: ${res.status} ${res.statusText}`);
+      return null;
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] ElevenLabs error:`, err);
+    return null;
+  }
+}
+
 // ── Types ──────────────────────────────────────────────────────────
 
 interface BridgeState {
@@ -161,7 +206,18 @@ wss.on('connection', (ws) => {
       state.lastOutputSummary = msg.text;
 
       const phone = getClient('phone');
-      if (phone) sendJSON(phone, { type: 'result', text: msg.text });
+      if (phone) {
+        sendJSON(phone, { type: 'result', text: msg.text });
+
+        // Generate TTS audio and send to phone
+        generateSpeech(msg.text).then((audioBuffer) => {
+          if (audioBuffer && phone.readyState === WebSocket.OPEN) {
+            const base64 = audioBuffer.toString('base64');
+            sendJSON(phone, { type: 'audio', data: base64 });
+            console.log(`[${timestamp()}] Sent TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
+          }
+        });
+      }
       return;
     }
 

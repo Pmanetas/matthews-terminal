@@ -61,6 +61,18 @@ export function useBridge() {
               }
               return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
             })
+          } else if (data.type === 'audio' && data.data) {
+            // Play ElevenLabs audio
+            try {
+              const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
+              const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
+              const url = URL.createObjectURL(blob)
+              const audio = new Audio(url)
+              audio.play().catch(() => {})
+              audio.onended = () => URL.revokeObjectURL(url)
+            } catch {
+              // audio playback failed silently
+            }
           }
         } catch {
           // ignore malformed messages
