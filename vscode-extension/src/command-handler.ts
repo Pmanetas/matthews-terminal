@@ -49,8 +49,9 @@ export class CommandHandler {
                 ? `${process.env.APPDATA}\\npm\\claude.cmd`
                 : 'claude';
 
-            // Build args: --print for non-interactive, --continue to keep conversation
-            const args = ['--print'];
+            // Build args: --print for non-interactive, --dangerously-skip-permissions so it can
+            // actually create/edit files without prompting, --continue to keep conversation
+            const args = ['--print', '--dangerously-skip-permissions'];
             if (this.conversationStarted) {
                 args.push('--continue');
             }
