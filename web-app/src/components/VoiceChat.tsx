@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -18,22 +18,17 @@ function stopAndReleaseAudio() {
 }
 
 export function VoiceChat() {
-  // Auto-start listening when audio finishes playing
-  const autoListenRef = useRef<(() => void) | null>(null)
+  // Track when audio just finished so we can prompt user to tap mic
+  const [audioJustFinished, setAudioJustFinished] = useState(false)
 
   const { status, messages, sendCommand } = useBridge(() => {
-    // Called when ElevenLabs audio finishes — release audio then auto-listen
+    // Called when ElevenLabs audio finishes — release audio and prompt user
     stopAndReleaseAudio()
-    setTimeout(() => {
-      autoListenRef.current?.()
-    }, 500) // delay to let iOS release mic hardware
+    setAudioJustFinished(true)
   })
 
   const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported } =
     useVoice()
-
-  // Store startListening in ref so the bridge callback can use it
-  autoListenRef.current = startListening
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -45,6 +40,11 @@ export function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Clear prompt when user starts listening
+  useEffect(() => {
+    if (isListening) setAudioJustFinished(false)
+  }, [isListening])
+
   // Send transcript when done listening
   useEffect(() => {
     if (!isListening && transcript) sendCommand(transcript)
@@ -53,11 +53,12 @@ export function VoiceChat() {
   const handleMicClick = () => {
     // Fully release audio so mic can access the hardware
     stopAndReleaseAudio()
+    setAudioJustFinished(false)
     if (isListening) {
       stopListening()
     } else {
-      // Small delay after releasing audio to let iOS free the mic
-      setTimeout(() => startListening(), 200)
+      // Start immediately — must stay in user gesture context for iOS
+      startListening()
     }
   }
 
@@ -140,10 +141,11 @@ export function VoiceChat() {
 
       {/* Bottom controls */}
       <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-4 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B] to-transparent">
-        {/* Listening status */}
+        {/* Listening / prompt status */}
         <AnimatePresence>
-          {isListening && (
+          {isListening ? (
             <motion.p
+              key="listening"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
@@ -151,7 +153,17 @@ export function VoiceChat() {
             >
               {transcript ? `"${transcript}"` : 'Listening...'}
             </motion.p>
-          )}
+          ) : audioJustFinished ? (
+            <motion.p
+              key="tap-prompt"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="text-xs text-violet-300/70"
+            >
+              Tap to respond
+            </motion.p>
+          ) : null}
         </AnimatePresence>
 
         <div className="flex items-center gap-4">
@@ -175,7 +187,9 @@ export function VoiceChat() {
               'relative flex items-center justify-center w-14 h-14 rounded-full transition-all duration-500',
               isListening
                 ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.5)]'
-                : 'bg-white/10 hover:bg-white/15 border border-white/10',
+                : audioJustFinished
+                  ? 'bg-violet-500/30 shadow-[0_0_30px_rgba(139,92,246,0.3)] border border-violet-400/30 animate-pulse'
+                  : 'bg-white/10 hover:bg-white/15 border border-white/10',
               !supported && 'opacity-30 cursor-not-allowed',
             )}
           >
