@@ -5,12 +5,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
     ImageIcon,
-    FileUp,
     MonitorIcon,
-    CircleUserRound,
-    ArrowUpIcon,
     Paperclip,
-    PlusIcon,
     SendIcon,
     XIcon,
     LoaderIcon,
@@ -160,7 +156,7 @@ export function AnimatedAIChat({
     const [_isPending, startTransition] = useTransition();
     const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
     const [showCommandPalette, setShowCommandPalette] = useState(false);
-    const [recentCommand, setRecentCommand] = useState<string | null>(null);
+    const [, setRecentCommand] = useState<string | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: 60,
