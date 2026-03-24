@@ -8,7 +8,7 @@ let audioUnlocked = false
 // ── Web Audio API analyser for sphere visualisation ──────────────
 let audioContext: AudioContext | null = null
 let analyser: AnalyserNode | null = null
-let analyserData: Uint8Array | null = null
+let analyserData: Uint8Array<ArrayBuffer> | null = null
 let sourceConnected = false
 
 function ensureAnalyser() {
@@ -18,7 +18,7 @@ function ensureAnalyser() {
     analyser = audioContext.createAnalyser()
     analyser.fftSize = 256
     analyser.smoothingTimeConstant = 0.7
-    analyserData = new Uint8Array(analyser.frequencyBinCount as number)
+    analyserData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
     if (!sourceConnected) {
       const source = audioContext.createMediaElementSource(sharedAudio)
       source.connect(analyser)
