@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0A0A0B;
+  color: #fff;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); }
+
+/* ================================================================= */
+/*  Geometric Sphere — all transitions, no animation restarts         */
+/* ================================================================= */
+
+.sphere-wrapper {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+}
+
+/* ---- Core glow ---- */
+.sphere-core-light {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
+  filter: blur(200px);
+  box-shadow:
+    0 0 100px 30px rgba(59, 130, 246, 0.15),
+    0 0 200px 50px rgba(139, 92, 246, 0.1);
+  animation: coreGlow 25s ease-in-out infinite;
+  /* Smooth transitions for active state changes */
+  transition: box-shadow 1.5s ease, filter 1.5s ease;
+}
+
+.sphere-active .sphere-core-light {
+  box-shadow:
+    0 0 100px 40px rgba(59, 130, 246, 0.35),
+    0 0 200px 60px rgba(139, 92, 246, 0.25);
+  filter: blur(180px);
+}
+
+/* ---- Spinning wireframe container ---- */
+.sphere-spin-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  /* Tilt from mouse follows via CSS vars (set by JS rAF) */
+  transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  /* Always spinning — never change this animation, so it never restarts */
+  animation: sphereRotate 240s linear infinite;
+}
+
+/* When active, we layer on a SECOND faster rotation via the wrapper's perspective tilt.
+   We do NOT change the animation-duration — that would restart it.
+   Instead, we add a subtle CSS scale pulse. */
+.sphere-active .sphere-spin-container {
+  animation: sphereRotate 240s linear infinite, sphereBreathing 3s ease-in-out infinite;
+}
+
+/* ---- Wireframe rings ---- */
+.sphere-wireframe-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid rgba(139, 92, 246, 0.75);
+  box-shadow:
+    0 0 70px rgba(139, 92, 246, 0.15),
+    inset 0 0 70px rgba(139, 92, 246, 0.08);
+  transform-style: preserve-3d;
+  /* Smooth glow transition */
+  transition: border-color 1.5s ease, box-shadow 1.5s ease;
+}
+
+.sphere-active .sphere-wireframe-line {
+  border-color: rgba(139, 92, 246, 1);
+  box-shadow:
+    0 0 120px rgba(139, 92, 246, 0.3),
+    inset 0 0 120px rgba(139, 92, 246, 0.15);
+}
+
+/* ---- Pulse rings ---- */
+.sphere-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120%;
+  height: 120%;
+  transform: translate(-50%, -50%) scale(0.8);
+  border-radius: 50%;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.sphere-pulse-ring-delayed {
+  animation-delay: 1s;
+}
+
+.sphere-active .sphere-pulse-ring {
+  opacity: 1;
+  animation: spherePulse 2.5s ease-out infinite;
+}
+
+.sphere-active .sphere-pulse-ring-delayed {
+  animation: spherePulse 2.5s ease-out 1.25s infinite;
+}
+
+/* ---- Keyframes (never changed, never restarted) ---- */
+@keyframes sphereRotate {
+  from { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) rotateZ(0deg); }
+  to   { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) rotateZ(360deg); }
+}
+
+@keyframes sphereBreathing {
+  0%, 100% { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(1); }
+  50%      { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) scale(1.06); }
+}
+
+@keyframes coreGlow {
+  0%, 100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0.9; }
+  50%      { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+}
+
+@keyframes spherePulse {
+  0%   { transform: translate(-50%, -50%) scale(0.85); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}

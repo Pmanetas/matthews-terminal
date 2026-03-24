@@ -1,0 +1,45 @@
+{
+  "name": "matthews-terminal",
+  "displayName": "Matthews Terminal - Voice Bridge",
+  "description": "Voice bridge extension for Matthews Terminal",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "matthewsTerminal.connect",
+        "title": "Matthews Terminal: Connect to Voice Bridge"
+      },
+      {
+        "command": "matthewsTerminal.disconnect",
+        "title": "Matthews Terminal: Disconnect from Voice Bridge"
+      }
+    ],
+    "configuration": {
+      "title": "Matthews Terminal",
+      "properties": {
+        "matthewsTerminal.bridgeUrl": {
+          "type": "string",
+          "default": "ws://localhost:4800",
+          "description": "WebSocket URL of the voice bridge server (e.g. wss://your-app.onrender.com)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
