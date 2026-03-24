@@ -1,6 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectionStatus, Message } from '@/types'
 
+// Persistent audio element — unlocked on first user tap so autoplay works on mobile
+const sharedAudio = typeof window !== 'undefined' ? new Audio() : null
+let audioUnlocked = false
+
+function unlockAudio() {
+  if (audioUnlocked || !sharedAudio) return
+  // Play a silent buffer to unlock audio on iOS
+  sharedAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQAAAAAAAAAAaC0MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=='
+  sharedAudio.play().then(() => { audioUnlocked = true }).catch(() => {})
+}
+
+// Call this on any user interaction
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', unlockAudio, { once: true })
+  document.addEventListener('click', unlockAudio, { once: true })
+}
+
 // Auto-detect: if served from the bridge, use same host. Otherwise use env var or localhost.
 function getWsUrl(): string {
   if (import.meta.env.VITE_BRIDGE_URL) return import.meta.env.VITE_BRIDGE_URL
@@ -62,16 +79,18 @@ export function useBridge() {
               return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
             })
           } else if (data.type === 'audio' && data.data) {
-            // Play ElevenLabs audio
+            // Play ElevenLabs audio using the unlocked shared element
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
               const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
-              const audio = new Audio(url)
-              audio.play().catch(() => {})
-              audio.onended = () => URL.revokeObjectURL(url)
-            } catch {
-              // audio playback failed silently
+              if (sharedAudio) {
+                sharedAudio.src = url
+                sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))
+                sharedAudio.onended = () => URL.revokeObjectURL(url)
+              }
+            } catch (e) {
+              console.error('[Audio] Error:', e)
             }
           }
         } catch {

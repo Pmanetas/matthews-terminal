@@ -29,7 +29,7 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
       },
       body: JSON.stringify({
         text: ttsText,
-        model_id: 'eleven_turbo_v2_5',
+        model_id: 'eleven_multilingual_v2',
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.75,
@@ -38,7 +38,8 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
     });
 
     if (!res.ok) {
-      console.error(`[${new Date().toISOString()}] ElevenLabs error: ${res.status} ${res.statusText}`);
+      const errBody = await res.text().catch(() => '');
+      console.error(`[${new Date().toISOString()}] ElevenLabs error: ${res.status} ${res.statusText} - ${errBody}`);
       return null;
     }
 
