@@ -75,15 +75,24 @@ export function useVoice() {
 
     recognition.onend = () => {
       setIsListening(false)
+      recognitionRef.current = null
     }
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: { error: string }) => {
+      console.error('[Voice] Speech recognition error:', event.error)
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    setTranscript('')
+    setIsListening(true)
+
+    try {
+      recognition.start()
+    } catch (err) {
+      console.error('[Voice] Failed to start recognition:', err)
       setIsListening(false)
     }
-
-    recognition.start()
-    setIsListening(true)
-    setTranscript('')
   }, [])
 
   const stopListening = useCallback(() => {
