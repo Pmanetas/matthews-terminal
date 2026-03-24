@@ -42,12 +42,17 @@ export class CommandHandler {
 
             // Escape the prompt for shell safety
             const escaped = prompt.replace(/"/g, '\\"');
-            const command = `claude --print "${escaped}"`;
+            // Use full path on Windows since extension env may not have npm globals in PATH
+            const claudeBin = process.platform === 'win32'
+                ? `"${process.env.APPDATA}\\npm\\claude.cmd"`
+                : 'claude';
+            const command = `${claudeBin} --print "${escaped}"`;
 
             this.activeProcess = exec(command, {
                 cwd,
                 timeout: 120_000, // 2 min timeout
                 maxBuffer: 1024 * 1024, // 1MB output buffer
+                shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh',
             }, (error, stdout, stderr) => {
                 clearInterval(statusTimer);
 
