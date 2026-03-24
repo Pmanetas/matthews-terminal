@@ -4,15 +4,34 @@ import { Mic, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge } from '@/hooks/useBridge'
+import { useBridge, sharedAudio } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
+// Stop any playing audio (call before starting mic)
+function stopAudio() {
+  if (sharedAudio && !sharedAudio.paused) {
+    sharedAudio.pause()
+    sharedAudio.currentTime = 0
+  }
+}
+
 export function VoiceChat() {
-  const { status, messages, sendCommand } = useBridge()
-  const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, speak, supported } =
+  // Auto-start listening when audio finishes playing
+  const autoListenRef = useRef<(() => void) | null>(null)
+
+  const { status, messages, sendCommand } = useBridge(() => {
+    // Called when ElevenLabs audio finishes — auto-start listening
+    setTimeout(() => {
+      autoListenRef.current?.()
+    }, 300) // small delay to avoid mic picking up tail end of audio
+  })
+
+  const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported } =
     useVoice()
 
-  const lastMessageCount = useRef(0)
+  // Store startListening in ref so the bridge callback can use it
+  autoListenRef.current = startListening
+
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   const isProcessing = messages.length > 0 && messages[messages.length - 1]?.role === 'user'
@@ -23,21 +42,14 @@ export function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Auto-speak assistant responses
-  useEffect(() => {
-    if (ttsEnabled && messages.length > lastMessageCount.current) {
-      const newest = messages[messages.length - 1]
-      if (newest?.role === 'assistant' && !newest.streaming) speak(newest.text)
-    }
-    lastMessageCount.current = messages.length
-  }, [messages, ttsEnabled, speak])
-
   // Send transcript when done listening
   useEffect(() => {
     if (!isListening && transcript) sendCommand(transcript)
   }, [isListening, transcript, sendCommand])
 
   const handleMicClick = () => {
+    // Stop any playing audio before toggling mic
+    stopAudio()
     if (isListening) stopListening()
     else startListening()
   }

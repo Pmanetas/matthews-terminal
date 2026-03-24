@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectionStatus, Message } from '@/types'
 
 // Persistent audio element — unlocked on first user tap so autoplay works on mobile
-const sharedAudio = typeof window !== 'undefined' ? new Audio() : null
+export const sharedAudio = typeof window !== 'undefined' ? new Audio() : null
 let audioUnlocked = false
 
 function unlockAudio() {
@@ -27,11 +27,13 @@ function getWsUrl(): string {
 const WS_URL = getWsUrl()
 const RECONNECT_INTERVAL = 3000
 
-export function useBridge() {
+export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [messages, setMessages] = useState<Message[]>([])
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onAudioDoneRef = useRef(onAudioDone)
+  onAudioDoneRef.current = onAudioDone
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN ||
@@ -85,9 +87,14 @@ export function useBridge() {
               const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
               if (sharedAudio) {
+                sharedAudio.volume = 1.0
                 sharedAudio.src = url
                 sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))
-                sharedAudio.onended = () => URL.revokeObjectURL(url)
+                sharedAudio.onended = () => {
+                  URL.revokeObjectURL(url)
+                  // Auto-restart listening after Claude finishes speaking
+                  onAudioDoneRef.current?.()
+                }
               }
             } catch (e) {
               console.error('[Audio] Error:', e)
