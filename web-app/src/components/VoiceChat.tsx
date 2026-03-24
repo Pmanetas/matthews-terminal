@@ -13,11 +13,9 @@ export function VoiceChat() {
     useVoice()
 
   const [mode, setMode] = useState<'voice' | 'text'>('voice')
-  const [showDemo, setShowDemo] = useState(false)
   const lastMessageCount = useRef(0)
 
   const isProcessing = messages.length > 0 && messages[messages.length - 1]?.role === 'user'
-  const latestResponse = [...messages].reverse().find((m) => m.role === 'assistant')
 
   // Auto-speak assistant responses
   useEffect(() => {
@@ -44,7 +42,7 @@ export function VoiceChat() {
     status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
   // Sphere is active when listening, processing, or demo mode
-  const sphereActive = isListening || isProcessing || showDemo
+  const sphereActive = isListening || isProcessing
 
   // ---- Text mode ----
   if (mode === 'text') {
@@ -96,7 +94,7 @@ export function VoiceChat() {
 
   // ---- Voice mode ----
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-[#0A0A0B] text-white relative overflow-hidden">
+    <div className="min-h-[100dvh] flex flex-col items-center bg-[#0A0A0B] text-white relative overflow-hidden">
       {/* Background glow */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-[128px] animate-pulse" />
@@ -110,6 +108,7 @@ export function VoiceChat() {
           <span className={cn('h-2 w-2 rounded-full', statusColor, status === 'connecting' && 'animate-pulse')} />
           <span className="text-xs text-white/30">{statusLabel}</span>
         </div>
+        <h1 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-white/90 to-white/60">Matthews Terminal</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setTtsEnabled(!ttsEnabled)}
@@ -130,22 +129,22 @@ export function VoiceChat() {
       </div>
 
       {/* Sphere + status */}
-      <div className="relative z-10 flex flex-col items-center gap-8">
+      <div className="relative z-10 flex flex-col items-center gap-4 mt-16 pt-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
-          <GeometricSphere isActive={sphereActive} size={350} />
+          <GeometricSphere isActive={sphereActive} size={200} />
         </motion.div>
 
         {/* Status text */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1">
           <AnimatePresence mode="wait">
             {isListening ? (
               <motion.p
                 key="listening"
-                className="text-lg font-medium text-violet-300"
+                className="text-sm font-medium text-violet-300"
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
@@ -155,39 +154,29 @@ export function VoiceChat() {
             ) : isProcessing ? (
               <motion.p
                 key="processing"
-                className="text-lg font-medium text-white/60"
+                className="text-sm font-medium text-white/60"
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
               >
                 Thinking...
               </motion.p>
-            ) : latestResponse ? (
-              <motion.p
-                key="response"
-                className="text-sm text-white/50 max-w-md"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-              >
-                {latestResponse.text}
-              </motion.p>
-            ) : (
+            ) : messages.length === 0 ? (
               <motion.p
                 key="idle"
-                className="text-lg font-medium bg-clip-text text-transparent bg-gradient-to-r from-white/60 to-white/30"
+                className="text-sm font-medium bg-clip-text text-transparent bg-gradient-to-r from-white/60 to-white/30"
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
               >
                 Tap to speak
               </motion.p>
-            )}
+            ) : null}
           </AnimatePresence>
 
           {isListening && transcript && (
             <motion.p
-              className="text-sm text-white/40 italic max-w-sm"
+              className="text-xs text-white/40 italic max-w-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
@@ -197,20 +186,31 @@ export function VoiceChat() {
         </div>
       </div>
 
-      {/* Bottom controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col items-center gap-4 pb-10 pt-6">
-        <button
-          onClick={() => setShowDemo(!showDemo)}
-          className={cn(
-            'text-xs px-3 py-1.5 rounded-full border transition-all duration-500',
-            showDemo
-              ? 'border-violet-500/30 bg-violet-500/10 text-violet-300'
-              : 'border-white/10 bg-white/[0.03] text-white/30 hover:text-white/50',
-          )}
-        >
-          {showDemo ? 'Stop Demo' : 'Preview Animation'}
-        </button>
+      {/* Chat log */}
+      {messages.length > 0 && (
+        <div className="relative z-10 flex-1 w-full max-w-lg mx-auto px-4 py-3 overflow-y-auto">
+          <div className="flex flex-col gap-2">
+            {messages.map((msg, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  'text-sm py-2 px-3 rounded-xl max-w-[85%]',
+                  msg.role === 'user'
+                    ? 'self-end bg-violet-500/20 text-white/80 border border-violet-500/10'
+                    : 'self-start bg-white/[0.05] text-white/70 border border-white/[0.06]',
+                )}
+              >
+                {msg.text}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
 
+      {/* Bottom controls */}
+      <div className="relative z-50 flex flex-col items-center gap-4 pb-10 pt-4">
         <motion.button
           onClick={handleMicClick}
           disabled={!supported}
