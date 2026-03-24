@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -71,6 +73,17 @@ app.get('/health', (_req, res) => {
 
 app.get('/state', (_req, res) => {
   res.json(state);
+});
+
+// ── Serve web app (built files from ../web-app/dist) ────────────────
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const webAppDist = path.join(__dirname, '..', '..', 'web-app', 'dist');
+app.use(express.static(webAppDist));
+// SPA fallback — serve index.html for any non-API route
+app.use((req, res, next) => {
+  if (req.path.startsWith('/health') || req.path.startsWith('/state')) return next();
+  res.sendFile(path.join(webAppDist, 'index.html'));
 });
 
 // ── HTTP + WebSocket server ────────────────────────────────────────

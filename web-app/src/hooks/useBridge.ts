@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectionStatus, Message } from '@/types'
 
-// In production, connect to the Render bridge via wss://
-// In dev, fall back to local
-const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'ws://localhost:4800'
-const WS_URL = BRIDGE_URL
+// Auto-detect: if served from the bridge, use same host. Otherwise use env var or localhost.
+function getWsUrl(): string {
+  if (import.meta.env.VITE_BRIDGE_URL) return import.meta.env.VITE_BRIDGE_URL
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${window.location.host}`
+}
+const WS_URL = getWsUrl()
 const RECONNECT_INTERVAL = 3000
 
 export function useBridge() {
