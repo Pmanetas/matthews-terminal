@@ -34,8 +34,7 @@ export function activate(context: vscode.ExtensionContext): void {
         })
     );
 
-    // Auto-connect on activation
-    bridgeClient.connect();
+    // No auto-connect — user picks which window to use via the command
 }
 
 function updateStatusBar(state: ConnectionState): void {
