@@ -14,7 +14,7 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
   }
 
   const form = new FormData();
-  form.append('file', new Blob([audioBuffer], { type: mimeType }), 'audio.webm');
+  form.append('file', new Blob([new Uint8Array(audioBuffer)], { type: mimeType }), 'audio.webm');
   form.append('model', 'whisper-large-v3-turbo');
   form.append('language', 'en');
 
@@ -44,10 +44,17 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
   }
 
   // Trim text for TTS — don't read code blocks aloud, soften ending
-  const ttsText = text
+  let ttsText = text
     .replace(/```[\s\S]*?```/g, '... code block omitted ...')
-    .replace(/[.!]+\s*$/, '')  // Remove trailing periods/exclamation for smoother endings
+    .replace(/[*_#`]/g, '') // Strip markdown formatting
+    .replace(/\n{2,}/g, '. ') // Double newlines → sentence break
+    .replace(/\n/g, ' ') // Single newlines → space
+    .trim()
     .slice(0, 2000); // ElevenLabs has char limits
+  // Ensure text ends with a complete-sounding ending (not cut off)
+  if (ttsText && !/[.!?]$/.test(ttsText)) {
+    ttsText += '.';
+  }
 
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
@@ -98,6 +105,7 @@ interface CommandMessage { type: 'command'; text: string; }
 interface StatusMessage { type: 'status'; text: string; }
 interface ToolStatusMessage { type: 'tool_status'; text: string; }
 interface ResultMessage { type: 'result'; text: string; }
+interface SpeakMessage { type: 'speak'; text: string; }
 interface WorkspaceMessage { type: 'workspace'; data: { workspace: string; repo: string }; }
 
 type BridgeMessage =
@@ -106,6 +114,7 @@ type BridgeMessage =
   | StatusMessage
   | ToolStatusMessage
   | ResultMessage
+  | SpeakMessage
   | WorkspaceMessage;
 
 // ── State ──────────────────────────────────────────────────────────

@@ -131,38 +131,19 @@ export function useBridge(onAudioDone?: () => void) {
         try {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
-            // First, finalize any streaming assistant message above
-            setMessages((prev) => {
-              const lastStreamIdx = prev.findLastIndex((m) => m.role === 'assistant' && m.streaming)
-              if (lastStreamIdx >= 0) {
-                const updated = [...prev]
-                updated[lastStreamIdx] = { ...updated[lastStreamIdx], streaming: false }
-                return [...updated, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
-              }
-              return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
-            })
+            setMessages((prev) => [
+              ...prev,
+              { role: 'tool' as const, text: data.text, timestamp: Date.now() },
+            ])
           } else if (data.type === 'status') {
-            // Streaming text — always update/create at the END of the list
-            setMessages((prev) => {
-              const last = prev[prev.length - 1]
-              // If the very last message is a streaming assistant message, update it in-place
-              if (last && last.role === 'assistant' && last.streaming) {
-                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
-              }
-              // Otherwise (last message is a tool call, user msg, or finalized assistant) — create new streaming message at the end
-              return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
-            })
+            // Intermediate streaming text — don't show on screen (spoken via TTS only)
+            // Just ignore for visual display
           } else if (data.type === 'result') {
-            // Final response: finalize the last streaming message, or add new one
-            setMessages((prev) => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'assistant' && last.streaming) {
-                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
-              }
-              // Find any remaining streaming messages and finalize them
-              const updated = prev.map((m) => m.streaming ? { ...m, streaming: false } : m)
-              return [...updated, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
-            })
+            // Final response — the only visible assistant message
+            setMessages((prev) => [
+              ...prev,
+              { role: 'assistant' as const, text: data.text, timestamp: Date.now() },
+            ])
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { GeometricSphere } from '@/components/GeometricSphere'
+import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
 import { useBridge, sharedAudio, getAudioLevel } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
@@ -27,6 +27,39 @@ function ToolIcon({ text }: { text: string }) {
   return <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
 }
 
+/** Render tool call text with code diff lines highlighted */
+function ToolContent({ text }: { text: string }) {
+  const lines = text.split('\n')
+  if (lines.length === 1) {
+    return <span className="text-xs text-white/50 leading-tight">{text}</span>
+  }
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-xs text-white/50 leading-tight">{lines[0]}</span>
+      {lines.slice(1).map((line, i) => {
+        const trimmed = line.trim()
+        if (trimmed.startsWith('⊖')) {
+          return (
+            <span key={i} className="text-[10px] font-mono text-red-400/70 leading-tight truncate">
+              {trimmed}
+            </span>
+          )
+        }
+        if (trimmed.startsWith('⊕')) {
+          return (
+            <span key={i} className="text-[10px] font-mono text-emerald-400/70 leading-tight truncate">
+              {trimmed}
+            </span>
+          )
+        }
+        return (
+          <span key={i} className="text-xs text-white/40 leading-tight">{trimmed}</span>
+        )
+      })}
+    </div>
+  )
+}
+
 export function VoiceChat() {
   const [pendingMessage, setPendingMessage] = useState('')
   const autoListenRef = useRef<(() => void) | null>(null)
@@ -45,7 +78,10 @@ export function VoiceChat() {
   autoListenRef.current = startListening
 
   const chatEndRef = useRef<HTMLDivElement>(null)
-  const isProcessing = messages.length > 0 && messages[messages.length - 1]?.role === 'user'
+  // Processing = last message is from user OR there are tool messages after the last user message (working)
+  const lastUserIdx = messages.findLastIndex((m) => m.role === 'user')
+  const lastAssistantIdx = messages.findLastIndex((m) => m.role === 'assistant')
+  const isProcessing = lastUserIdx >= 0 && lastUserIdx > lastAssistantIdx
   const sphereActive = isListening || isProcessing
 
   // Auto-scroll chat
@@ -118,7 +154,7 @@ export function VoiceChat() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
-          <GeometricSphere isActive={sphereActive} size={140} getAudioLevel={getAudioLevel} />
+          <VoiceWaveform isActive={sphereActive} size={140} getAudioLevel={getAudioLevel} />
         </motion.div>
         <h1 className="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-white/90 to-white/60 mt-2">
           Matthews Terminal
@@ -149,11 +185,11 @@ export function VoiceChat() {
                     </div>
                   </div>
                 ) : msg.role === 'tool' ? (
-                  <div className="flex items-center gap-2.5 py-1.5 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0">
+                  <div className="flex items-start gap-2.5 py-1.5 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
                       <ToolIcon text={msg.text} />
                     </div>
-                    <span className="text-xs text-white/50 leading-tight">{msg.text}</span>
+                    <ToolContent text={msg.text} />
                   </div>
                 ) : (
                   <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl rounded-bl-md px-4 py-3">
@@ -162,13 +198,6 @@ export function VoiceChat() {
                         <span className="text-[10px] font-bold">M</span>
                       </div>
                       <span className="text-[11px] font-medium text-white/40">Matthew</span>
-                      {msg.streaming && (
-                        <span className="flex gap-0.5 ml-1">
-                          <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </span>
-                      )}
                     </div>
                     <MarkdownMessage text={msg.text} />
                   </div>
