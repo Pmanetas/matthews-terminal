@@ -163,10 +163,23 @@ export function useBridge(onAudioDone?: () => void) {
         try {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
-            setMessages((prev) => [
-              ...prev,
-              { role: 'tool' as const, text: data.text, timestamp: Date.now() },
-            ])
+            setMessages((prev) => {
+              // Collapse repeated tool calls on same file (e.g. 6 edits → "Edited test/index.html (6 changes)")
+              const last = prev[prev.length - 1]
+              if (last && last.role === 'tool') {
+                const lastFirstLine = last.text.split('\n')[0]
+                const newFirstLine = data.text.split('\n')[0]
+                // Same action on same file? Merge with count
+                const lastMatch = lastFirstLine.match(/^(\w+)\s+(.+?)(?:\s+\((\d+) changes\))?$/)
+                const newMatch = newFirstLine.match(/^(\w+)\s+(.+)$/)
+                if (lastMatch && newMatch && lastMatch[1] === newMatch[1] && lastMatch[2] === newMatch[2]) {
+                  const count = parseInt(lastMatch[3] || '1', 10) + 1
+                  const merged = `${newMatch[1]} ${newMatch[2]} (${count} changes)`
+                  return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
+                }
+              }
+              return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
+            })
           } else if (data.type === 'status') {
             // Intermediate streaming text — don't show on screen (spoken via TTS only)
             // Just ignore for visual display
