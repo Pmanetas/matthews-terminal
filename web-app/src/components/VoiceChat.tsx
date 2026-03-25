@@ -27,22 +27,23 @@ function ToolContent({ text }: { text: string }) {
     return <span className="text-xs text-white/50 leading-tight">{text}</span>
   }
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div className="flex flex-col gap-0.5 min-w-0 w-full">
       <span className="text-xs text-white/50 leading-tight">{lines[0]}</span>
       {lines.slice(1).map((line, i) => {
         const trimmed = line.trim()
+        const code = trimmed.replace(/^[⊖⊕]\s*/, '')
         if (trimmed.startsWith('⊖')) {
           return (
-            <span key={i} className="text-[10px] font-mono text-red-400/70 leading-tight truncate">
-              {trimmed}
-            </span>
+            <div key={i} className="bg-red-500/15 border-l-2 border-red-500/50 px-2 py-0.5 rounded-r-sm -mx-1">
+              <span className="text-[10px] font-mono text-red-300/80 leading-tight block truncate">{code}</span>
+            </div>
           )
         }
         if (trimmed.startsWith('⊕')) {
           return (
-            <span key={i} className="text-[10px] font-mono text-emerald-400/70 leading-tight truncate">
-              {trimmed}
-            </span>
+            <div key={i} className="bg-emerald-500/15 border-l-2 border-emerald-500/50 px-2 py-0.5 rounded-r-sm -mx-1">
+              <span className="text-[10px] font-mono text-emerald-300/80 leading-tight block truncate">{code}</span>
+            </div>
           )
         }
         return (
