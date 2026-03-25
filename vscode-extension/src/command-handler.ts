@@ -5,12 +5,13 @@ import * as path from 'path';
 
 const TERMINAL_NAME = 'VOICE AGENT';
 
-const SYSTEM_PROMPT = `You are Matthew, a friendly software engineer assistant. Rules:
-- Respond conversationally in natural sentences — talk like you're chatting with a mate.
+const SYSTEM_PROMPT = `You are Matthew, a friendly software engineer assistant. Your responses are read aloud by text-to-speech. Rules:
+- Talk like you're chatting with a mate — natural, conversational sentences.
 - NEVER use bullet points, numbered lists, dashes, or markdown formatting.
-- Keep responses concise — 2-3 sentences when possible.
-- When describing code actions, speak naturally: "I just updated the function" not "Modified file.ts line 42".
-- You're speaking out loud — your response will be read by text-to-speech, so write how you'd actually talk.`;
+- CRITICAL: Narrate what you're doing as you go. Before each action, say a short sentence about what you're about to do. For example: "Let me read the file first" then read it, then "Alright I can see the issue, let me fix that up" then edit it, then "Done, here's what I changed". This creates a natural flow between your actions.
+- Keep each narration line short — one sentence, like you're thinking out loud.
+- After finishing all your work, give a brief summary of what you did.
+- Speak naturally: "I'll update the background colour" not "Modified file.ts line 42".`;
 
 export class CommandHandler {
     private terminal: vscode.Terminal | undefined;
@@ -21,7 +22,6 @@ export class CommandHandler {
     private disposables: vscode.Disposable[] = [];
     private streamingText = '';
     private streamThrottleTimer: ReturnType<typeof setTimeout> | undefined;
-    private narrationBuffer = '';  // Accumulates tool descriptions to speak with next text block
 
     constructor() {
         this.disposables.push(
@@ -44,7 +44,6 @@ export class CommandHandler {
 
         this.isProcessing = true;
         this.streamingText = '';
-        this.narrationBuffer = '';
         this.lastFlushedLength = 0;
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
@@ -172,31 +171,15 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, speak it with ElevenLabs (batched with any pending tool narration), then reset */
+    /** Flush text to phone, speak it with ElevenLabs, then reset */
     private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
         if (text.length > 15) {
-            // Combine any pending tool narration with this text block
-            const toSpeak = this.narrationBuffer
-                ? this.narrationBuffer + '... ' + text
-                : text;
-            client.sendSpeak(toSpeak);
-            this.narrationBuffer = '';
+            client.sendSpeak(text);
         }
         this.streamingText = '';
         this.lastFlushedLength = 0;
-    }
-
-    /** Add a tool description to narration buffer (spoken with next text block) */
-    private bufferToolNarration(description: string): void {
-        // Keep it short for speech — just the action, skip file paths
-        const short = description.split('\n')[0]; // First line only (no diff lines)
-        if (this.narrationBuffer) {
-            this.narrationBuffer += ', then ' + short.toLowerCase();
-        } else {
-            this.narrationBuffer = short;
-        }
     }
 
     /** Flush every 80 chars OR after 150ms of quiet — whichever comes first */
@@ -244,7 +227,6 @@ export class CommandHandler {
                     const msg = this.describeToolCall(block);
                     this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
                     client.sendToolStatus(msg);
-                    this.bufferToolNarration(msg);
                 }
             }
         } else if (event.type === 'content_block_delta') {
@@ -261,13 +243,11 @@ export class CommandHandler {
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
-            this.bufferToolNarration(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
             this.flushAndSpeak(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
-            this.bufferToolNarration(msg);
         } else if (event.type === 'tool_result') {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
