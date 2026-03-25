@@ -19,6 +19,8 @@ export class CommandHandler {
     private activeProcess: ChildProcess | undefined;
     private conversationStarted = false;
     private disposables: vscode.Disposable[] = [];
+    private streamingText = '';
+    private streamThrottleTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor() {
         this.disposables.push(
@@ -40,6 +42,7 @@ export class CommandHandler {
         this.terminal?.show(false);
 
         this.isProcessing = true;
+        this.streamingText = '';
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -149,13 +152,23 @@ export class CommandHandler {
                 }
             });
 
-            setTimeout(() => {
-                if (this.isProcessing && this.activeProcess) {
-                    this.activeProcess.kill();
-                    reject(new Error('Timed out after 3 minutes.'));
-                }
-            }, 180_000);
+            // No timeout — let Claude run as long as it needs
         });
+    }
+
+    /** Send accumulated streaming text to phone (throttled to avoid flooding) */
+    private flushStreamingText(client: BridgeClient): void {
+        if (this.streamingText.trim()) {
+            client.sendStatus(this.streamingText);
+        }
+    }
+
+    private scheduleStreamFlush(client: BridgeClient): void {
+        if (this.streamThrottleTimer) return;
+        this.streamThrottleTimer = setTimeout(() => {
+            this.streamThrottleTimer = undefined;
+            this.flushStreamingText(client);
+        }, 200); // Send updates to phone every 200ms
     }
 
     private handleStreamEvent(
@@ -167,9 +180,12 @@ export class CommandHandler {
             for (const block of event.message.content) {
                 if (block.type === 'text') {
                     onText(block.text);
+                    this.streamingText += block.text;
                     this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
-                    client.sendStatus(block.text);
+                    this.flushStreamingText(client);
                 } else if (block.type === 'tool_use') {
+                    // Flush any pending text before showing tool call
+                    this.flushStreamingText(client);
                     const msg = this.describeToolCall(block);
                     this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
                     client.sendToolStatus(msg);
@@ -178,52 +194,92 @@ export class CommandHandler {
         } else if (event.type === 'content_block_delta') {
             if (event.delta?.type === 'text_delta' && event.delta.text) {
                 onText(event.delta.text);
+                this.streamingText += event.delta.text;
                 this.writeEmitter.fire(`\x1b[36m${event.delta.text.replace(/\n/g, '\r\n')}\x1b[0m`);
+                // Stream to phone with throttling
+                this.scheduleStreamFlush(client);
             }
         } else if (event.type === 'result') {
-            // Skip — text already accumulated from streaming, don't duplicate
+            // Flush final text
+            if (this.streamThrottleTimer) {
+                clearTimeout(this.streamThrottleTimer);
+                this.streamThrottleTimer = undefined;
+            }
+            this.flushStreamingText(client);
         } else if (event.type === 'system' && event.subtype === 'tool_use') {
+            this.flushStreamingText(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
+            this.flushStreamingText(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
         } else if (event.type === 'tool_result') {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
-            const preview = output.length > 150 ? output.slice(0, 150) + '...' : output;
+            const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
             this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
+            // Reset streaming text after tool results so next text block is fresh
+            this.streamingText = '';
         }
     }
 
     /**
-     * Describe tool calls in natural language — like Matthew is talking
+     * Describe tool calls in natural language with detail
      */
     private describeToolCall(block: any): string {
         const toolName = block.name || block.tool_name || 'tool';
         const input = block.input || {};
 
-        const fileName = input.file_path ? path.basename(input.file_path) : 'a file';
+        const filePath = input.file_path || '';
+        const fileName = filePath ? path.basename(filePath) : '';
+        const dirName = filePath ? path.basename(path.dirname(filePath)) : '';
+        const shortPath = fileName ? (dirName ? `${dirName}/${fileName}` : fileName) : 'a file';
 
         switch (toolName) {
-            case 'Read':
-                return `I'm reading ${fileName}...`;
-            case 'Edit':
-                return `I'm making some changes to ${fileName}...`;
+            case 'Read': {
+                let msg = `Reading ${shortPath}`;
+                if (input.offset) msg += ` from line ${input.offset}`;
+                if (input.limit) msg += ` (${input.limit} lines)`;
+                return msg;
+            }
+            case 'Edit': {
+                let msg = `Editing ${shortPath}`;
+                if (input.old_string) {
+                    const preview = input.old_string.trim().split('\n')[0];
+                    const short = preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
+                    msg += ` — changing "${short}"`;
+                }
+                return msg;
+            }
             case 'Write':
-                return `I'm creating ${fileName}...`;
+                return `Creating ${shortPath}`;
             case 'Bash': {
                 const cmd = (input.command || '').trim();
-                const short = cmd.length > 60 ? cmd.slice(0, 60) + '...' : cmd;
-                return `I'm running a command — ${short}`;
+                const short = cmd.length > 80 ? cmd.slice(0, 80) + '...' : cmd;
+                return `Running: ${short}`;
             }
             case 'Glob':
-                return `I'm searching for files matching ${input.pattern || 'a pattern'}...`;
+                return `Searching for files matching ${input.pattern || 'a pattern'}`;
             case 'Grep':
-                return `I'm searching the code for "${input.pattern || 'something'}"...`;
+                return `Searching code for "${input.pattern || 'something'}"`;
+            case 'TodoWrite':
+                return 'Planning next steps...';
+            case 'TodoRead':
+                return 'Checking task list...';
+            case 'ToolSearch':
+                return 'Looking up available tools...';
+            case 'Agent':
+                return `Running a subtask: ${input.description || input.prompt?.slice(0, 60) || 'working...'}`;
+            case 'WebSearch':
+                return `Searching the web for "${input.query || 'something'}"`;
+            case 'WebFetch':
+                return `Fetching ${input.url || 'a webpage'}`;
+            case 'NotebookEdit':
+                return `Editing notebook ${shortPath}`;
             default:
-                return `I'm using ${toolName}...`;
+                return `Using ${toolName}...`;
         }
     }
 

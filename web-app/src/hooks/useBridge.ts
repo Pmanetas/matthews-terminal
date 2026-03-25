@@ -104,22 +104,26 @@ export function useBridge(onAudioDone?: () => void) {
               { role: 'tool' as const, text: data.text, timestamp: Date.now() },
             ])
           } else if (data.type === 'status') {
-            // Streaming text: update the last assistant message in-place (or create one)
+            // Streaming text: find and update the last streaming assistant message, or create one
             setMessages((prev) => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'assistant' && last.streaming) {
-                // Replace the streaming message
-                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
+              // Find the last streaming assistant message (might have tool msgs after it)
+              const lastStreamIdx = prev.findLastIndex((m) => m.role === 'assistant' && m.streaming)
+              if (lastStreamIdx >= 0) {
+                const updated = [...prev]
+                updated[lastStreamIdx] = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }
+                return updated
               }
               // Create new streaming message
               return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
             })
           } else if (data.type === 'result') {
-            // Final response: replace streaming message or add new one
+            // Final response: find last streaming assistant message and finalize it
             setMessages((prev) => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'assistant' && last.streaming) {
-                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
+              const lastStreamIdx = prev.findLastIndex((m) => m.role === 'assistant' && m.streaming)
+              if (lastStreamIdx >= 0) {
+                const updated = [...prev]
+                updated[lastStreamIdx] = { role: 'assistant' as const, text: data.text, timestamp: Date.now() }
+                return updated
               }
               return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
             })
