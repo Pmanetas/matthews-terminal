@@ -21,6 +21,7 @@ export class CommandHandler {
     private disposables: vscode.Disposable[] = [];
     private streamingText = '';
     private streamThrottleTimer: ReturnType<typeof setTimeout> | undefined;
+    private narrationBuffer = '';  // Accumulates tool descriptions to speak with next text block
 
     constructor() {
         this.disposables.push(
@@ -43,6 +44,7 @@ export class CommandHandler {
 
         this.isProcessing = true;
         this.streamingText = '';
+        this.narrationBuffer = '';
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -169,10 +171,30 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone and reset for next block (no separate TTS — phone handles it) */
-    private flushAndReset(client: BridgeClient): void {
+    /** Flush text to phone, speak it with ElevenLabs (batched with any pending tool narration), then reset */
+    private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
+        const text = this.streamingText.trim();
+        if (text.length > 15) {
+            // Combine any pending tool narration with this text block
+            const toSpeak = this.narrationBuffer
+                ? this.narrationBuffer + '... ' + text
+                : text;
+            client.sendSpeak(toSpeak);
+            this.narrationBuffer = '';
+        }
         this.streamingText = '';
+    }
+
+    /** Add a tool description to narration buffer (spoken with next text block) */
+    private bufferToolNarration(description: string): void {
+        // Keep it short for speech — just the action, skip file paths
+        const short = description.split('\n')[0]; // First line only (no diff lines)
+        if (this.narrationBuffer) {
+            this.narrationBuffer += ', then ' + short.toLowerCase();
+        } else {
+            this.narrationBuffer = short;
+        }
     }
 
     private scheduleStreamFlush(client: BridgeClient): void {
@@ -198,10 +220,11 @@ export class CommandHandler {
                     this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
                     this.flushStreamingText(client);
                 } else if (block.type === 'tool_use') {
-                    this.flushAndReset(client);
+                    this.flushAndSpeak(client);
                     const msg = this.describeToolCall(block);
                     this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
                     client.sendToolStatus(msg);
+                    this.bufferToolNarration(msg);
                 }
             }
         } else if (event.type === 'content_block_delta') {
@@ -214,15 +237,17 @@ export class CommandHandler {
         } else if (event.type === 'result') {
             this.flushStreamingText(client);
         } else if (event.type === 'system' && event.subtype === 'tool_use') {
-            this.flushAndReset(client);
+            this.flushAndSpeak(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
+            this.bufferToolNarration(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
-            this.flushAndReset(client);
+            this.flushAndSpeak(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
+            this.bufferToolNarration(msg);
         } else if (event.type === 'tool_result') {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
