@@ -59,7 +59,7 @@ export class CommandHandler {
                 ? `${process.env.APPDATA}\\npm\\claude.cmd`
                 : 'claude';
 
-            const args = ['--print', '--dangerously-skip-permissions', '--output-format', 'stream-json'];
+            const args = ['--print', '--verbose', '--dangerously-skip-permissions', '--output-format', 'stream-json'];
             if (this.conversationStarted) {
                 args.push('--continue');
             }
