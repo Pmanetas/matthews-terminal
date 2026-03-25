@@ -29,6 +29,10 @@ export class CommandHandler {
     private pendingToolName: string | null = null;
     private pendingToolInput = '';
 
+    // Batch tool call speech — don't speak every tool individually
+    private toolSpeechQueue: string[] = [];
+    private toolSpeechTimer: ReturnType<typeof setTimeout> | undefined;
+
     constructor() {
         this.disposables.push(
             vscode.window.onDidCloseTerminal((closed) => {
@@ -55,11 +59,11 @@ export class CommandHandler {
         this.lastToolDescription = '';
         this.pendingToolName = null;
         this.pendingToolInput = '';
+        this.toolSpeechQueue = [];
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
 
-        // Speak a filler phrase so there's no dead air while Claude thinks
         const fillers = [
             "Alright, give me a sec to think about this.",
             "Hang tight, just working this out.",
@@ -81,6 +85,10 @@ export class CommandHandler {
         } finally {
             this.isProcessing = false;
             this.activeProcess = undefined;
+            if (this.toolSpeechTimer) {
+                clearTimeout(this.toolSpeechTimer);
+                this.toolSpeechTimer = undefined;
+            }
         }
     }
 
@@ -119,11 +127,6 @@ export class CommandHandler {
 
                     try {
                         const event = JSON.parse(trimmed);
-                        // Debug: log every event type to terminal
-                        const eventType = event.type || 'unknown';
-                        const subtype = event.subtype || event.delta?.type || '';
-                        this.writeEmitter.fire(`\x1b[2m[event: ${eventType}${subtype ? '/' + subtype : ''}]\x1b[0m\r\n`);
-
                         this.handleStreamEvent(event, client, (text) => {
                             fullResponseText += text;
                         });
@@ -136,29 +139,24 @@ export class CommandHandler {
             // Parse stderr for tool calls — Claude CLI --verbose outputs tool info here
             this.activeProcess.stderr?.on('data', (data: Buffer) => {
                 const text = data.toString();
-                const lines = text.split('\n');
-                for (const line of lines) {
+                const stderrLines = text.split('\n');
+                for (const line of stderrLines) {
                     const trimmed = line.trim();
                     if (!trimmed) continue;
 
                     this.writeEmitter.fire(`\x1b[2m${trimmed.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
 
-                    // Try to detect tool calls from verbose stderr output
                     const toolMsg = this.parseStderrToolCall(trimmed);
                     if (toolMsg) {
                         this.flushAndSpeak(client);
-                        this.lastToolDescription = toolMsg;
+                        this.lastToolDescription = toolMsg.split('\n')[0];
                         client.sendToolStatus(toolMsg);
-                        // Speak it so the user hears what's happening
-                        const spokenMsg = this.simplifyForSpeech(toolMsg);
-                        if (spokenMsg) {
-                            client.sendSpeak(spokenMsg);
-                        }
+                        // Queue speech (batched, not individual)
+                        this.queueToolSpeech(toolMsg.split('\n')[0], client);
                     }
                 }
             });
 
-            // Pipe system prompt + user prompt via stdin
             const fullPrompt = this.conversationStarted
                 ? prompt
                 : `${SYSTEM_PROMPT}\n\nUser: ${prompt}`;
@@ -198,33 +196,89 @@ export class CommandHandler {
     }
 
     /**
+     * Queue tool descriptions for batched speech.
+     * If multiple tools fire within 2s, combine them into one spoken summary.
+     */
+    private queueToolSpeech(description: string, client: BridgeClient): void {
+        this.toolSpeechQueue.push(description);
+
+        if (this.toolSpeechTimer) {
+            clearTimeout(this.toolSpeechTimer);
+        }
+
+        // Wait 2s for more tools, then speak a summary
+        this.toolSpeechTimer = setTimeout(() => {
+            this.toolSpeechTimer = undefined;
+            const queue = this.toolSpeechQueue;
+            this.toolSpeechQueue = [];
+
+            if (queue.length === 0) return;
+
+            let speech: string;
+            if (queue.length === 1) {
+                speech = queue[0];
+            } else if (queue.length <= 3) {
+                // "Reading the file, then editing it, then running a command"
+                speech = queue.join(', then ');
+            } else {
+                // "Did a few things — read some files, made 3 edits, and ran a command"
+                const summary = this.summarizeToolBatch(queue);
+                speech = summary;
+            }
+
+            client.sendSpeak(speech);
+        }, 2000);
+    }
+
+    /**
+     * Summarize a batch of tool calls into natural speech
+     */
+    private summarizeToolBatch(tools: string[]): string {
+        const counts: Record<string, number> = {};
+        for (const t of tools) {
+            const action = t.split(' ')[0].toLowerCase(); // "reading", "editing", etc.
+            counts[action] = (counts[action] || 0) + 1;
+        }
+
+        const parts: string[] = [];
+        for (const [action, count] of Object.entries(counts)) {
+            if (count === 1) {
+                parts.push(`${action} a file`);
+            } else {
+                parts.push(`${action} ${count} files`);
+            }
+        }
+
+        if (parts.length === 1) {
+            return `Just ${parts[0]}`;
+        }
+        const last = parts.pop();
+        return `Just ${parts.join(', ')} and ${last}`;
+    }
+
+    /**
      * Parse stderr lines from Claude CLI --verbose for tool call info.
-     * Returns a human-friendly description, or null if not a tool line.
      */
     private parseStderrToolCall(line: string): string | null {
-        // Claude CLI verbose output patterns — match common tool indicators
-        // Examples: "⏵ Read(file_path: src/app.ts)", "⏵ Edit(file_path: ...)", "⏵ Bash(command: npm test)"
-        // Or: "tool:Read {", "Tool: Read", etc.
-
-        // Pattern 1: "⏵ ToolName(...)" or "▸ ToolName(...)"
+        // Pattern: "⏵ ToolName(...)" or "▸ ToolName(...)"
         const arrowMatch = line.match(/^[⏵▸►→>]\s*(\w+)\((.+)\)/);
         if (arrowMatch) {
             return this.describeStderrTool(arrowMatch[1], arrowMatch[2]);
         }
 
-        // Pattern 2: "⏵ ToolName" (no parens)
+        // Pattern: "⏵ ToolName"
         const arrowSimple = line.match(/^[⏵▸►→>]\s*(\w+)\s*$/);
         if (arrowSimple) {
             return this.describeStderrTool(arrowSimple[1], '');
         }
 
-        // Pattern 3: "Tool: Read" or "tool: Read"
+        // Pattern: "Tool: Read"
         const toolPrefix = line.match(/^[Tt]ool:\s*(\w+)/);
         if (toolPrefix) {
             return this.describeStderrTool(toolPrefix[1], '');
         }
 
-        // Pattern 4: Lines that start with known tool names
+        // Lines starting with known tool names
         const knownTools = ['Read', 'Edit', 'Write', 'Bash', 'Glob', 'Grep', 'Agent', 'WebSearch', 'WebFetch'];
         for (const tool of knownTools) {
             if (line.startsWith(tool + '(') || line.startsWith(tool + ' ')) {
@@ -232,9 +286,8 @@ export class CommandHandler {
             }
         }
 
-        // Pattern 5: Common verbose patterns like "Reading file..." or "Running command..."
+        // Verbose patterns like "Reading file..."
         if (/^(Reading|Editing|Writing|Creating|Searching|Running|Fetching)\s/i.test(line)) {
-            // Already a description — use it directly
             return line.length > 100 ? line.slice(0, 100) + '...' : line;
         }
 
@@ -244,7 +297,6 @@ export class CommandHandler {
     private describeStderrTool(toolName: string, details: string): string {
         const cleanDetails = details.replace(/^\(/, '').replace(/\)$/, '').trim();
 
-        // Try to extract file_path from details
         const fileMatch = cleanDetails.match(/file_path:\s*["']?([^"',\)]+)/);
         const fileName = fileMatch ? path.basename(fileMatch[1].trim()) : '';
         const dirName = fileMatch ? path.basename(path.dirname(fileMatch[1].trim())) : '';
@@ -255,11 +307,10 @@ export class CommandHandler {
                 return `Reading ${shortPath || 'a file'}`;
             case 'Edit': {
                 let msg = `Editing ${shortPath || 'a file'}`;
-                // Try to extract old_string/new_string from details
-                const oldMatch = cleanDetails.match(/old_string:\s*["']([^"']{0,50})/);
-                const newMatch = cleanDetails.match(/new_string:\s*["']([^"']{0,50})/);
-                if (oldMatch) msg += `\n  ⊖ ${oldMatch[1]}...`;
-                if (newMatch) msg += `\n  ⊕ ${newMatch[1]}...`;
+                const oldMatch = cleanDetails.match(/old_string:\s*["']([^"']{0,60})/);
+                const newMatch = cleanDetails.match(/new_string:\s*["']([^"']{0,60})/);
+                if (oldMatch) msg += `\n  ⊖ ${oldMatch[1]}`;
+                if (newMatch) msg += `\n  ⊕ ${newMatch[1]}`;
                 return msg;
             }
             case 'Write':
@@ -281,20 +332,8 @@ export class CommandHandler {
             case 'TodoWrite':
                 return 'Planning next steps...';
             default:
-                return `Using ${toolName}...`;
+                return `Using ${toolName}`;
         }
-    }
-
-    /**
-     * Simplify a tool description for speech (shorter, no code diffs)
-     */
-    private simplifyForSpeech(msg: string): string | null {
-        // Take just the first line (remove code diff lines)
-        const firstLine = msg.split('\n')[0].trim();
-        if (!firstLine || firstLine.startsWith('Planning') || firstLine.startsWith('Using TodoWrite')) {
-            return null;
-        }
-        return firstLine;
     }
 
     /** Send accumulated streaming text to phone */
@@ -308,7 +347,7 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, speak it with ElevenLabs, then reset */
+    /** Flush text to phone, speak it, then reset */
     private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
@@ -343,18 +382,15 @@ export class CommandHandler {
         }, 150);
     }
 
-    /** Send a tool call to the phone (visual + spoken) */
+    /** Send a tool call to the phone (visual only — speech is batched separately) */
     private emitToolCall(block: any, client: BridgeClient): void {
         this.flushAndSpeak(client);
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
         client.sendToolStatus(msg);
-        // Speak the tool action
-        const spokenMsg = this.describeToolCallForSpeech(block);
-        if (spokenMsg) {
-            client.sendSpeak(spokenMsg);
-        }
+        // Queue speech (batched with 2s window)
+        this.queueToolSpeech(msg.split('\n')[0], client);
     }
 
     private handleStreamEvent(
@@ -362,7 +398,6 @@ export class CommandHandler {
         client: BridgeClient,
         onText: (text: string) => void,
     ): void {
-        // ── Full assistant message (contains text + tool_use blocks) ──
         if (event.type === 'assistant' && event.message?.content) {
             for (const block of event.message.content) {
                 if (block.type === 'text') {
@@ -375,7 +410,6 @@ export class CommandHandler {
                 }
             }
         }
-        // ── Streaming text deltas ──
         else if (event.type === 'content_block_delta') {
             if (event.delta?.type === 'text_delta' && event.delta.text) {
                 onText(event.delta.text);
@@ -387,7 +421,6 @@ export class CommandHandler {
                 this.pendingToolInput += event.delta.partial_json;
             }
         }
-        // ── content_block_start: tool_use begins ──
         else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
             this.pendingToolName = event.content_block.name || event.content_block.tool_name || null;
             this.pendingToolInput = '';
@@ -396,7 +429,6 @@ export class CommandHandler {
                 this.pendingToolName = null;
             }
         }
-        // ── content_block_stop: finalize buffered tool call ──
         else if (event.type === 'content_block_stop') {
             if (this.pendingToolName) {
                 let input = {};
@@ -412,19 +444,15 @@ export class CommandHandler {
                 this.pendingToolInput = '';
             }
         }
-        // ── Final result ──
         else if (event.type === 'result') {
             this.flushStreamingText(client);
         }
-        // ── System tool_use event ──
         else if (event.type === 'system' && event.subtype === 'tool_use') {
             this.emitToolCall(event, client);
         }
-        // ── Standalone tool_use event ──
         else if (event.type === 'tool_use' || event.tool_name) {
             this.emitToolCall(event, client);
         }
-        // ── Tool result ──
         else if (event.type === 'tool_result') {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
@@ -434,9 +462,6 @@ export class CommandHandler {
         }
     }
 
-    /**
-     * Describe tool calls for visual display on phone (with code details)
-     */
     private describeToolCall(block: any): string {
         const toolName = block.name || block.tool_name || 'tool';
         const input = block.input || {};
@@ -493,40 +518,7 @@ export class CommandHandler {
             case 'NotebookEdit':
                 return `Editing notebook ${shortPath}`;
             default:
-                return `Using ${toolName}...`;
-        }
-    }
-
-    /**
-     * Short spoken version (no code, just what's happening)
-     */
-    private describeToolCallForSpeech(block: any): string | null {
-        const toolName = block.name || block.tool_name || 'tool';
-        const input = block.input || {};
-        const filePath = input.file_path || '';
-        const fileName = filePath ? path.basename(filePath) : '';
-
-        switch (toolName) {
-            case 'Read':
-                return fileName ? `Reading ${fileName}` : 'Reading a file';
-            case 'Edit':
-                return fileName ? `Editing ${fileName}` : 'Making an edit';
-            case 'Write':
-                return fileName ? `Creating ${fileName}` : 'Creating a new file';
-            case 'Bash':
-                return 'Running a command';
-            case 'Glob':
-                return 'Searching for files';
-            case 'Grep':
-                return 'Searching through the code';
-            case 'Agent':
-                return 'Working on a subtask';
-            case 'WebSearch':
-                return 'Searching the web';
-            case 'WebFetch':
-                return 'Fetching a webpage';
-            default:
-                return null;
+                return `Using ${toolName}`;
         }
     }
 
@@ -551,6 +543,7 @@ export class CommandHandler {
         this.activeProcess?.kill();
         this.terminal?.dispose();
         this.writeEmitter.dispose();
+        if (this.toolSpeechTimer) clearTimeout(this.toolSpeechTimer);
         for (const d of this.disposables) d.dispose();
     }
 }

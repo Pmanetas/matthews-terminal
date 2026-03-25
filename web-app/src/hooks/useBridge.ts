@@ -70,12 +70,25 @@ interface AudioQueueItem {
 }
 
 let isPlayingAudio = false
+let _onPlayingChange: ((playing: boolean) => void) | null = null
+
+/** Subscribe to audio playing state changes */
+export function onAudioPlayingChange(cb: (playing: boolean) => void) {
+  _onPlayingChange = cb
+}
+
+function setPlaying(v: boolean) {
+  if (isPlayingAudio !== v) {
+    isPlayingAudio = v
+    _onPlayingChange?.(v)
+  }
+}
 
 function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   const queue = _audioQueue
   if (isPlayingAudio || queue.length === 0 || !sharedAudio) return
 
-  isPlayingAudio = true
+  setPlaying(true)
   const item = queue.shift()!
   ensureAnalyser()
   audioContext?.resume()
@@ -84,11 +97,10 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))
   sharedAudio.onended = () => {
     URL.revokeObjectURL(item.url)
-    isPlayingAudio = false
+    setPlaying(false)
     if (queue.length > 0) {
       playNextAudio(onAudioDoneRef)
     } else if (item.isFinal) {
-      // Only auto-listen after the final audio chunk
       onAudioDoneRef.current?.()
     }
   }

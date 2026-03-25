@@ -3,7 +3,7 @@
   "displayName": "Matthews Terminal - Voice Bridge",
   "description": "Voice bridge extension for Matthews Terminal",
   "publisher": "pmanetas",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "engines": {
     "vscode": "^1.85.0"
   },
