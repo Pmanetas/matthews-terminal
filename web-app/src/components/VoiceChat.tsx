@@ -4,15 +4,8 @@ import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePl
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange } from '@/hooks/useBridge'
+import { useBridge, getAudioLevel, onAudioPlayingChange, stopAllAudio } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
-
-function stopAudioPlayback() {
-  if (sharedAudio) {
-    sharedAudio.pause()
-    sharedAudio.currentTime = 0
-  }
-}
 
 function ToolIcon({ text }: { text: string }) {
   const t = text.toLowerCase()
@@ -73,7 +66,7 @@ export function VoiceChat() {
   }, [])
 
   const { status, messages, sendCommand } = useBridge(() => {
-    stopAudioPlayback()
+    // Called when final TTS audio finishes — auto-listen
     autoListenRef.current?.()
   })
 
@@ -101,6 +94,16 @@ export function VoiceChat() {
     const trimmed = transcript.trim()
     if (!trimmed) return
 
+    // "stop" / "shut up" / "quiet" — interrupt Matthew
+    const stopPattern = /^(stop|shut up|quiet|be quiet|enough)\s*[.!]?\s*$/i
+    if (stopPattern.test(trimmed)) {
+      hasSentRef.current = true
+      stopAllAudio()
+      stopListening()
+      setPendingMessage('')
+      return
+    }
+
     const sendPattern = /\bsend\s*[.!]?\s*$/i
     if (sendPattern.test(trimmed)) {
       const msg = trimmed.replace(sendPattern, '').trim()
@@ -124,7 +127,8 @@ export function VoiceChat() {
   }
 
   const handleMicClick = () => {
-    stopAudioPlayback()
+    // Stop all audio immediately (clears queue + resets state)
+    stopAllAudio()
     if (isListening) {
       stopListening()
     } else {

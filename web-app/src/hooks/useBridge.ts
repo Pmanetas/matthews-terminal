@@ -94,7 +94,10 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   audioContext?.resume()
   sharedAudio.volume = 1.0
   sharedAudio.src = item.url
-  sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))
+  sharedAudio.play().catch((e) => {
+    console.error('[Audio] Playback failed:', e)
+    setPlaying(false)
+  })
   sharedAudio.onended = () => {
     URL.revokeObjectURL(item.url)
     setPlaying(false)
@@ -107,6 +110,23 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
 }
 
 const _audioQueue: AudioQueueItem[] = []
+
+/** Stop all audio playback and clear the queue */
+export function stopAllAudio() {
+  // Clear queue
+  while (_audioQueue.length > 0) {
+    const item = _audioQueue.pop()
+    if (item) URL.revokeObjectURL(item.url)
+  }
+  // Stop current playback
+  if (sharedAudio) {
+    sharedAudio.pause()
+    sharedAudio.currentTime = 0
+    sharedAudio.onended = null
+    sharedAudio.src = ''
+  }
+  setPlaying(false)
+}
 
 export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')

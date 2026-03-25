@@ -472,12 +472,8 @@ export class CommandHandler {
         const shortPath = fileName ? (dirName ? `${dirName}/${fileName}` : fileName) : 'a file';
 
         switch (toolName) {
-            case 'Read': {
-                let msg = `Reading ${shortPath}`;
-                if (input.offset) msg += ` from line ${input.offset}`;
-                if (input.limit) msg += ` (${input.limit} lines)`;
-                return msg;
-            }
+            case 'Read':
+                return `Reading ${shortPath}`;
             case 'Edit': {
                 let msg = `Editing ${shortPath}`;
                 if (input.old_string) {
