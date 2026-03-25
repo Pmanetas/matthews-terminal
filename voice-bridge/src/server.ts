@@ -124,10 +124,11 @@ const state: BridgeState = {
 const clients: Map<WebSocket, ClientRole> = new Map();
 
 function getClient(role: ClientRole): WebSocket | undefined {
+  let latest: WebSocket | undefined;
   for (const [ws, r] of clients) {
-    if (r === role && ws.readyState === WebSocket.OPEN) return ws;
+    if (r === role && ws.readyState === WebSocket.OPEN) latest = ws;
   }
-  return undefined;
+  return latest;
 }
 
 function sendJSON(ws: WebSocket, data: unknown): void {
@@ -211,8 +212,16 @@ wss.on('connection', (ws) => {
     // ── Identify ───────────────────────────────────────────────
     if (msg.type === 'identify') {
       const role = msg.client;
+      // Close any existing connections with the same role (prevents stale sockets)
+      for (const [existingWs, existingRole] of clients) {
+        if (existingRole === role && existingWs !== ws) {
+          console.log(`[${timestamp()}] Closing stale ${role} connection`);
+          clients.delete(existingWs);
+          existingWs.close();
+        }
+      }
       clients.set(ws, role);
-      console.log(`[${timestamp()}] Client identified as: ${role}`);
+      console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
       return;
     }
 
