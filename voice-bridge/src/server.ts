@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -33,28 +34,95 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
   return data.text || '';
 }
 
-// ── ElevenLabs TTS ────────────────────────────────────────────────
+// ── Piper TTS (local, free) ───────────────────────────────────────
+const __filename2 = fileURLToPath(import.meta.url);
+const __dirname2 = path.dirname(__filename2);
+// Piper binary + model live in voice-bridge/piper/ and voice-bridge/voices/
+const PIPER_BIN = path.join(__dirname2, '..', 'piper', 'piper');
+const PIPER_MODEL = path.join(__dirname2, '..', 'voices', 'en_US-lessac-medium.onnx');
+
+// Optional ElevenLabs fallback if Piper binary not found
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // default: Adam
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
 
-async function generateSpeech(text: string): Promise<Buffer | null> {
-  if (!ELEVENLABS_API_KEY) {
-    console.log(`[${new Date().toISOString()}] ElevenLabs: No API key, skipping TTS`);
-    return null;
-  }
-
-  // Trim text for TTS — don't read code blocks aloud, soften ending
-  let ttsText = text
+function cleanTextForTTS(text: string): string {
+  return text
     .replace(/```[\s\S]*?```/g, '... code block omitted ...')
-    .replace(/[*_#`]/g, '') // Strip markdown formatting
-    .replace(/\n{2,}/g, '. ') // Double newlines → sentence break
-    .replace(/\n/g, ' ') // Single newlines → space
+    .replace(/[*_#`]/g, '')
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, ' ')
     .trim()
-    .slice(0, 2000); // ElevenLabs has char limits
-  // Ensure text ends with a complete-sounding ending (not cut off)
-  if (ttsText && !/[.!?]$/.test(ttsText)) {
-    ttsText += '.';
-  }
+    .slice(0, 2000);
+}
+
+/** Generate speech using Piper TTS (local) → returns MP3 buffer */
+function generateSpeechPiper(text: string): Promise<Buffer | null> {
+  const ttsText = cleanTextForTTS(text);
+  if (!ttsText) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    try {
+      // Piper outputs raw PCM → pipe through ffmpeg to get MP3
+      const piper = spawn(PIPER_BIN, [
+        '--model', PIPER_MODEL,
+        '--output-raw',
+        '--length_scale', '1.0',
+      ]);
+
+      const ffmpeg = spawn('ffmpeg', [
+        '-f', 's16le',        // raw PCM input
+        '-ar', '22050',       // Piper sample rate
+        '-ac', '1',           // mono
+        '-i', 'pipe:0',       // stdin
+        '-f', 'mp3',          // output format
+        '-ab', '64k',         // bitrate (small + fast)
+        'pipe:1',             // stdout
+      ]);
+
+      // Pipe: piper stdout → ffmpeg stdin → collect MP3
+      piper.stdout.pipe(ffmpeg.stdin);
+
+      const chunks: Buffer[] = [];
+      ffmpeg.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+      ffmpeg.on('close', (code) => {
+        if (code === 0 && chunks.length > 0) {
+          const mp3 = Buffer.concat(chunks);
+          console.log(`[${timestamp()}] Piper TTS: ${ttsText.length} chars → ${Math.round(mp3.length / 1024)}KB MP3`);
+          resolve(mp3);
+        } else {
+          console.error(`[${timestamp()}] ffmpeg exited with code ${code}`);
+          resolve(null);
+        }
+      });
+
+      piper.on('error', (err) => {
+        console.error(`[${timestamp()}] Piper error:`, err.message);
+        resolve(null);
+      });
+
+      ffmpeg.on('error', (err) => {
+        console.error(`[${timestamp()}] ffmpeg error:`, err.message);
+        resolve(null);
+      });
+
+      // Send text to piper
+      piper.stdin.write(ttsText);
+      piper.stdin.end();
+    } catch (err) {
+      console.error(`[${timestamp()}] Piper TTS error:`, err);
+      resolve(null);
+    }
+  });
+}
+
+/** Fallback: ElevenLabs TTS (API, costs money) */
+async function generateSpeechElevenLabs(text: string): Promise<Buffer | null> {
+  if (!ELEVENLABS_API_KEY) return null;
+
+  const ttsText = cleanTextForTTS(text);
+  if (!ttsText) return null;
+  const finalText = /[.!?]$/.test(ttsText) ? ttsText : ttsText + '.';
 
   try {
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
@@ -64,27 +132,26 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
         'xi-api-key': ELEVENLABS_API_KEY,
       },
       body: JSON.stringify({
-        text: ttsText,
+        text: finalText,
         model_id: 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-        },
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
       }),
     });
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      console.error(`[${new Date().toISOString()}] ElevenLabs error: ${res.status} ${res.statusText} - ${errBody}`);
-      return null;
-    }
-
-    const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch (err) {
-    console.error(`[${new Date().toISOString()}] ElevenLabs error:`, err);
+    if (!res.ok) return null;
+    return Buffer.from(await res.arrayBuffer());
+  } catch {
     return null;
   }
+}
+
+/** Try Piper first, fall back to ElevenLabs if Piper not available */
+async function generateSpeech(text: string): Promise<Buffer | null> {
+  // Try Piper first (free, fast)
+  const piperResult = await generateSpeechPiper(text);
+  if (piperResult) return piperResult;
+
+  // Fallback to ElevenLabs
+  return generateSpeechElevenLabs(text);
 }
 
 // ── Types ──────────────────────────────────────────────────────────

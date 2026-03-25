@@ -5,3 +5,6 @@ out/
 .env.local
 *.vsix
 .vscode/
+# Piper TTS binary + voice models (downloaded at build time)
+voice-bridge/piper/
+voice-bridge/voices/
