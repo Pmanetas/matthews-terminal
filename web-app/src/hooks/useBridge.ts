@@ -187,7 +187,7 @@ export function useBridge(onAudioDone?: () => void) {
                     const label = count === 1 ? 'step' : 'steps'
                     const header = `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`
                     // Keep diff lines (⊖/⊕) from the latest tool call
-                    const diffLines = newLines.slice(1).filter(l => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
+                    const diffLines = newLines.slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
                     const merged = diffLines.length > 0 ? header + '\n' + diffLines.join('\n') : header
                     return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
                   }
