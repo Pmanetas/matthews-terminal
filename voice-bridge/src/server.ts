@@ -100,7 +100,7 @@ async function generateSpeechGroq(text: string): Promise<Buffer | null> {
         model: 'canopylabs/orpheus-v1-english',
         voice: 'daniel',
         input: ttsText,
-        response_format: 'mp3',
+        response_format: 'wav',
       }),
     });
 
