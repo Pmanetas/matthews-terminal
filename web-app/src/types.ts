@@ -1,6 +1,6 @@
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
-export type MessageRole = 'user' | 'assistant'
+export type MessageRole = 'user' | 'assistant' | 'tool'
 
 export interface Message {
   role: MessageRole

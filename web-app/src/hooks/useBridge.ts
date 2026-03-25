@@ -97,8 +97,14 @@ export function useBridge(onAudioDone?: () => void) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          if (data.type === 'status') {
-            // Streaming: update the last assistant message in-place (or create one)
+          if (data.type === 'tool_status') {
+            // Tool call — add as a separate step in the chat
+            setMessages((prev) => [
+              ...prev,
+              { role: 'tool' as const, text: data.text, timestamp: Date.now() },
+            ])
+          } else if (data.type === 'status') {
+            // Streaming text: update the last assistant message in-place (or create one)
             setMessages((prev) => {
               const last = prev[prev.length - 1]
               if (last && last.role === 'assistant' && last.streaming) {

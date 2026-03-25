@@ -107,10 +107,17 @@ export class BridgeClient {
     }
 
     /**
-     * Sends a status message back to the bridge.
+     * Sends a text-streaming status message back to the bridge.
      */
     sendStatus(text: string): void {
         this.send({ type: 'status', text });
+    }
+
+    /**
+     * Sends a tool-call status (shows as a separate step on phone).
+     */
+    sendToolStatus(text: string): void {
+        this.send({ type: 'tool_status', text });
     }
 
     /**

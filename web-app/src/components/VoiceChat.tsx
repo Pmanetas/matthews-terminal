@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Send, Volume2, VolumeX } from 'lucide-react'
+import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -12,6 +12,16 @@ function stopAudioPlayback() {
     sharedAudio.pause()
     sharedAudio.currentTime = 0
   }
+}
+
+function ToolIcon({ text }: { text: string }) {
+  const t = text.toLowerCase()
+  if (t.includes('reading')) return <FileText className="w-3.5 h-3.5 text-amber-400" />
+  if (t.includes('running a command')) return <Terminal className="w-3.5 h-3.5 text-amber-400" />
+  if (t.includes('searching')) return <Search className="w-3.5 h-3.5 text-amber-400" />
+  if (t.includes('changes to') || t.includes('editing')) return <Pencil className="w-3.5 h-3.5 text-amber-400" />
+  if (t.includes('creating')) return <FilePlus className="w-3.5 h-3.5 text-amber-400" />
+  return <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
 }
 
 export function VoiceChat() {
@@ -134,6 +144,13 @@ export function VoiceChat() {
                     <div className="max-w-[80%] bg-violet-500/15 border border-violet-500/15 rounded-2xl rounded-br-md px-4 py-2.5">
                       <p className="text-sm text-white/80">{msg.text}</p>
                     </div>
+                  </div>
+                ) : msg.role === 'tool' ? (
+                  <div className="flex items-center gap-2.5 py-1.5 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0">
+                      <ToolIcon text={msg.text} />
+                    </div>
+                    <span className="text-xs text-white/50 leading-tight">{msg.text}</span>
                   </div>
                 ) : (
                   <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl rounded-bl-md px-4 py-3">

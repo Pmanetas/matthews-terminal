@@ -95,6 +95,7 @@ type ClientRole = 'phone' | 'extension';
 interface IdentifyMessage { type: 'identify'; client: ClientRole; }
 interface CommandMessage { type: 'command'; text: string; }
 interface StatusMessage { type: 'status'; text: string; }
+interface ToolStatusMessage { type: 'tool_status'; text: string; }
 interface ResultMessage { type: 'result'; text: string; }
 interface WorkspaceMessage { type: 'workspace'; data: { workspace: string; repo: string }; }
 
@@ -102,6 +103,7 @@ type BridgeMessage =
   | IdentifyMessage
   | CommandMessage
   | StatusMessage
+  | ToolStatusMessage
   | ResultMessage
   | WorkspaceMessage;
 
@@ -241,6 +243,13 @@ wss.on('connection', (ws) => {
     if (role === 'extension' && msg.type === 'status') {
       const phone = getClient('phone');
       if (phone) sendJSON(phone, { type: 'status', text: msg.text });
+      return;
+    }
+
+    // ── Extension sends tool status (separate step on phone) ──
+    if (role === 'extension' && msg.type === 'tool_status') {
+      const phone = getClient('phone');
+      if (phone) sendJSON(phone, { type: 'tool_status', text: msg.text });
       return;
     }
 

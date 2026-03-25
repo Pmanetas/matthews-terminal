@@ -172,8 +172,7 @@ export class CommandHandler {
                 } else if (block.type === 'tool_use') {
                     const msg = this.describeToolCall(block);
                     this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
-                    // Send tool status to phone so user hears what's happening
-                    client.sendStatus(msg);
+                    client.sendToolStatus(msg);
                 }
             }
         } else if (event.type === 'content_block_delta') {
@@ -186,11 +185,11 @@ export class CommandHandler {
         } else if (event.type === 'system' && event.subtype === 'tool_use') {
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
-            client.sendStatus(msg);
+            client.sendToolStatus(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
-            client.sendStatus(msg);
+            client.sendToolStatus(msg);
         } else if (event.type === 'tool_result') {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 150 ? output.slice(0, 150) + '...' : output;
