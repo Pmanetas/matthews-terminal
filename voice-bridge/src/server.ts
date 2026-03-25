@@ -97,8 +97,8 @@ async function generateSpeechGroq(text: string): Promise<Buffer | null> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'playai-tts',
-        voice: 'Fritz-PlayAI',
+        model: 'canopylabs/orpheus-v1-english',
+        voice: 'tara',
         input: ttsText,
         response_format: 'mp3',
       }),
