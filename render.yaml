@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: matthews-terminal-bridge
+    runtime: node
+    plan: free
+    rootDir: voice-bridge
+    buildCommand: npm install && cd ../web-app && npm install && VITE_BRIDGE_URL=wss://matthews-terminal.onrender.com npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production

@@ -39,8 +39,16 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
 const __filename2 = fileURLToPath(import.meta.url);
 const __dirname2 = path.dirname(__filename2);
 // Piper binary + model live in voice-bridge/piper/ and voice-bridge/voices/
-const PIPER_BIN = path.join(__dirname2, '..', 'piper', 'piper');
-const PIPER_MODEL = path.join(__dirname2, '..', 'voices', 'en_US-lessac-medium.onnx');
+// Try both __dirname-relative and cwd-relative paths (covers different deploy setups)
+import { existsSync } from 'fs';
+const piperFromDir = path.join(__dirname2, '..', 'piper', 'piper');
+const piperFromCwd = path.join(process.cwd(), 'piper', 'piper');
+const PIPER_BIN = existsSync(piperFromDir) ? piperFromDir : piperFromCwd;
+const modelFromDir = path.join(__dirname2, '..', 'voices', 'en_US-lessac-medium.onnx');
+const modelFromCwd = path.join(process.cwd(), 'voices', 'en_US-lessac-medium.onnx');
+const PIPER_MODEL = existsSync(modelFromDir) ? modelFromDir : modelFromCwd;
+console.log(`[Piper] Binary: ${PIPER_BIN} (exists: ${existsSync(PIPER_BIN)})`);
+console.log(`[Piper] Model: ${PIPER_MODEL} (exists: ${existsSync(PIPER_MODEL)})`);
 
 // Optional ElevenLabs fallback if Piper binary not found
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
