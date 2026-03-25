@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench } from 'lucide-react'
+import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -9,26 +9,29 @@ import { useVoice } from '@/hooks/useVoice'
 
 function ToolIcon({ text }: { text: string }) {
   const t = text.toLowerCase()
-  if (t.startsWith('reading')) return <FileText className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('running')) return <Terminal className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('searching')) return <Search className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('editing')) return <Pencil className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('creating')) return <FilePlus className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('planning') || t.startsWith('checking task')) return <ListTodo className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('searching the web') || t.startsWith('fetching')) return <Globe className="w-3.5 h-3.5 text-amber-400" />
-  if (t.startsWith('looking up')) return <Wrench className="w-3.5 h-3.5 text-amber-400" />
-  return <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('reading')) return <FileText className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('running')) return <Terminal className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('searching')) return <Search className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('editing')) return <Pencil className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('creating')) return <FilePlus className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('planning') || t.startsWith('checking task')) return <ListTodo className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('searching the web') || t.startsWith('fetching')) return <Globe className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('looking up')) return <Wrench className="w-3.5 h-3.5 text-violet-400" />
+  return <CheckCircle2 className="w-3.5 h-3.5 text-violet-400" />
 }
 
-/** Render tool call text with code diff lines highlighted */
-function ToolContent({ text }: { text: string }) {
+/** Render tool call — expanded shows diff lines, collapsed shows only header */
+function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   const lines = text.split('\n')
-  if (lines.length === 1) {
-    return <span className="text-xs text-white/50 leading-tight">{text}</span>
+  const header = lines[0]
+
+  if (!expanded || lines.length === 1) {
+    return <span className="text-xs text-white/50 leading-tight">{header}</span>
   }
+
   return (
     <div className="flex flex-col gap-0.5 min-w-0 w-full">
-      <span className="text-xs text-white/50 leading-tight">{lines[0]}</span>
+      <span className="text-xs text-white/50 leading-tight">{header}</span>
       {lines.slice(1).map((line, i) => {
         const trimmed = line.trim()
         const code = trimmed.replace(/^[⊖⊕]\s*/, '')
@@ -80,6 +83,17 @@ export function VoiceChat() {
 
   // Waveform only animates when audio is actually playing
   const waveformActive = isAudioPlaying
+
+  // Detect if processing (last message is user or tool — no assistant reply yet)
+  const isProcessing = messages.length > 0 && messages[messages.length - 1].role !== 'assistant'
+
+  // Find the index of the last tool message (for expand/collapse)
+  const lastToolIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'tool') return i
+    }
+    return -1
+  })()
 
   // Auto-scroll chat
   useEffect(() => {
@@ -145,17 +159,17 @@ export function VoiceChat() {
     status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-[#0A0A0B] text-white relative overflow-hidden">
-      {/* Background glow */}
+    <div className="h-[100dvh] flex flex-col bg-black text-white relative overflow-hidden">
+      {/* Background glow — subtle purple ambient */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-[128px] animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '700ms' }} />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-violet-500/8 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/8 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '700ms' }} />
       </div>
 
       {/* Header */}
       <div className="relative z-10 flex flex-col items-center pt-6 pb-3 shrink-0">
         <VoiceWaveform isActive={waveformActive} size={200} getAudioLevel={getAudioLevel} />
-        <h1 className="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-white/90 to-white/60 mt-1">
+        <h1 className="text-xl font-semibold tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-violet-300 to-white/70 mt-1">
           Matthews Terminal
         </h1>
         <div className="flex items-center gap-2 mt-1">
@@ -166,13 +180,15 @@ export function VoiceChat() {
 
       {/* Chat area */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-5 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="max-w-lg mx-auto flex flex-col gap-3">
+        <div className="max-w-2xl mx-auto flex flex-col gap-3">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12">Tap the mic to start talking</p>
           ) : (
             messages.map((msg, i) => {
               const isNextTool = messages[i + 1]?.role === 'tool'
               const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
+              const isLastTool = i === lastToolIndex
+              const isExpanded = isLastTool && isProcessing
 
               return (
                 <motion.div
@@ -183,28 +199,38 @@ export function VoiceChat() {
                 >
                   {msg.role === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="max-w-[85%] bg-violet-500/15 border border-violet-500/15 rounded-2xl rounded-br-md px-4 py-2.5">
+                      <div className="max-w-[85%] bg-violet-500/15 border border-violet-500/20 rounded-2xl rounded-br-md px-4 py-2.5">
                         <p className="text-sm text-white/80">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
-                    <div className="flex items-stretch gap-2.5 ml-1">
+                    <div className="flex items-stretch gap-2.5 ml-2">
                       {/* Timeline line + dot */}
                       <div className="flex flex-col items-center w-3 shrink-0">
-                        <div className={cn('w-px flex-1', isPrevTool ? 'bg-amber-500/25' : 'bg-transparent')} />
-                        <div className="w-2 h-2 rounded-full bg-amber-400/70 shrink-0" />
-                        <div className={cn('w-px flex-1', isNextTool ? 'bg-amber-500/25' : 'bg-transparent')} />
+                        <div className={cn('w-px flex-1', isPrevTool ? 'bg-violet-500/25' : 'bg-transparent')} />
+                        <div className={cn(
+                          'w-2 h-2 rounded-full shrink-0 transition-all',
+                          isLastTool && isProcessing
+                            ? 'bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.6)]'
+                            : 'bg-violet-400/50'
+                        )} />
+                        <div className={cn('w-px flex-1', isNextTool ? 'bg-violet-500/25' : 'bg-transparent')} />
                       </div>
                       {/* Tool content */}
-                      <div className="flex-1 flex items-start gap-2.5 py-2 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                        <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <div className={cn(
+                        'flex-1 flex items-start gap-2.5 py-2 px-3 rounded-xl border transition-all',
+                        isExpanded
+                          ? 'bg-white/[0.04] border-violet-500/20'
+                          : 'bg-white/[0.02] border-white/[0.06]'
+                      )}>
+                        <div className="w-6 h-6 rounded-lg bg-violet-500/15 border border-violet-500/20 flex items-center justify-center shrink-0 mt-0.5">
                           <ToolIcon text={msg.text} />
                         </div>
-                        <ToolContent text={msg.text} />
+                        <ToolContent text={msg.text} expanded={isExpanded} />
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-bl-md px-4 py-3 ml-1">
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-bl-md px-4 py-3 ml-2">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
                           <span className="text-[10px] font-bold">M</span>
@@ -218,12 +244,25 @@ export function VoiceChat() {
               )
             })
           )}
+
+          {/* Loading spinner while processing */}
+          {isProcessing && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-2 ml-8 py-2"
+            >
+              <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin" />
+              <span className="text-xs text-white/30">Working...</span>
+            </motion.div>
+          )}
+
           <div ref={chatEndRef} />
         </div>
       </div>
 
       {/* Bottom controls */}
-      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-4 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B] to-transparent">
+      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-4 bg-gradient-to-t from-black via-black to-transparent">
         <AnimatePresence mode="wait">
           {isListening ? (
             <motion.p
