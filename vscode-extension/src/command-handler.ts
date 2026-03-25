@@ -35,7 +35,7 @@ export class CommandHandler {
 
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
         if (this.isProcessing) {
-            client.sendStatus('Still working on the last command...');
+            client.sendResult('Still working on the last command...');
             return;
         }
 
@@ -45,6 +45,7 @@ export class CommandHandler {
         this.isProcessing = true;
         this.streamingText = '';
         this.narrationBuffer = '';
+        this.lastFlushedLength = 0;
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -184,6 +185,7 @@ export class CommandHandler {
             this.narrationBuffer = '';
         }
         this.streamingText = '';
+        this.lastFlushedLength = 0;
     }
 
     /** Add a tool description to narration buffer (spoken with next text block) */
@@ -197,14 +199,32 @@ export class CommandHandler {
         }
     }
 
+    /** Flush every 80 chars OR after 150ms of quiet — whichever comes first */
+    private lastFlushedLength = 0;
+
     private scheduleStreamFlush(client: BridgeClient): void {
-        if (this.streamThrottleTimer) return;
+        // Flush immediately if we've accumulated 80+ new chars since last flush
+        const newChars = this.streamingText.length - this.lastFlushedLength;
+        if (newChars >= 80) {
+            if (this.streamThrottleTimer) {
+                clearTimeout(this.streamThrottleTimer);
+                this.streamThrottleTimer = undefined;
+            }
+            this.lastFlushedLength = this.streamingText.length;
+            client.sendStatus(this.streamingText);
+            return;
+        }
+        // Otherwise debounce — flush after 150ms of quiet
+        if (this.streamThrottleTimer) {
+            clearTimeout(this.streamThrottleTimer);
+        }
         this.streamThrottleTimer = setTimeout(() => {
             this.streamThrottleTimer = undefined;
             if (this.streamingText.trim()) {
+                this.lastFlushedLength = this.streamingText.length;
                 client.sendStatus(this.streamingText);
             }
-        }, 200);
+        }, 150);
     }
 
     private handleStreamEvent(
@@ -254,6 +274,7 @@ export class CommandHandler {
             this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
             // Reset so next text block creates fresh message on phone
             this.streamingText = '';
+            this.lastFlushedLength = 0;
         }
     }
 
