@@ -253,6 +253,21 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // ── Extension sends speak (intermediate TTS) ─────────────
+    if (role === 'extension' && msg.type === 'speak') {
+      const phone = getClient('phone');
+      if (phone) {
+        generateSpeech(msg.text).then((audioBuffer) => {
+          if (audioBuffer && phone.readyState === WebSocket.OPEN) {
+            const base64 = audioBuffer.toString('base64');
+            sendJSON(phone, { type: 'audio', data: base64, final: false });
+            console.log(`[${timestamp()}] Sent intermediate TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
+          }
+        });
+      }
+      return;
+    }
+
     // ── Extension sends result ─────────────────────────────────
     if (role === 'extension' && msg.type === 'result') {
       state.currentTaskStatus = 'complete';
@@ -262,12 +277,12 @@ wss.on('connection', (ws) => {
       if (phone) {
         sendJSON(phone, { type: 'result', text: msg.text });
 
-        // Generate TTS audio and send to phone
+        // Generate TTS audio and send to phone (marked as final)
         generateSpeech(msg.text).then((audioBuffer) => {
           if (audioBuffer && phone.readyState === WebSocket.OPEN) {
             const base64 = audioBuffer.toString('base64');
-            sendJSON(phone, { type: 'audio', data: base64 });
-            console.log(`[${timestamp()}] Sent TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
+            sendJSON(phone, { type: 'audio', data: base64, final: true });
+            console.log(`[${timestamp()}] Sent final TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
           }
         });
       }

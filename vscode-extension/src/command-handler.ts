@@ -156,19 +156,36 @@ export class CommandHandler {
         });
     }
 
-    /** Send accumulated streaming text to phone (throttled to avoid flooding) */
+    /** Send accumulated streaming text to phone */
     private flushStreamingText(client: BridgeClient): void {
+        if (this.streamThrottleTimer) {
+            clearTimeout(this.streamThrottleTimer);
+            this.streamThrottleTimer = undefined;
+        }
         if (this.streamingText.trim()) {
             client.sendStatus(this.streamingText);
         }
+    }
+
+    /** Flush text to phone AND send it to TTS, then reset for next block */
+    private flushAndSpeak(client: BridgeClient): void {
+        this.flushStreamingText(client);
+        const text = this.streamingText.trim();
+        if (text.length > 20) {
+            // Only speak if there's meaningful text (not just "Thinking...")
+            client.sendSpeak(text);
+        }
+        this.streamingText = '';
     }
 
     private scheduleStreamFlush(client: BridgeClient): void {
         if (this.streamThrottleTimer) return;
         this.streamThrottleTimer = setTimeout(() => {
             this.streamThrottleTimer = undefined;
-            this.flushStreamingText(client);
-        }, 200); // Send updates to phone every 200ms
+            if (this.streamingText.trim()) {
+                client.sendStatus(this.streamingText);
+            }
+        }, 200);
     }
 
     private handleStreamEvent(
@@ -184,8 +201,8 @@ export class CommandHandler {
                     this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
                     this.flushStreamingText(client);
                 } else if (block.type === 'tool_use') {
-                    // Flush any pending text before showing tool call
-                    this.flushStreamingText(client);
+                    // Flush text AND speak it before showing tool call
+                    this.flushAndSpeak(client);
                     const msg = this.describeToolCall(block);
                     this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
                     client.sendToolStatus(msg);
@@ -196,23 +213,17 @@ export class CommandHandler {
                 onText(event.delta.text);
                 this.streamingText += event.delta.text;
                 this.writeEmitter.fire(`\x1b[36m${event.delta.text.replace(/\n/g, '\r\n')}\x1b[0m`);
-                // Stream to phone with throttling
                 this.scheduleStreamFlush(client);
             }
         } else if (event.type === 'result') {
-            // Flush final text
-            if (this.streamThrottleTimer) {
-                clearTimeout(this.streamThrottleTimer);
-                this.streamThrottleTimer = undefined;
-            }
             this.flushStreamingText(client);
         } else if (event.type === 'system' && event.subtype === 'tool_use') {
-            this.flushStreamingText(client);
+            this.flushAndSpeak(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
-            this.flushStreamingText(client);
+            this.flushAndSpeak(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
@@ -220,7 +231,7 @@ export class CommandHandler {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
             this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
-            // Reset streaming text after tool results so next text block is fresh
+            // Reset so next text block creates fresh message on phone
             this.streamingText = '';
         }
     }

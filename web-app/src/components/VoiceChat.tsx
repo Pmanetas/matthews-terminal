@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, Loader2 } from 'lucide-react'
+import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -16,12 +16,15 @@ function stopAudioPlayback() {
 
 function ToolIcon({ text }: { text: string }) {
   const t = text.toLowerCase()
-  if (t.includes('reading')) return <FileText className="w-3.5 h-3.5 text-amber-400" />
-  if (t.includes('running a command')) return <Terminal className="w-3.5 h-3.5 text-amber-400" />
-  if (t.includes('searching')) return <Search className="w-3.5 h-3.5 text-amber-400" />
-  if (t.includes('changes to') || t.includes('editing')) return <Pencil className="w-3.5 h-3.5 text-amber-400" />
-  if (t.includes('creating')) return <FilePlus className="w-3.5 h-3.5 text-amber-400" />
-  return <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+  if (t.startsWith('reading')) return <FileText className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('running')) return <Terminal className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('searching')) return <Search className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('editing')) return <Pencil className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('creating')) return <FilePlus className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('planning') || t.startsWith('checking task')) return <ListTodo className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('searching the web') || t.startsWith('fetching')) return <Globe className="w-3.5 h-3.5 text-amber-400" />
+  if (t.startsWith('looking up')) return <Wrench className="w-3.5 h-3.5 text-amber-400" />
+  return <CheckCircle2 className="w-3.5 h-3.5 text-amber-400" />
 }
 
 export function VoiceChat() {

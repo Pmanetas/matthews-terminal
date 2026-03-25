@@ -64,6 +64,38 @@ function getWsUrl(): string {
 const WS_URL = getWsUrl()
 const RECONNECT_INTERVAL = 3000
 
+interface AudioQueueItem {
+  url: string
+  isFinal: boolean
+}
+
+let isPlayingAudio = false
+
+function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
+  const queue = _audioQueue
+  if (isPlayingAudio || queue.length === 0 || !sharedAudio) return
+
+  isPlayingAudio = true
+  const item = queue.shift()!
+  ensureAnalyser()
+  audioContext?.resume()
+  sharedAudio.volume = 1.0
+  sharedAudio.src = item.url
+  sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))
+  sharedAudio.onended = () => {
+    URL.revokeObjectURL(item.url)
+    isPlayingAudio = false
+    if (queue.length > 0) {
+      playNextAudio(onAudioDoneRef)
+    } else if (item.isFinal) {
+      // Only auto-listen after the final audio chunk
+      onAudioDoneRef.current?.()
+    }
+  }
+}
+
+const _audioQueue: AudioQueueItem[] = []
+
 export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [messages, setMessages] = useState<Message[]>([])
@@ -71,6 +103,7 @@ export function useBridge(onAudioDone?: () => void) {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onAudioDoneRef = useRef(onAudioDone)
   onAudioDoneRef.current = onAudioDone
+  const audioQueueRef = useRef(_audioQueue)
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN ||
@@ -99,52 +132,46 @@ export function useBridge(onAudioDone?: () => void) {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
             // Tool call — add as a separate step in the chat
-            setMessages((prev) => [
-              ...prev,
-              { role: 'tool' as const, text: data.text, timestamp: Date.now() },
-            ])
-          } else if (data.type === 'status') {
-            // Streaming text: find and update the last streaming assistant message, or create one
+            // First, finalize any streaming assistant message above
             setMessages((prev) => {
-              // Find the last streaming assistant message (might have tool msgs after it)
               const lastStreamIdx = prev.findLastIndex((m) => m.role === 'assistant' && m.streaming)
               if (lastStreamIdx >= 0) {
                 const updated = [...prev]
-                updated[lastStreamIdx] = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }
-                return updated
+                updated[lastStreamIdx] = { ...updated[lastStreamIdx], streaming: false }
+                return [...updated, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
               }
-              // Create new streaming message
+              return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
+            })
+          } else if (data.type === 'status') {
+            // Streaming text — always update/create at the END of the list
+            setMessages((prev) => {
+              const last = prev[prev.length - 1]
+              // If the very last message is a streaming assistant message, update it in-place
+              if (last && last.role === 'assistant' && last.streaming) {
+                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
+              }
+              // Otherwise (last message is a tool call, user msg, or finalized assistant) — create new streaming message at the end
               return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now(), streaming: true }]
             })
           } else if (data.type === 'result') {
-            // Final response: find last streaming assistant message and finalize it
+            // Final response: finalize the last streaming message, or add new one
             setMessages((prev) => {
-              const lastStreamIdx = prev.findLastIndex((m) => m.role === 'assistant' && m.streaming)
-              if (lastStreamIdx >= 0) {
-                const updated = [...prev]
-                updated[lastStreamIdx] = { role: 'assistant' as const, text: data.text, timestamp: Date.now() }
-                return updated
+              const last = prev[prev.length - 1]
+              if (last && last.role === 'assistant' && last.streaming) {
+                return [...prev.slice(0, -1), { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
               }
-              return [...prev, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
+              // Find any remaining streaming messages and finalize them
+              const updated = prev.map((m) => m.streaming ? { ...m, streaming: false } : m)
+              return [...updated, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
             })
           } else if (data.type === 'audio' && data.data) {
-            // Play ElevenLabs audio using the unlocked shared element
+            // Queue audio — play immediately or after current audio finishes
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
               const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
-              if (sharedAudio) {
-                ensureAnalyser()
-                audioContext?.resume()
-                sharedAudio.volume = 1.0
-                sharedAudio.src = url
-                sharedAudio.play().catch((e) => console.error('[Audio] Playback failed:', e))
-                sharedAudio.onended = () => {
-                  URL.revokeObjectURL(url)
-                  // Auto-restart listening after Claude finishes speaking
-                  onAudioDoneRef.current?.()
-                }
-              }
+              audioQueueRef.current.push({ url, isFinal: !!data.final })
+              playNextAudio(onAudioDoneRef)
             } catch (e) {
               console.error('[Audio] Error:', e)
             }

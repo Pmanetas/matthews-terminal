@@ -121,6 +121,13 @@ export class BridgeClient {
     }
 
     /**
+     * Sends text to be spoken via TTS immediately (intermediate speech).
+     */
+    sendSpeak(text: string): void {
+        this.send({ type: 'speak', text });
+    }
+
+    /**
      * Sends a result message back to the bridge.
      */
     sendResult(text: string): void {
