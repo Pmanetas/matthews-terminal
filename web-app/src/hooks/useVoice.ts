@@ -36,6 +36,8 @@ export function useVoice() {
   const [supported, setSupported] = useState(true)
   const [micError, setMicError] = useState('')
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const retryCountRef = useRef(0)
+  const MAX_RETRIES = 3
 
   useEffect(() => {
     if (!getSpeechRecognitionConstructor()) {
@@ -43,9 +45,11 @@ export function useVoice() {
     }
   }, [])
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback((isRetry = false) => {
     const SpeechRecognition = getSpeechRecognitionConstructor()
     if (!SpeechRecognition) return
+
+    if (!isRetry) retryCountRef.current = 0
 
     // Stop any existing session — detach handlers first so old onend doesn't interfere
     if (recognitionRef.current) {
@@ -89,7 +93,15 @@ export function useVoice() {
     recognition.onerror = (event: { error: string }) => {
       console.error('[Voice] Speech recognition error:', event.error)
       if (recognitionRef.current === recognition) {
-        setMicError(event.error)
+        // Auto-retry on network errors (Chrome uses Google's servers)
+        if (event.error === 'network' && retryCountRef.current < MAX_RETRIES) {
+          retryCountRef.current++
+          setMicError(`Connecting... (attempt ${retryCountRef.current + 1})`)
+          recognitionRef.current = null
+          setTimeout(() => startListening(true), 500)
+          return
+        }
+        setMicError(event.error === 'network' ? 'Speech service unavailable — try your phone instead' : event.error)
         setIsListening(false)
         recognitionRef.current = null
       }
