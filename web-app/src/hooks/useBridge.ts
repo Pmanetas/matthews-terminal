@@ -178,7 +178,7 @@ export function useBridge(onAudioDone?: () => void) {
                 const newTarget = getTarget(data.text)
 
                 if (lastTarget && newTarget && lastTarget === newTarget) {
-                  // Same file — collapse into single entry with step count, keep latest diff lines
+                  // Same file — collapse, ACCUMULATE all diff lines from every step
                   const countMatch = last.text.match(/\((\d+) steps?\)/)
                   const count = countMatch ? parseInt(countMatch[1], 10) + 1 : 2
                   const newLines = data.text.split('\n')
@@ -186,9 +186,11 @@ export function useBridge(onAudioDone?: () => void) {
                   if (actionMatch) {
                     const label = count === 1 ? 'step' : 'steps'
                     const header = `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`
-                    // Keep diff lines (⊖/⊕) from the latest tool call
-                    const diffLines = newLines.slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
-                    const merged = diffLines.length > 0 ? header + '\n' + diffLines.join('\n') : header
+                    // Keep ALL existing diff lines + append new ones
+                    const existingDiffs = last.text.split('\n').slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
+                    const newDiffs = newLines.slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
+                    const allDiffs = [...existingDiffs, ...newDiffs]
+                    const merged = allDiffs.length > 0 ? header + '\n' + allDiffs.join('\n') : header
                     return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
                   }
                 }
