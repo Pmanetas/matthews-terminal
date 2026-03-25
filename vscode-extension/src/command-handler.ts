@@ -28,24 +28,17 @@ export class CommandHandler {
             return;
         }
 
-        // Ensure terminal exists
         this.ensureTerminal();
-        this.terminal?.show(false); // false = take focus so user sees output
+        this.terminal?.show(false);
 
         this.isProcessing = true;
-
-        // Show user message in terminal
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
 
         try {
             const response = await this.runClaude(text, client);
-            // Show response in terminal
-            this.writeEmitter.fire(`\x1b[36m🤖 Claude:\x1b[0m\r\n`);
-            this.writeEmitter.fire(response.replace(/\n/g, '\r\n'));
             this.writeEmitter.fire('\r\n');
-            // Send final response to phone
             client.sendResult(response);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -66,7 +59,7 @@ export class CommandHandler {
                 ? `${process.env.APPDATA}\\npm\\claude.cmd`
                 : 'claude';
 
-            const args = ['--print', '--dangerously-skip-permissions'];
+            const args = ['--print', '--dangerously-skip-permissions', '--output-format', 'stream-json'];
             if (this.conversationStarted) {
                 args.push('--continue');
             }
@@ -77,27 +70,40 @@ export class CommandHandler {
                 env: { ...process.env },
             });
 
-            let fullOutput = '';
+            let fullResponseText = '';
+            let lineBuffer = '';
 
             this.activeProcess.stdout?.on('data', (data: Buffer) => {
-                const chunk = data.toString();
-                fullOutput += chunk;
-                // Stream to terminal
-                this.writeEmitter.fire(chunk.replace(/\n/g, '\r\n'));
-                // Stream to phone
-                client.sendStatus(fullOutput);
+                lineBuffer += data.toString();
+
+                // Process complete JSON lines
+                const lines = lineBuffer.split('\n');
+                lineBuffer = lines.pop() || ''; // keep incomplete line in buffer
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+
+                    try {
+                        const event = JSON.parse(trimmed);
+                        this.handleStreamEvent(event, client, (text) => {
+                            fullResponseText += text;
+                        });
+                    } catch {
+                        // Not JSON — show raw output
+                        this.writeEmitter.fire(trimmed.replace(/\n/g, '\r\n') + '\r\n');
+                    }
+                }
             });
 
             this.activeProcess.stderr?.on('data', (data: Buffer) => {
                 const err = data.toString().trim();
                 if (err.length > 0) {
                     console.error('[Matthews Terminal] stderr:', err);
-                    // Show stderr in terminal too so user can see what's happening
                     this.writeEmitter.fire(`\x1b[2m${err.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
                 }
             });
 
-            // Write prompt via stdin to avoid shell escaping issues
             this.activeProcess.stdin?.write(prompt);
             this.activeProcess.stdin?.end();
 
@@ -110,15 +116,26 @@ export class CommandHandler {
             });
 
             this.activeProcess.on('close', (code) => {
+                // Process any remaining buffer
+                if (lineBuffer.trim()) {
+                    try {
+                        const event = JSON.parse(lineBuffer.trim());
+                        this.handleStreamEvent(event, client, (text) => {
+                            fullResponseText += text;
+                        });
+                    } catch {
+                        // ignore
+                    }
+                }
+
                 this.conversationStarted = true;
                 if (code === 0) {
-                    resolve(fullOutput.trim() || 'Done.');
+                    resolve(fullResponseText.trim() || 'Done.');
                 } else {
-                    reject(new Error(fullOutput.trim() || `Claude exited with code ${code}`));
+                    reject(new Error(fullResponseText.trim() || `Claude exited with code ${code}`));
                 }
             });
 
-            // Timeout after 3 minutes
             setTimeout(() => {
                 if (this.isProcessing && this.activeProcess) {
                     this.activeProcess.kill();
@@ -126,6 +143,85 @@ export class CommandHandler {
                 }
             }, 180_000);
         });
+    }
+
+    /**
+     * Parse a stream-json event and display it nicely in the terminal.
+     * Also accumulates response text and sends streaming status to phone.
+     */
+    private handleStreamEvent(
+        event: any,
+        client: BridgeClient,
+        onText: (text: string) => void,
+    ): void {
+        // Handle different event types from claude --output-format stream-json
+        if (event.type === 'assistant' && event.message?.content) {
+            for (const block of event.message.content) {
+                if (block.type === 'text') {
+                    onText(block.text);
+                    this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
+                    client.sendStatus(block.text);
+                } else if (block.type === 'tool_use') {
+                    this.showToolCall(block);
+                }
+            }
+        } else if (event.type === 'content_block_delta') {
+            if (event.delta?.type === 'text_delta' && event.delta.text) {
+                onText(event.delta.text);
+                this.writeEmitter.fire(`\x1b[36m${event.delta.text.replace(/\n/g, '\r\n')}\x1b[0m`);
+            }
+        } else if (event.type === 'result') {
+            // Final result — may contain the full text
+            if (event.result) {
+                // Don't double-add if already accumulated
+                if (!event.result.startsWith('{')) {
+                    this.writeEmitter.fire(`\r\n\x1b[36m${event.result.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
+                }
+            }
+        } else if (event.type === 'system' && event.subtype === 'tool_use') {
+            this.showToolCall(event);
+        } else if (event.type === 'tool_use' || event.tool_name || event.name) {
+            this.showToolCall(event);
+        } else if (event.type === 'tool_result') {
+            // Show brief tool result
+            const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
+            const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
+            this.writeEmitter.fire(`\x1b[2m   ↳ ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
+        }
+    }
+
+    /**
+     * Display a tool call (Read, Edit, Write, Bash, etc.) in the terminal
+     */
+    private showToolCall(block: any): void {
+        const toolName = block.name || block.tool_name || 'tool';
+        const input = block.input || {};
+
+        let display = '';
+        switch (toolName) {
+            case 'Read':
+                display = `📖 Reading: ${input.file_path || 'file'}`;
+                break;
+            case 'Edit':
+                display = `✏️  Editing: ${input.file_path || 'file'}`;
+                break;
+            case 'Write':
+                display = `📝 Writing: ${input.file_path || 'file'}`;
+                break;
+            case 'Bash':
+                display = `💻 Running: ${(input.command || '').slice(0, 100)}`;
+                break;
+            case 'Glob':
+                display = `🔍 Searching files: ${input.pattern || ''}`;
+                break;
+            case 'Grep':
+                display = `🔎 Searching code: ${input.pattern || ''}`;
+                break;
+            default:
+                display = `🔧 ${toolName}: ${JSON.stringify(input).slice(0, 100)}`;
+        }
+
+        this.writeEmitter.fire(`\r\n\x1b[33m${display}\x1b[0m\r\n`);
     }
 
     private ensureTerminal(): void {
