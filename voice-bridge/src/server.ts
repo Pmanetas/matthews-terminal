@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { spawn } from 'child_process';
-import { readFile, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -35,24 +33,8 @@ async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<s
   return data.text || '';
 }
 
-// ── Piper TTS (local, free) ───────────────────────────────────────
-const __filename2 = fileURLToPath(import.meta.url);
-const __dirname2 = path.dirname(__filename2);
-// Piper binary + model live in voice-bridge/piper/ and voice-bridge/voices/
-// Try both __dirname-relative and cwd-relative paths (covers different deploy setups)
-import { existsSync } from 'fs';
-const piperFromDir = path.join(__dirname2, '..', 'piper', 'piper');
-const piperFromCwd = path.join(process.cwd(), 'piper', 'piper');
-const PIPER_BIN = existsSync(piperFromDir) ? piperFromDir : piperFromCwd;
-const modelFromDir = path.join(__dirname2, '..', 'voices', 'en_US-lessac-medium.onnx');
-const modelFromCwd = path.join(process.cwd(), 'voices', 'en_US-lessac-medium.onnx');
-const PIPER_MODEL = existsSync(modelFromDir) ? modelFromDir : modelFromCwd;
-console.log(`[Piper] Binary: ${PIPER_BIN} (exists: ${existsSync(PIPER_BIN)})`);
-console.log(`[Piper] Model: ${PIPER_MODEL} (exists: ${existsSync(PIPER_MODEL)})`);
-
-// Optional ElevenLabs fallback if Piper binary not found
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB';
+// ── OpenAI TTS ────────────────────────────────────────────────────
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 function cleanTextForTTS(text: string): string {
   return text
@@ -61,97 +43,46 @@ function cleanTextForTTS(text: string): string {
     .replace(/\n{2,}/g, '. ')
     .replace(/\n/g, ' ')
     .trim()
-    .slice(0, 2000);
+    .slice(0, 4000);
 }
 
-/** Generate speech using Piper TTS (local) → returns WAV buffer */
-function generateSpeechPiper(text: string): Promise<Buffer | null> {
-  const ttsText = cleanTextForTTS(text);
-  if (!ttsText) return Promise.resolve(null);
-
-  const tmpFile = `/tmp/piper_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`;
-
-  return new Promise((resolve) => {
-    try {
-      const piper = spawn(PIPER_BIN, [
-        '--model', PIPER_MODEL,
-        '--output_file', tmpFile,
-        '--length_scale', '1.0',
-      ]);
-
-      piper.stdin.write(ttsText);
-      piper.stdin.end();
-
-      piper.on('close', async (code) => {
-        if (code === 0) {
-          try {
-            const wav = await readFile(tmpFile);
-            await unlink(tmpFile).catch(() => {});
-            console.log(`[${timestamp()}] Piper TTS: ${ttsText.length} chars → ${Math.round(wav.length / 1024)}KB WAV`);
-            resolve(wav);
-          } catch (err) {
-            console.error(`[${timestamp()}] Failed to read Piper output:`, err);
-            resolve(null);
-          }
-        } else {
-          console.error(`[${timestamp()}] Piper exited with code ${code}`);
-          await unlink(tmpFile).catch(() => {});
-          resolve(null);
-        }
-      });
-
-      piper.on('error', (err) => {
-        console.error(`[${timestamp()}] Piper error:`, err.message);
-        resolve(null);
-      });
-
-      // Log stderr for debugging
-      piper.stderr?.on('data', (data: Buffer) => {
-        console.log(`[${timestamp()}] Piper: ${data.toString().trim()}`);
-      });
-    } catch (err) {
-      console.error(`[${timestamp()}] Piper TTS error:`, err);
-      resolve(null);
-    }
-  });
-}
-
-/** Fallback: ElevenLabs TTS (API, costs money) */
-async function generateSpeechElevenLabs(text: string): Promise<Buffer | null> {
-  if (!ELEVENLABS_API_KEY) return null;
+async function generateSpeech(text: string): Promise<Buffer | null> {
+  if (!OPENAI_API_KEY) {
+    console.error(`[${timestamp()}] OPENAI_API_KEY not configured`);
+    return null;
+  }
 
   const ttsText = cleanTextForTTS(text);
   if (!ttsText) return null;
-  const finalText = /[.!?]$/.test(ttsText) ? ttsText : ttsText + '.';
 
   try {
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
-        'xi-api-key': ELEVENLABS_API_KEY,
       },
       body: JSON.stringify({
-        text: finalText,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+        model: 'tts-1',
+        voice: 'onyx',
+        input: ttsText,
+        response_format: 'mp3',
       }),
     });
-    if (!res.ok) return null;
-    return Buffer.from(await res.arrayBuffer());
-  } catch {
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      console.error(`[${timestamp()}] OpenAI TTS error: ${res.status} ${res.statusText} - ${errBody}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    console.log(`[${timestamp()}] OpenAI TTS: ${ttsText.length} chars → ${Math.round(buffer.length / 1024)}KB MP3`);
+    return buffer;
+  } catch (err: any) {
+    console.error(`[${timestamp()}] OpenAI TTS error:`, err.message);
     return null;
   }
-}
-
-/** Try Piper first, fall back to ElevenLabs if Piper not available */
-async function generateSpeech(text: string): Promise<Buffer | null> {
-  // Try Piper first (free, fast)
-  const piperResult = await generateSpeechPiper(text);
-  if (piperResult) return piperResult;
-
-  // Fallback to ElevenLabs
-  return generateSpeechElevenLabs(text);
 }
 
 // ── Types ──────────────────────────────────────────────────────────

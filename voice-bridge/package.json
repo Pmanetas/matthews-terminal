@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "build": "echo 'no build needed'",
-    "postinstall": "bash setup-piper.sh || echo 'Piper setup skipped (not Linux or download failed)'"
+    "build": "echo 'no build needed'"
   },
   "engines": {
     "node": ">=18"
