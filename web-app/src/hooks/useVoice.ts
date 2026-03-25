@@ -1,90 +1,123 @@
 import { useCallback, useRef, useState } from 'react'
 
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList
+  resultIndex: number
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  abort(): void
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onend: (() => void) | null
+  onerror: ((event: { error: string }) => void) | null
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognitionInstance
+    webkitSpeechRecognition: new () => SpeechRecognitionInstance
+  }
+}
+
+function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionInstance) | null {
+  if (typeof window === 'undefined') return null
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null
+}
+
 export function useVoice() {
   const [isListening, setIsListening] = useState(false)
-  const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [ttsEnabled, setTtsEnabled] = useState(false)
-  const [supported, setSupported] = useState(true)
+  const [supported, setSupported] = useState(!!getSpeechRecognitionConstructor())
   const [micError, setMicError] = useState('')
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const streamRef = useRef<MediaStream | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const startListening = useCallback(() => {
-    // Reset state
-    setTranscript('')
+    const SpeechRecognition = getSpeechRecognitionConstructor()
+    if (!SpeechRecognition) {
+      setSupported(false)
+      return
+    }
+
+    // Detach old handlers before abort to prevent stale onend
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null
+      recognitionRef.current.onerror = null
+      recognitionRef.current.onresult = null
+      recognitionRef.current.abort()
+      recognitionRef.current = null
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognitionRef.current = recognition
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let allFinal = ''
+      let currentInterim = ''
+
+      // Accumulate ALL results including across pauses
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          allFinal += result[0].transcript
+        } else {
+          currentInterim += result[0].transcript
+        }
+      }
+
+      setTranscript(allFinal + currentInterim)
+    }
+
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition) {
+        setIsListening(false)
+        recognitionRef.current = null
+      }
+    }
+
+    recognition.onerror = (event: { error: string }) => {
+      console.error('[Voice] Speech recognition error:', event.error)
+      if (recognitionRef.current === recognition) {
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          // Not a real error — just no speech detected or we aborted
+          return
+        }
+        setMicError(event.error === 'network'
+          ? 'Speech service unavailable — use your phone instead'
+          : event.error)
+        setIsListening(false)
+        recognitionRef.current = null
+      }
+    }
+
     setMicError('')
+    setTranscript('')
     setIsListening(true)
 
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then((stream) => {
-        streamRef.current = stream
-
-        // Pick a supported mime type
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : 'audio/mp4'
-
-        const recorder = new MediaRecorder(stream, { mimeType })
-        mediaRecorderRef.current = recorder
-        chunksRef.current = []
-
-        recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunksRef.current.push(e.data)
-        }
-
-        recorder.onstop = async () => {
-          // Release mic immediately
-          stream.getTracks().forEach((t) => t.stop())
-          streamRef.current = null
-
-          if (chunksRef.current.length === 0) return
-
-          const blob = new Blob(chunksRef.current, { type: mimeType })
-          setIsTranscribing(true)
-
-          try {
-            const res = await fetch('/transcribe', {
-              method: 'POST',
-              headers: { 'Content-Type': mimeType },
-              body: blob,
-            })
-
-            if (res.ok) {
-              const data = await res.json()
-              const text = (data.text || '').trim()
-              setTranscript(text)
-            } else {
-              const err = await res.json().catch(() => ({ error: 'Unknown error' }))
-              setMicError(err.error || 'Transcription failed')
-            }
-          } catch {
-            setMicError('Could not reach transcription service')
-          } finally {
-            setIsTranscribing(false)
-          }
-        }
-
-        // Record in 1-second chunks for reliability
-        recorder.start(1000)
-      })
-      .catch((err) => {
-        console.error('[Voice] getUserMedia error:', err)
-        setMicError('Microphone access denied')
-        setIsListening(false)
-        setSupported(false)
-      })
+    try {
+      recognition.start()
+    } catch (err) {
+      console.error('[Voice] Failed to start recognition:', err)
+      setIsListening(false)
+    }
   }, [])
 
   const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop()
+    if (recognitionRef.current) {
+      recognitionRef.current.onend = null
+      recognitionRef.current.onerror = null
+      recognitionRef.current.stop()
+      recognitionRef.current = null
     }
-    mediaRecorderRef.current = null
     setIsListening(false)
   }, [])
 
@@ -92,15 +125,11 @@ export function useVoice() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 1.0
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
     window.speechSynthesis.speak(utterance)
   }, [])
 
   return {
     isListening,
-    isTranscribing,
     transcript,
     ttsEnabled,
     setTtsEnabled,

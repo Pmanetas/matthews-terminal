@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Send, Volume2, VolumeX, Loader2 } from 'lucide-react'
+import { Mic, Send, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
 import { useBridge, sharedAudio, getAudioLevel } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
-// Stop audio playback so microphone can be used
 function stopAudioPlayback() {
   if (sharedAudio) {
     sharedAudio.pause()
@@ -16,22 +15,23 @@ function stopAudioPlayback() {
 }
 
 export function VoiceChat() {
-  const [audioJustFinished, setAudioJustFinished] = useState(false)
   const [pendingMessage, setPendingMessage] = useState('')
-  const hasSentRef = useRef(false) // prevent duplicate sends
+  const autoListenRef = useRef<(() => void) | null>(null)
+  const hasSentRef = useRef(false)
 
   const { status, messages, sendCommand } = useBridge(() => {
+    // Called when ElevenLabs audio finishes
     stopAudioPlayback()
-    setAudioJustFinished(true)
+    // Auto-listen after TTS finishes
+    autoListenRef.current?.()
   })
 
-  const {
-    isListening, isTranscribing, transcript, ttsEnabled, setTtsEnabled,
-    startListening, stopListening, supported, micError,
-  } = useVoice()
+  const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported, micError } =
+    useVoice()
+
+  autoListenRef.current = startListening
 
   const chatEndRef = useRef<HTMLDivElement>(null)
-
   const isProcessing = messages.length > 0 && messages[messages.length - 1]?.role === 'user'
   const sphereActive = isListening || isProcessing
 
@@ -40,18 +40,14 @@ export function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Clear prompt when user starts listening
+  // Reset sent guard when starting to listen
   useEffect(() => {
-    if (isListening) {
-      setAudioJustFinished(false)
-      hasSentRef.current = false
-    }
+    if (isListening) hasSentRef.current = false
   }, [isListening])
 
-  // When transcript arrives from Whisper, check for "send" or hold as pending
+  // Real-time "send" detection + pending message handling
   useEffect(() => {
     if (!transcript || hasSentRef.current) return
-
     const trimmed = transcript.trim()
     if (!trimmed) return
 
@@ -60,13 +56,15 @@ export function VoiceChat() {
       const msg = trimmed.replace(sendPattern, '').trim()
       if (msg) {
         hasSentRef.current = true
+        stopListening()
         setPendingMessage('')
         sendCommand(msg)
       }
-    } else {
+    } else if (!isListening) {
+      // Stopped without saying "send" — hold as pending
       setPendingMessage(trimmed)
     }
-  }, [transcript, sendCommand])
+  }, [isListening, transcript, sendCommand, stopListening])
 
   const handleSend = () => {
     if (pendingMessage && !hasSentRef.current) {
@@ -78,7 +76,6 @@ export function VoiceChat() {
 
   const handleMicClick = () => {
     stopAudioPlayback()
-    setAudioJustFinished(false)
     if (isListening) {
       stopListening()
     } else {
@@ -101,7 +98,7 @@ export function VoiceChat() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[128px] animate-pulse" style={{ animationDelay: '700ms' }} />
       </div>
 
-      {/* Header — sphere + title + status */}
+      {/* Header */}
       <div className="relative z-10 flex flex-col items-center pt-8 pb-4 shrink-0">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -119,7 +116,7 @@ export function VoiceChat() {
         </div>
       </div>
 
-      {/* Chat area — scrollable */}
+      {/* Chat area */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-4 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
         <div className="max-w-lg mx-auto space-y-4">
           {messages.length === 0 ? (
@@ -165,7 +162,6 @@ export function VoiceChat() {
 
       {/* Bottom controls */}
       <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-4 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B] to-transparent">
-        {/* Status text */}
         <AnimatePresence mode="wait">
           {isListening ? (
             <motion.p
@@ -173,21 +169,10 @@ export function VoiceChat() {
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
-              className="text-xs text-violet-300"
+              className="text-xs text-violet-300 px-4 text-center max-w-[80%]"
             >
-              Recording... tap mic to stop
+              {transcript ? `"${transcript}"` : 'Listening... say "send" when done'}
             </motion.p>
-          ) : isTranscribing ? (
-            <motion.div
-              key="transcribing"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              className="flex items-center gap-2 text-xs text-violet-300/70"
-            >
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Transcribing...
-            </motion.div>
           ) : micError ? (
             <motion.p
               key="error"
@@ -208,16 +193,6 @@ export function VoiceChat() {
             >
               &ldquo;{pendingMessage}&rdquo;
             </motion.p>
-          ) : audioJustFinished ? (
-            <motion.p
-              key="tap-prompt"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              className="text-xs text-violet-300/70"
-            >
-              Tap to respond
-            </motion.p>
           ) : null}
         </AnimatePresence>
 
@@ -236,29 +211,23 @@ export function VoiceChat() {
           {/* Mic button */}
           <motion.button
             onClick={handleMicClick}
-            disabled={!supported || isTranscribing}
+            disabled={!supported}
             whileTap={{ scale: 0.92 }}
             className={cn(
               'relative flex items-center justify-center w-14 h-14 rounded-full transition-all duration-500',
               isListening
-                ? 'bg-red-500 shadow-[0_0_40px_rgba(239,68,68,0.5)]'
-                : audioJustFinished
-                  ? 'bg-violet-500/30 shadow-[0_0_30px_rgba(139,92,246,0.3)] border border-violet-400/30 animate-pulse'
-                  : 'bg-white/10 hover:bg-white/15 border border-white/10',
-              (!supported || isTranscribing) && 'opacity-30 cursor-not-allowed',
+                ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.5)]'
+                : 'bg-white/10 hover:bg-white/15 border border-white/10',
+              !supported && 'opacity-30 cursor-not-allowed',
             )}
           >
             {isListening && (
-              <span className="absolute inset-0 rounded-full bg-red-500/30 animate-ping" style={{ animationDuration: '1.5s' }} />
+              <span className="absolute inset-0 rounded-full bg-violet-500/30 animate-ping" style={{ animationDuration: '1.5s' }} />
             )}
-            {isListening ? (
-              <MicOff className="w-5 h-5 relative z-10 text-white" />
-            ) : (
-              <Mic className={cn('w-5 h-5 relative z-10', audioJustFinished ? 'text-white' : 'text-white/70')} />
-            )}
+            <Mic className={cn('w-5 h-5 relative z-10', isListening ? 'text-white' : 'text-white/70')} />
           </motion.button>
 
-          {/* Send button — appears when there's a pending message */}
+          {/* Send button */}
           <AnimatePresence>
             {pendingMessage ? (
               <motion.button
