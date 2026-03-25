@@ -30,7 +30,7 @@ export class CommandHandler {
 
         // Ensure terminal exists
         this.ensureTerminal();
-        this.terminal?.show(true);
+        this.terminal?.show(false); // false = take focus so user sees output
 
         this.isProcessing = true;
 
@@ -92,6 +92,8 @@ export class CommandHandler {
                 const err = data.toString().trim();
                 if (err.length > 0) {
                     console.error('[Matthews Terminal] stderr:', err);
+                    // Show stderr in terminal too so user can see what's happening
+                    this.writeEmitter.fire(`\x1b[2m${err.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
                 }
             });
 

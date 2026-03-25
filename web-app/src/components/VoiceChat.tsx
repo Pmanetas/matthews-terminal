@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Volume2, VolumeX } from 'lucide-react'
+import { Mic, Send, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -12,27 +12,23 @@ function stopAudioPlayback() {
   if (sharedAudio) {
     sharedAudio.pause()
     sharedAudio.currentTime = 0
-    // Don't clear src or call load() — that causes a long delay on iOS
   }
 }
 
 export function VoiceChat() {
-  // Track when audio just finished so we can prompt user to tap mic (fallback)
   const [audioJustFinished, setAudioJustFinished] = useState(false)
+  const [pendingMessage, setPendingMessage] = useState('')
   const autoListenRef = useRef<(() => void) | null>(null)
 
   const { status, messages, sendCommand } = useBridge(() => {
-    // Called when ElevenLabs audio finishes — stop playback and auto-listen
     stopAudioPlayback()
     setAudioJustFinished(true)
-    // Try auto-listen (works on Android/desktop; iOS may block without gesture)
     autoListenRef.current?.()
   })
 
   const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported } =
     useVoice()
 
-  // Keep ref updated so the bridge callback can use it
   autoListenRef.current = startListening
 
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -50,19 +46,40 @@ export function VoiceChat() {
     if (isListening) setAudioJustFinished(false)
   }, [isListening])
 
-  // Send transcript when done listening
+  // When done listening, hold transcript as pending (don't auto-send)
+  // BUT if the user says "send" at the end, strip it and send immediately
   useEffect(() => {
-    if (!isListening && transcript) sendCommand(transcript)
+    if (!isListening && transcript) {
+      const trimmed = transcript.trim()
+      const sendPattern = /\bsend\s*$/i
+      if (sendPattern.test(trimmed)) {
+        // User said "send" — strip it and send
+        const msg = trimmed.replace(sendPattern, '').trim()
+        if (msg) {
+          setPendingMessage('')
+          sendCommand(msg)
+        }
+      } else {
+        // Hold as pending
+        setPendingMessage(trimmed)
+      }
+    }
   }, [isListening, transcript, sendCommand])
 
+  const handleSend = () => {
+    if (pendingMessage) {
+      sendCommand(pendingMessage)
+      setPendingMessage('')
+    }
+  }
+
   const handleMicClick = () => {
-    // Stop any playing audio so mic can access the hardware
     stopAudioPlayback()
     setAudioJustFinished(false)
     if (isListening) {
       stopListening()
     } else {
-      // Start immediately — must stay in user gesture context for iOS
+      setPendingMessage('') // clear old pending when re-recording
       startListening()
     }
   }
@@ -98,8 +115,8 @@ export function VoiceChat() {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 pb-4">
+      {/* Chat area — scrollable */}
+      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 -webkit-overflow-scrolling-touch">
         <div className="max-w-lg mx-auto space-y-4">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12">Tap the mic to start talking</p>
@@ -112,14 +129,12 @@ export function VoiceChat() {
                 transition={{ duration: 0.2 }}
               >
                 {msg.role === 'user' ? (
-                  /* User message — right aligned bubble */
                   <div className="flex justify-end">
                     <div className="max-w-[80%] bg-violet-500/15 border border-violet-500/15 rounded-2xl rounded-br-md px-4 py-2.5">
                       <p className="text-sm text-white/80">{msg.text}</p>
                     </div>
                   </div>
                 ) : (
-                  /* Claude response — full width, rich formatting */
                   <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl rounded-bl-md px-4 py-3">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
@@ -146,17 +161,27 @@ export function VoiceChat() {
 
       {/* Bottom controls */}
       <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-4 bg-gradient-to-t from-[#0A0A0B] via-[#0A0A0B] to-transparent">
-        {/* Listening / prompt status */}
-        <AnimatePresence>
+        {/* Status text / pending message preview */}
+        <AnimatePresence mode="wait">
           {isListening ? (
             <motion.p
               key="listening"
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
-              className="text-xs text-violet-300"
+              className="text-xs text-violet-300 px-4 text-center"
             >
               {transcript ? `"${transcript}"` : 'Listening...'}
+            </motion.p>
+          ) : pendingMessage ? (
+            <motion.p
+              key="pending"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="text-xs text-white/50 px-4 text-center max-w-[80%] line-clamp-2"
+            >
+              "{pendingMessage}"
             </motion.p>
           ) : audioJustFinished ? (
             <motion.p
@@ -204,8 +229,23 @@ export function VoiceChat() {
             <Mic className={cn('w-5 h-5 relative z-10', isListening ? 'text-white' : 'text-white/70')} />
           </motion.button>
 
-          {/* Spacer for symmetry */}
-          <div className="w-9" />
+          {/* Send button — appears when there's a pending message */}
+          <AnimatePresence>
+            {pendingMessage ? (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                onClick={handleSend}
+                whileTap={{ scale: 0.92 }}
+                className="p-2.5 rounded-full bg-violet-500 text-white shadow-[0_0_20px_rgba(139,92,246,0.4)]"
+              >
+                <Send className="w-4 h-4" />
+              </motion.button>
+            ) : (
+              <div className="w-9" />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
