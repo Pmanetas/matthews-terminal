@@ -9,7 +9,7 @@ export function MarkdownMessage({ text, className }: MarkdownMessageProps) {
   const blocks = parseBlocks(text)
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-1', className)}>
       {blocks.map((block, i) => {
         if (block.type === 'code') {
           return (
@@ -32,7 +32,7 @@ export function MarkdownMessage({ text, className }: MarkdownMessageProps) {
         return (
           <div
             key={i}
-            className="text-sm leading-relaxed text-white/70"
+            className="text-sm leading-relaxed text-violet-200/70"
             dangerouslySetInnerHTML={{ __html: renderInline(block.content) }}
           />
         )
@@ -89,6 +89,7 @@ function renderInline(text: string): string {
     .replace(/^[-•] (.+)$/gm, '<div class="flex gap-2 items-start"><span class="text-violet-400/60 mt-0.5">•</span><span>$1</span></div>')
     // Numbered lists
     .replace(/^(\d+)\. (.+)$/gm, '<div class="flex gap-2 items-start"><span class="text-violet-400/60 font-mono text-xs mt-0.5">$1.</span><span>$2</span></div>')
-    // Line breaks
-    .replace(/\n/g, '<br />')
+    // Double newlines = paragraph break, single newlines = space
+    .replace(/\n\n+/g, '<br /><br />')
+    .replace(/\n/g, ' ')
 }

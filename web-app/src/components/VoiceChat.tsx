@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,7 @@ function ToolIcon({ text }: { text: string }) {
   return <CheckCircle2 className="w-3 h-3 text-violet-400" />
 }
 
-/** Expanded tool: show header + all diff lines as sub-steps with mini dots */
+/** Expanded tool: show header + all accumulated diff lines with sub-dots */
 function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
@@ -30,16 +30,15 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
     return <span className="text-xs text-white/50 leading-tight">{header}</span>
   }
 
-  // Group diff lines into pairs (⊖ then ⊕) as sub-steps
   return (
     <div className="flex flex-col min-w-0 w-full">
-      <span className="text-xs text-white/50 leading-tight mb-1">{header}</span>
-      <div className="flex gap-2">
+      <span className="text-xs text-white/50 leading-tight mb-1.5">{header}</span>
+      <div className="flex gap-2.5">
         {/* Mini sub-timeline */}
-        <div className="flex flex-col items-center w-2 shrink-0 ml-1">
+        <div className="flex flex-col items-center w-2 shrink-0">
           {diffLines.map((_, idx) => (
-            <div key={idx} className="flex flex-col items-center flex-1">
-              <div className="w-1 h-1 bg-violet-500/40 shrink-0" />
+            <div key={idx} className="flex flex-col items-center flex-1 min-h-[18px]">
+              <div className="w-1 h-1 bg-violet-500/40 shrink-0 mt-1.5" />
               {idx < diffLines.length - 1 && <div className="w-px flex-1 bg-violet-500/10" />}
             </div>
           ))}
@@ -73,14 +72,13 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   )
 }
 
-/** Typing animation — only animates latest message, older ones render instantly */
-function TypingMarkdown({ text, animate }: { text: string; animate: boolean }) {
+/** Typing animation — scrolls as it types */
+function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: boolean; onUpdate?: () => void }) {
   const [chars, setChars] = useState(animate ? 0 : text.length)
   const prevTextRef = useRef(text)
 
   useEffect(() => {
     if (!animate) { setChars(text.length); return }
-    // If text changed (new message), start typing
     if (text !== prevTextRef.current) {
       prevTextRef.current = text
       setChars(0)
@@ -92,9 +90,10 @@ function TypingMarkdown({ text, animate }: { text: string; animate: boolean }) {
         if (next >= text.length) { clearInterval(id); return text.length }
         return next
       })
+      onUpdate?.()
     }, 8)
     return () => clearInterval(id)
-  }, [text, animate, chars])
+  }, [text, animate, chars, onUpdate])
 
   return <MarkdownMessage text={text.slice(0, chars)} />
 }
@@ -130,7 +129,6 @@ export function VoiceChat() {
     return -1
   })()
 
-  // Find last assistant message index (for typing animation)
   const lastAssistantIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'assistant') return i
@@ -138,9 +136,13 @@ export function VoiceChat() {
     return -1
   })()
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
   useEffect(() => {
     if (isListening) hasSentRef.current = false
@@ -193,24 +195,30 @@ export function VoiceChat() {
     }
   }
 
-  const statusColor =
-    status === 'connected' ? 'text-emerald-400' : status === 'connecting' ? 'text-yellow-400' : 'text-red-400'
+  const statusDot =
+    status === 'connected' ? 'bg-emerald-400' : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
+  const statusText =
+    status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white relative overflow-hidden">
-      {/* Header — title on top, waveform below */}
+      {/* Header */}
       <div className="relative z-10 flex flex-col items-center pt-6 pb-2 shrink-0">
         <h1 className="text-base font-bold tracking-[0.25em] uppercase text-violet-400/80 mb-3"
             style={{ textShadow: '0 0 20px rgba(139,92,246,0.3)' }}>
           MATTHEWS TERMINAL
         </h1>
         <VoiceWaveform isActive={waveformActive} size={200} getAudioLevel={getAudioLevel} />
+        <div className="flex items-center gap-2 mt-3">
+          <span className={cn('h-1.5 w-1.5', statusDot)} />
+          <span className="text-[10px] text-white/25 tracking-wide">{statusText}</span>
+        </div>
         <div className="w-full mt-4 h-px bg-gradient-to-r from-transparent via-violet-500/15 to-transparent" />
       </div>
 
-      {/* Chat area — full width */}
+      {/* Chat area */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex flex-col gap-3 pt-3 px-6">
+        <div className="flex flex-col gap-3 pt-3 mx-8">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12 tracking-wide">Tap the mic to start talking</p>
           ) : (
@@ -229,9 +237,9 @@ export function VoiceChat() {
                 >
                   {msg.role === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="max-w-[70%] border border-violet-500/20 px-5 py-3"
+                      <div className="max-w-[60%] border border-violet-500/20 px-5 py-3"
                            style={{ background: 'rgba(139,92,246,0.06)' }}>
-                        <p className="text-sm text-white/80 break-words">{msg.text}</p>
+                        <p className="text-sm text-white/80 break-words whitespace-pre-wrap">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
@@ -264,9 +272,9 @@ export function VoiceChat() {
                     </div>
                   ) : (
                     <div className="border border-white/[0.06] bg-white/[0.02] px-5 py-4">
-                      <span className="text-[11px] font-medium text-violet-400/60 tracking-wide uppercase mb-2 block">Matthew</span>
+                      <span className="text-[11px] font-medium text-violet-400/50 tracking-wider uppercase mb-2 block">Matthew</span>
                       {i === lastAssistantIndex ? (
-                        <TypingMarkdown text={msg.text} animate={true} />
+                        <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
                       ) : (
                         <MarkdownMessage text={msg.text} />
                       )}
@@ -278,14 +286,6 @@ export function VoiceChat() {
           )}
           <div ref={chatEndRef} />
         </div>
-      </div>
-
-      {/* Connected status — bottom left */}
-      <div className="absolute bottom-3 left-4 z-40 flex items-center gap-1.5">
-        <span className={cn('text-[10px] tracking-wide', statusColor)}>●</span>
-        <span className="text-[10px] text-white/20 tracking-wide">
-          {status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
-        </span>
       </div>
 
       {/* Bottom controls */}
