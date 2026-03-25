@@ -20,43 +20,83 @@ function ToolIcon({ text }: { text: string }) {
   return <CheckCircle2 className="w-3 h-3 text-violet-400" />
 }
 
-/** Render tool call — expanded shows ALL diff lines, collapsed shows only header */
+/** Expanded tool: show header + all diff lines as sub-steps with mini dots */
 function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
+  const diffLines = lines.slice(1)
 
-  if (!expanded || lines.length === 1) {
+  if (!expanded || diffLines.length === 0) {
     return <span className="text-xs text-white/50 leading-tight">{header}</span>
   }
 
+  // Group diff lines into pairs (⊖ then ⊕) as sub-steps
   return (
-    <div className="flex flex-col gap-0.5 min-w-0 w-full">
-      <span className="text-xs text-white/50 leading-tight">{header}</span>
-      <div className="mt-1 flex flex-col gap-px">
-        {lines.slice(1).map((line, i) => {
-          const trimmed = line.trim()
-          const code = trimmed.replace(/^[⊖⊕]\s*/, '')
-          if (trimmed.startsWith('⊖')) {
+    <div className="flex flex-col min-w-0 w-full">
+      <span className="text-xs text-white/50 leading-tight mb-1">{header}</span>
+      <div className="flex gap-2">
+        {/* Mini sub-timeline */}
+        <div className="flex flex-col items-center w-2 shrink-0 ml-1">
+          {diffLines.map((_, idx) => (
+            <div key={idx} className="flex flex-col items-center flex-1">
+              <div className="w-1 h-1 bg-violet-500/40 shrink-0" />
+              {idx < diffLines.length - 1 && <div className="w-px flex-1 bg-violet-500/10" />}
+            </div>
+          ))}
+        </div>
+        {/* Diff content */}
+        <div className="flex flex-col gap-px flex-1 min-w-0">
+          {diffLines.map((line, i) => {
+            const trimmed = line.trim()
+            const code = trimmed.replace(/^[⊖⊕]\s*/, '')
+            if (trimmed.startsWith('⊖')) {
+              return (
+                <div key={i} className="bg-red-500/10 border-l border-red-500/40 px-2 py-0.5">
+                  <span className="text-[10px] font-mono text-red-300/70 leading-tight block">{code}</span>
+                </div>
+              )
+            }
+            if (trimmed.startsWith('⊕')) {
+              return (
+                <div key={i} className="bg-emerald-500/10 border-l border-emerald-500/40 px-2 py-0.5">
+                  <span className="text-[10px] font-mono text-emerald-300/70 leading-tight block">{code}</span>
+                </div>
+              )
+            }
             return (
-              <div key={i} className="bg-red-500/15 border-l-2 border-red-500/50 px-2 py-0.5">
-                <span className="text-[10px] font-mono text-red-300/80 leading-tight block truncate">{code}</span>
-              </div>
+              <span key={i} className="text-[10px] text-white/30 leading-tight px-2">{trimmed}</span>
             )
-          }
-          if (trimmed.startsWith('⊕')) {
-            return (
-              <div key={i} className="bg-emerald-500/15 border-l-2 border-emerald-500/50 px-2 py-0.5">
-                <span className="text-[10px] font-mono text-emerald-300/80 leading-tight block truncate">{code}</span>
-              </div>
-            )
-          }
-          return (
-            <span key={i} className="text-xs text-white/40 leading-tight">{trimmed}</span>
-          )
-        })}
+          })}
+        </div>
       </div>
     </div>
   )
+}
+
+/** Typing animation — only animates latest message, older ones render instantly */
+function TypingMarkdown({ text, animate }: { text: string; animate: boolean }) {
+  const [chars, setChars] = useState(animate ? 0 : text.length)
+  const prevTextRef = useRef(text)
+
+  useEffect(() => {
+    if (!animate) { setChars(text.length); return }
+    // If text changed (new message), start typing
+    if (text !== prevTextRef.current) {
+      prevTextRef.current = text
+      setChars(0)
+    }
+    if (chars >= text.length) return
+    const id = setInterval(() => {
+      setChars((c) => {
+        const next = c + 3
+        if (next >= text.length) { clearInterval(id); return text.length }
+        return next
+      })
+    }, 8)
+    return () => clearInterval(id)
+  }, [text, animate, chars])
+
+  return <MarkdownMessage text={text.slice(0, chars)} />
 }
 
 export function VoiceChat() {
@@ -86,6 +126,14 @@ export function VoiceChat() {
   const lastToolIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'tool') return i
+    }
+    return -1
+  })()
+
+  // Find last assistant message index (for typing animation)
+  const lastAssistantIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return i
     }
     return -1
   })()
@@ -146,30 +194,23 @@ export function VoiceChat() {
   }
 
   const statusColor =
-    status === 'connected' ? 'bg-emerald-400' : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
-  const statusLabel =
-    status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'
+    status === 'connected' ? 'text-emerald-400' : status === 'connecting' ? 'text-yellow-400' : 'text-red-400'
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white relative overflow-hidden">
       {/* Header — title on top, waveform below */}
-      <div className="relative z-10 flex flex-col items-center pt-8 pb-4 shrink-0">
-        <h1 className="text-lg font-bold tracking-[0.3em] uppercase text-violet-400/90 mb-4"
+      <div className="relative z-10 flex flex-col items-center pt-6 pb-2 shrink-0">
+        <h1 className="text-base font-bold tracking-[0.25em] uppercase text-violet-400/80 mb-3"
             style={{ textShadow: '0 0 20px rgba(139,92,246,0.3)' }}>
           MATTHEWS TERMINAL
         </h1>
         <VoiceWaveform isActive={waveformActive} size={200} getAudioLevel={getAudioLevel} />
-        <div className="flex items-center gap-2 mt-3">
-          <span className={cn('h-1.5 w-1.5 rounded-full', statusColor, status === 'connecting' && 'animate-pulse')} />
-          <span className="text-[11px] text-white/25 tracking-wide">{statusLabel}</span>
-        </div>
-        {/* Separator line */}
-        <div className="w-full mt-4 h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
+        <div className="w-full mt-4 h-px bg-gradient-to-r from-transparent via-violet-500/15 to-transparent" />
       </div>
 
       {/* Chat area — full width */}
-      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-4 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="w-full max-w-5xl mx-auto flex flex-col gap-3 pt-2">
+      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex flex-col gap-3 pt-3 px-6">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12 tracking-wide">Tap the mic to start talking</p>
           ) : (
@@ -188,9 +229,9 @@ export function VoiceChat() {
                 >
                   {msg.role === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="max-w-[80%] border border-violet-500/20 px-4 py-2.5"
+                      <div className="max-w-[70%] border border-violet-500/20 px-5 py-3"
                            style={{ background: 'rgba(139,92,246,0.06)' }}>
-                        <p className="text-sm text-white/80">{msg.text}</p>
+                        <p className="text-sm text-white/80 break-words">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
@@ -210,7 +251,7 @@ export function VoiceChat() {
                       </div>
                       {/* Tool box */}
                       <div className={cn(
-                        'flex-1 flex items-start gap-2.5 py-2 px-3 border transition-all',
+                        'flex-1 flex items-start gap-2.5 py-2.5 px-4 border transition-all',
                         isExpanded
                           ? 'border-violet-500/25 bg-violet-500/[0.04]'
                           : 'border-white/[0.06] bg-white/[0.02]'
@@ -222,14 +263,13 @@ export function VoiceChat() {
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-5 h-5 bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-                          <span className="text-[10px] font-bold">M</span>
-                        </div>
-                        <span className="text-[11px] font-medium text-white/40 tracking-wide uppercase">Matthew</span>
-                      </div>
-                      <MarkdownMessage text={msg.text} />
+                    <div className="border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                      <span className="text-[11px] font-medium text-violet-400/60 tracking-wide uppercase mb-2 block">Matthew</span>
+                      {i === lastAssistantIndex ? (
+                        <TypingMarkdown text={msg.text} animate={true} />
+                      ) : (
+                        <MarkdownMessage text={msg.text} />
+                      )}
                     </div>
                   )}
                 </motion.div>
@@ -240,9 +280,17 @@ export function VoiceChat() {
         </div>
       </div>
 
+      {/* Connected status — bottom left */}
+      <div className="absolute bottom-3 left-4 z-40 flex items-center gap-1.5">
+        <span className={cn('text-[10px] tracking-wide', statusColor)}>●</span>
+        <span className="text-[10px] text-white/20 tracking-wide">
+          {status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
+        </span>
+      </div>
+
       {/* Bottom controls */}
-      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-4 bg-black">
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent mb-2" />
+      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-3 bg-black">
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-violet-500/15 to-transparent mb-1" />
 
         <AnimatePresence mode="wait">
           {isListening ? (
