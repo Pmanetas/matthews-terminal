@@ -46,11 +46,8 @@ function cleanTextForTTS(text: string): string {
     .slice(0, 4000);
 }
 
-async function generateSpeech(text: string): Promise<Buffer | null> {
-  if (!OPENAI_API_KEY) {
-    console.error(`[${timestamp()}] OPENAI_API_KEY not configured`);
-    return null;
-  }
+async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
+  if (!OPENAI_API_KEY) return null;
 
   const ttsText = cleanTextForTTS(text);
   if (!ttsText) return null;
@@ -83,6 +80,52 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
     console.error(`[${timestamp()}] OpenAI TTS error:`, err.message);
     return null;
   }
+}
+
+/** Fallback: Groq TTS (free, uses PlayAI voices) */
+async function generateSpeechGroq(text: string): Promise<Buffer | null> {
+  if (!GROQ_API_KEY) return null;
+
+  const ttsText = cleanTextForTTS(text);
+  if (!ttsText) return null;
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'playai-tts',
+        voice: 'Fritz-PlayAI',
+        input: ttsText,
+        response_format: 'mp3',
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      console.error(`[${timestamp()}] Groq TTS error: ${res.status} ${res.statusText} - ${errBody}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    console.log(`[${timestamp()}] Groq TTS: ${ttsText.length} chars → ${Math.round(buffer.length / 1024)}KB MP3`);
+    return buffer;
+  } catch (err: any) {
+    console.error(`[${timestamp()}] Groq TTS error:`, err.message);
+    return null;
+  }
+}
+
+/** Try OpenAI first, fall back to Groq (free) */
+async function generateSpeech(text: string): Promise<Buffer | null> {
+  const openaiResult = await generateSpeechOpenAI(text);
+  if (openaiResult) return openaiResult;
+
+  console.log(`[${timestamp()}] OpenAI TTS unavailable, falling back to Groq`);
+  return generateSpeechGroq(text);
 }
 
 // ── Types ──────────────────────────────────────────────────────────
