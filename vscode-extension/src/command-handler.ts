@@ -33,6 +33,10 @@ export class CommandHandler {
     private toolSpeechQueue: string[] = [];
     private toolSpeechTimer: ReturnType<typeof setTimeout> | undefined;
 
+    // Only speak one brief update per command when tools start
+    private hasSpokenToolUpdate = false;
+    private toolCallCount = 0;
+
     constructor() {
         this.disposables.push(
             vscode.window.onDidCloseTerminal((closed) => {
@@ -60,6 +64,8 @@ export class CommandHandler {
         this.pendingToolName = null;
         this.pendingToolInput = '';
         this.toolSpeechQueue = [];
+        this.hasSpokenToolUpdate = false;
+        this.toolCallCount = 0;
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -151,6 +157,8 @@ export class CommandHandler {
                         this.flushAndSpeak(client);
                         this.lastToolDescription = toolMsg.split('\n')[0];
                         client.sendToolStatus(toolMsg);
+                        this.toolCallCount++;
+                        this.maybeSpeak(client);
                     }
                 }
             });
@@ -380,13 +388,31 @@ export class CommandHandler {
         }, 150);
     }
 
-    /** Send a tool call to the phone (visual only — no speech for tool calls) */
+    /** Send a tool call to the phone — speaks a brief update on first tool */
     private emitToolCall(block: any, client: BridgeClient): void {
         this.flushAndSpeak(client);
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
         client.sendToolStatus(msg);
+        this.toolCallCount++;
+        this.maybeSpeak(client);
+    }
+
+    /** Speak a brief update on first tool call, then stay quiet */
+    private maybeSpeak(client: BridgeClient): void {
+        if (this.hasSpokenToolUpdate) return;
+        // Speak after 2nd tool call (gives filler time to play first)
+        if (this.toolCallCount >= 2) {
+            this.hasSpokenToolUpdate = true;
+            const updates = [
+                "Just working through some changes.",
+                "Making a few edits, won't be long.",
+                "Working on it now.",
+                "Just going through the code.",
+            ];
+            client.sendSpeak(updates[Math.floor(Math.random() * updates.length)]);
+        }
     }
 
     private handleStreamEvent(
