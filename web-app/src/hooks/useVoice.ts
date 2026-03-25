@@ -32,7 +32,7 @@ function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionInstance
 export function useVoice() {
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [ttsEnabled, setTtsEnabled] = useState(true)
+  const [ttsEnabled, setTtsEnabled] = useState(false)
   const [supported, setSupported] = useState(true)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
@@ -46,13 +46,17 @@ export function useVoice() {
     const SpeechRecognition = getSpeechRecognitionConstructor()
     if (!SpeechRecognition) return
 
-    // Stop any existing session
+    // Stop any existing session — detach handlers first so old onend doesn't interfere
     if (recognitionRef.current) {
+      recognitionRef.current.onend = null
+      recognitionRef.current.onerror = null
+      recognitionRef.current.onresult = null
       recognitionRef.current.abort()
+      recognitionRef.current = null
     }
 
     const recognition = new SpeechRecognition()
-    recognition.continuous = false
+    recognition.continuous = true // keep listening until user stops
     recognition.interimResults = true
     recognition.lang = 'en-US'
     recognitionRef.current = recognition
@@ -74,14 +78,19 @@ export function useVoice() {
     }
 
     recognition.onend = () => {
-      setIsListening(false)
-      recognitionRef.current = null
+      // Only update state if this is still the active recognition
+      if (recognitionRef.current === recognition) {
+        setIsListening(false)
+        recognitionRef.current = null
+      }
     }
 
     recognition.onerror = (event: { error: string }) => {
       console.error('[Voice] Speech recognition error:', event.error)
-      setIsListening(false)
-      recognitionRef.current = null
+      if (recognitionRef.current === recognition) {
+        setIsListening(false)
+        recognitionRef.current = null
+      }
     }
 
     setTranscript('')
