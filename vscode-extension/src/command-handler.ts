@@ -1,8 +1,16 @@
 import * as vscode from 'vscode';
 import { BridgeClient } from './bridge-client';
 import { spawn, ChildProcess } from 'child_process';
+import * as path from 'path';
 
 const TERMINAL_NAME = 'VOICE AGENT';
+
+const SYSTEM_PROMPT = `You are Matthew, a friendly software engineer assistant. Rules:
+- Respond conversationally in natural sentences — talk like you're chatting with a mate.
+- NEVER use bullet points, numbered lists, dashes, or markdown formatting.
+- Keep responses concise — 2-3 sentences when possible.
+- When describing code actions, speak naturally: "I just updated the function" not "Modified file.ts line 42".
+- You're speaking out loud — your response will be read by text-to-speech, so write how you'd actually talk.`;
 
 export class CommandHandler {
     private terminal: vscode.Terminal | undefined;
@@ -76,9 +84,8 @@ export class CommandHandler {
             this.activeProcess.stdout?.on('data', (data: Buffer) => {
                 lineBuffer += data.toString();
 
-                // Process complete JSON lines
                 const lines = lineBuffer.split('\n');
-                lineBuffer = lines.pop() || ''; // keep incomplete line in buffer
+                lineBuffer = lines.pop() || '';
 
                 for (const line of lines) {
                     const trimmed = line.trim();
@@ -90,7 +97,6 @@ export class CommandHandler {
                             fullResponseText += text;
                         });
                     } catch {
-                        // Not JSON — show raw output
                         this.writeEmitter.fire(trimmed.replace(/\n/g, '\r\n') + '\r\n');
                     }
                 }
@@ -104,7 +110,11 @@ export class CommandHandler {
                 }
             });
 
-            this.activeProcess.stdin?.write(prompt);
+            // Pipe system prompt + user prompt via stdin
+            const fullPrompt = this.conversationStarted
+                ? prompt
+                : `${SYSTEM_PROMPT}\n\nUser: ${prompt}`;
+            this.activeProcess.stdin?.write(fullPrompt);
             this.activeProcess.stdin?.end();
 
             this.activeProcess.on('error', (err) => {
@@ -116,7 +126,6 @@ export class CommandHandler {
             });
 
             this.activeProcess.on('close', (code) => {
-                // Process any remaining buffer
                 if (lineBuffer.trim()) {
                     try {
                         const event = JSON.parse(lineBuffer.trim());
@@ -145,16 +154,11 @@ export class CommandHandler {
         });
     }
 
-    /**
-     * Parse a stream-json event and display it nicely in the terminal.
-     * Also accumulates response text and sends streaming status to phone.
-     */
     private handleStreamEvent(
         event: any,
         client: BridgeClient,
         onText: (text: string) => void,
     ): void {
-        // Handle different event types from claude --output-format stream-json
         if (event.type === 'assistant' && event.message?.content) {
             for (const block of event.message.content) {
                 if (block.type === 'text') {
@@ -162,7 +166,10 @@ export class CommandHandler {
                     this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
                     client.sendStatus(block.text);
                 } else if (block.type === 'tool_use') {
-                    this.showToolCall(block);
+                    const msg = this.describeToolCall(block);
+                    this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
+                    // Send tool status to phone so user hears what's happening
+                    client.sendStatus(msg);
                 }
             }
         } else if (event.type === 'content_block_delta') {
@@ -171,57 +178,50 @@ export class CommandHandler {
                 this.writeEmitter.fire(`\x1b[36m${event.delta.text.replace(/\n/g, '\r\n')}\x1b[0m`);
             }
         } else if (event.type === 'result') {
-            // Final result — may contain the full text
-            if (event.result) {
-                // Don't double-add if already accumulated
-                if (!event.result.startsWith('{')) {
-                    this.writeEmitter.fire(`\r\n\x1b[36m${event.result.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
-                }
-            }
+            // Skip — text already accumulated from streaming, don't duplicate
         } else if (event.type === 'system' && event.subtype === 'tool_use') {
-            this.showToolCall(event);
+            const msg = this.describeToolCall(event);
+            this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
+            client.sendStatus(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
-            this.showToolCall(event);
+            const msg = this.describeToolCall(event);
+            this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
+            client.sendStatus(msg);
         } else if (event.type === 'tool_result') {
-            // Show brief tool result
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
-            const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
-            this.writeEmitter.fire(`\x1b[2m   ↳ ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
+            const preview = output.length > 150 ? output.slice(0, 150) + '...' : output;
+            this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
         }
     }
 
     /**
-     * Display a tool call (Read, Edit, Write, Bash, etc.) in the terminal
+     * Describe tool calls in natural language — like Matthew is talking
      */
-    private showToolCall(block: any): void {
+    private describeToolCall(block: any): string {
         const toolName = block.name || block.tool_name || 'tool';
         const input = block.input || {};
 
-        let display = '';
+        const fileName = input.file_path ? path.basename(input.file_path) : 'a file';
+
         switch (toolName) {
             case 'Read':
-                display = `📖 Reading: ${input.file_path || 'file'}`;
-                break;
+                return `I'm reading ${fileName}...`;
             case 'Edit':
-                display = `✏️  Editing: ${input.file_path || 'file'}`;
-                break;
+                return `I'm making some changes to ${fileName}...`;
             case 'Write':
-                display = `📝 Writing: ${input.file_path || 'file'}`;
-                break;
-            case 'Bash':
-                display = `💻 Running: ${(input.command || '').slice(0, 100)}`;
-                break;
+                return `I'm creating ${fileName}...`;
+            case 'Bash': {
+                const cmd = (input.command || '').trim();
+                const short = cmd.length > 60 ? cmd.slice(0, 60) + '...' : cmd;
+                return `I'm running a command — ${short}`;
+            }
             case 'Glob':
-                display = `🔍 Searching files: ${input.pattern || ''}`;
-                break;
+                return `I'm searching for files matching ${input.pattern || 'a pattern'}...`;
             case 'Grep':
-                display = `🔎 Searching code: ${input.pattern || ''}`;
-                break;
+                return `I'm searching the code for "${input.pattern || 'something'}"...`;
             default:
-                display = `🔧 ${toolName}: ${JSON.stringify(input).slice(0, 100)}`;
+                return `I'm using ${toolName}...`;
         }
-
-        this.writeEmitter.fire(`\r\n\x1b[33m${display}\x1b[0m\r\n`);
     }
 
     private ensureTerminal(): void {

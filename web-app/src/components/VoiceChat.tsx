@@ -46,25 +46,26 @@ export function VoiceChat() {
     if (isListening) setAudioJustFinished(false)
   }, [isListening])
 
-  // When done listening, hold transcript as pending (don't auto-send)
-  // BUT if the user says "send" at the end, strip it and send immediately
+  // Detect "send" keyword in real-time while still listening (desktop)
+  // OR when done listening (phone — where continuous mode may not work)
   useEffect(() => {
-    if (!isListening && transcript) {
-      const trimmed = transcript.trim()
-      const sendPattern = /\bsend\s*$/i
-      if (sendPattern.test(trimmed)) {
-        // User said "send" — strip it and send
-        const msg = trimmed.replace(sendPattern, '').trim()
-        if (msg) {
-          setPendingMessage('')
-          sendCommand(msg)
-        }
-      } else {
-        // Hold as pending
-        setPendingMessage(trimmed)
+    if (!transcript) return
+    const trimmed = transcript.trim()
+    const sendPattern = /\bsend\s*[.!]?\s*$/i
+
+    if (sendPattern.test(trimmed)) {
+      // User said "send" — strip it, stop listening, and send
+      const msg = trimmed.replace(sendPattern, '').trim()
+      if (msg) {
+        stopListening()
+        setPendingMessage('')
+        sendCommand(msg)
       }
+    } else if (!isListening) {
+      // Stopped listening without saying "send" — hold as pending
+      setPendingMessage(trimmed)
     }
-  }, [isListening, transcript, sendCommand])
+  }, [isListening, transcript, sendCommand, stopListening])
 
   const handleSend = () => {
     if (pendingMessage) {

@@ -67,19 +67,20 @@ export function useVoice() {
     recognitionRef.current = recognition
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = ''
-      let final = ''
+      let allFinal = ''
+      let currentInterim = ''
 
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      // Accumulate ALL results (including previous pauses)
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
-          final += result[0].transcript
+          allFinal += result[0].transcript
         } else {
-          interim += result[0].transcript
+          currentInterim += result[0].transcript
         }
       }
 
-      setTranscript(final || interim)
+      setTranscript(allFinal + currentInterim)
     }
 
     recognition.onend = () => {
