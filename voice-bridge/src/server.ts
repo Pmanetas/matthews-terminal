@@ -5,6 +5,34 @@ import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// ── Groq Whisper STT ─────────────────────────────────────────────
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+
+async function transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
+  if (!GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY not configured');
+  }
+
+  const form = new FormData();
+  form.append('file', new Blob([audioBuffer], { type: mimeType }), 'audio.webm');
+  form.append('model', 'whisper-large-v3-turbo');
+  form.append('language', 'en');
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Groq error: ${res.status} ${res.statusText} - ${errBody}`);
+  }
+
+  const data = await res.json() as { text?: string };
+  return data.text || '';
+}
+
 // ── ElevenLabs TTS ────────────────────────────────────────────────
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB'; // default: Adam
@@ -121,6 +149,21 @@ app.get('/state', (_req, res) => {
   res.json(state);
 });
 
+// ── Whisper transcription endpoint ──────────────────────────────────
+app.post('/transcribe', express.raw({ type: ['audio/*', 'application/octet-stream'], limit: '10mb' }), async (req, res) => {
+  try {
+    const audioBuffer = req.body as Buffer;
+    const mimeType = req.headers['content-type'] || 'audio/webm';
+    console.log(`[${timestamp()}] Transcribing ${Math.round(audioBuffer.length / 1024)}KB audio (${mimeType})`);
+    const text = await transcribeAudio(audioBuffer, mimeType);
+    console.log(`[${timestamp()}] Transcription: "${text}"`);
+    res.json({ text });
+  } catch (err: any) {
+    console.error(`[${timestamp()}] Transcription error:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Serve web app (built files from ../web-app/dist) ────────────────
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -128,7 +171,7 @@ const webAppDist = path.join(__dirname, '..', '..', 'web-app', 'dist');
 app.use(express.static(webAppDist));
 // SPA fallback — serve index.html for any non-API route
 app.use((req, res, next) => {
-  if (req.path.startsWith('/health') || req.path.startsWith('/state')) return next();
+  if (req.path.startsWith('/health') || req.path.startsWith('/state') || req.path.startsWith('/transcribe')) return next();
   res.sendFile(path.join(webAppDist, 'index.html'));
 });
 

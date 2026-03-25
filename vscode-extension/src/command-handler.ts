@@ -138,10 +138,14 @@ export class CommandHandler {
                 }
 
                 this.conversationStarted = true;
-                if (code === 0) {
-                    resolve(fullResponseText.trim() || 'Done.');
+                // Resolve if we have response text, even on non-zero exit
+                // (stream-json mode can exit non-zero but still have valid output)
+                if (fullResponseText.trim()) {
+                    resolve(fullResponseText.trim());
+                } else if (code === 0) {
+                    resolve('Done.');
                 } else {
-                    reject(new Error(fullResponseText.trim() || `Claude exited with code ${code}`));
+                    reject(new Error(`Claude exited with code ${code}`));
                 }
             });
 
