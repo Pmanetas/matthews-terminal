@@ -164,18 +164,29 @@ export function useBridge(onAudioDone?: () => void) {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
             setMessages((prev) => {
-              // Collapse repeated tool calls on same file (e.g. 6 edits → "Edited test/index.html (6 changes)")
+              // Aggressively collapse consecutive tool calls on the SAME file
               const last = prev[prev.length - 1]
               if (last && last.role === 'tool') {
-                const lastFirstLine = last.text.split('\n')[0]
-                const newFirstLine = data.text.split('\n')[0]
-                // Same action on same file? Merge with count
-                const lastMatch = lastFirstLine.match(/^(\w+)\s+(.+?)(?:\s+\((\d+) changes\))?$/)
-                const newMatch = newFirstLine.match(/^(\w+)\s+(.+)$/)
-                if (lastMatch && newMatch && lastMatch[1] === newMatch[1] && lastMatch[2] === newMatch[2]) {
-                  const count = parseInt(lastMatch[3] || '1', 10) + 1
-                  const merged = `${newMatch[1]} ${newMatch[2]} (${count} changes)`
-                  return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
+                // Extract file/target from tool text (everything after the action word, minus count suffix)
+                const getTarget = (text: string) => {
+                  const line = text.split('\n')[0]
+                  const clean = line.replace(/\s*\(\d+\s+steps?\)\s*$/, '')
+                  const m = clean.match(/^\w+\s+(.+)$/)
+                  return m?.[1] || ''
+                }
+                const lastTarget = getTarget(last.text)
+                const newTarget = getTarget(data.text)
+
+                if (lastTarget && newTarget && lastTarget === newTarget) {
+                  // Same file — collapse into single entry with step count
+                  const countMatch = last.text.match(/\((\d+) steps?\)/)
+                  const count = countMatch ? parseInt(countMatch[1], 10) + 1 : 2
+                  const newLine = data.text.split('\n')[0]
+                  const actionMatch = newLine.match(/^(\w+)\s+(.+)$/)
+                  if (actionMatch) {
+                    const label = count === 1 ? 'step' : 'steps'
+                    return [...prev.slice(0, -1), { role: 'tool' as const, text: `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`, timestamp: Date.now() }]
+                  }
                 }
               }
               return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]

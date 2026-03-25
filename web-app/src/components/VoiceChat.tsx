@@ -166,43 +166,57 @@ export function VoiceChat() {
 
       {/* Chat area */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-5 pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="max-w-md mx-auto flex flex-col gap-3">
+        <div className="max-w-lg mx-auto flex flex-col gap-3">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12">Tap the mic to start talking</p>
           ) : (
-            messages.map((msg, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                {msg.role === 'user' ? (
-                  <div className="flex justify-end">
-                    <div className="max-w-[85%] bg-violet-500/15 border border-violet-500/15 rounded-2xl rounded-br-md px-4 py-2.5">
-                      <p className="text-sm text-white/80">{msg.text}</p>
-                    </div>
-                  </div>
-                ) : msg.role === 'tool' ? (
-                  <div className="flex items-start gap-2.5 py-2 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06] ml-1">
-                    <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <ToolIcon text={msg.text} />
-                    </div>
-                    <ToolContent text={msg.text} />
-                  </div>
-                ) : (
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-bl-md px-4 py-3 ml-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-                        <span className="text-[10px] font-bold">M</span>
+            messages.map((msg, i) => {
+              const isNextTool = messages[i + 1]?.role === 'tool'
+              const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
+
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {msg.role === 'user' ? (
+                    <div className="flex justify-end">
+                      <div className="max-w-[85%] bg-violet-500/15 border border-violet-500/15 rounded-2xl rounded-br-md px-4 py-2.5">
+                        <p className="text-sm text-white/80">{msg.text}</p>
                       </div>
-                      <span className="text-[11px] font-medium text-white/40">Matthew</span>
                     </div>
-                    <MarkdownMessage text={msg.text} />
-                  </div>
-                )}
-              </motion.div>
-            ))
+                  ) : msg.role === 'tool' ? (
+                    <div className="flex items-stretch gap-2.5 ml-1">
+                      {/* Timeline line + dot */}
+                      <div className="flex flex-col items-center w-3 shrink-0">
+                        <div className={cn('w-px flex-1', isPrevTool ? 'bg-amber-500/25' : 'bg-transparent')} />
+                        <div className="w-2 h-2 rounded-full bg-amber-400/70 shrink-0" />
+                        <div className={cn('w-px flex-1', isNextTool ? 'bg-amber-500/25' : 'bg-transparent')} />
+                      </div>
+                      {/* Tool content */}
+                      <div className="flex-1 flex items-start gap-2.5 py-2 px-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <div className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                          <ToolIcon text={msg.text} />
+                        </div>
+                        <ToolContent text={msg.text} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl rounded-bl-md px-4 py-3 ml-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                          <span className="text-[10px] font-bold">M</span>
+                        </div>
+                        <span className="text-[11px] font-medium text-white/40">Matthew</span>
+                      </div>
+                      <MarkdownMessage text={msg.text} />
+                    </div>
+                  )}
+                </motion.div>
+              )
+            })
           )}
           <div ref={chatEndRef} />
         </div>

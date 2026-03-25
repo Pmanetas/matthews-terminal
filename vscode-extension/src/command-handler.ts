@@ -151,8 +151,6 @@ export class CommandHandler {
                         this.flushAndSpeak(client);
                         this.lastToolDescription = toolMsg.split('\n')[0];
                         client.sendToolStatus(toolMsg);
-                        // Queue speech (batched, not individual)
-                        this.queueToolSpeech(toolMsg.split('\n')[0], client);
                     }
                 }
             });
@@ -382,15 +380,13 @@ export class CommandHandler {
         }, 150);
     }
 
-    /** Send a tool call to the phone (visual only — speech is batched separately) */
+    /** Send a tool call to the phone (visual only — no speech for tool calls) */
     private emitToolCall(block: any, client: BridgeClient): void {
         this.flushAndSpeak(client);
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
         client.sendToolStatus(msg);
-        // Queue speech (batched with 2s window)
-        this.queueToolSpeech(msg.split('\n')[0], client);
     }
 
     private handleStreamEvent(
