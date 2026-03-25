@@ -34,6 +34,7 @@ export function useVoice() {
   const [transcript, setTranscript] = useState('')
   const [ttsEnabled, setTtsEnabled] = useState(false)
   const [supported, setSupported] = useState(true)
+  const [micError, setMicError] = useState('')
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   useEffect(() => {
@@ -88,11 +89,13 @@ export function useVoice() {
     recognition.onerror = (event: { error: string }) => {
       console.error('[Voice] Speech recognition error:', event.error)
       if (recognitionRef.current === recognition) {
+        setMicError(event.error)
         setIsListening(false)
         recognitionRef.current = null
       }
     }
 
+    setMicError('')
     setTranscript('')
     setIsListening(true)
 
@@ -134,5 +137,6 @@ export function useVoice() {
     stopListening,
     speak,
     supported,
+    micError,
   }
 }

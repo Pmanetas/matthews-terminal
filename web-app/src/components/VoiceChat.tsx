@@ -26,7 +26,7 @@ export function VoiceChat() {
     autoListenRef.current?.()
   })
 
-  const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported } =
+  const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported, micError } =
     useVoice()
 
   autoListenRef.current = startListening
@@ -182,6 +182,16 @@ export function VoiceChat() {
               className="text-xs text-white/50 px-4 text-center max-w-[80%] line-clamp-2"
             >
               "{pendingMessage}"
+            </motion.p>
+          ) : micError ? (
+            <motion.p
+              key="error"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="text-xs text-red-400"
+            >
+              Mic error: {micError}
             </motion.p>
           ) : audioJustFinished ? (
             <motion.p
