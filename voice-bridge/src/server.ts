@@ -98,7 +98,7 @@ async function generateSpeechGroq(text: string): Promise<Buffer | null> {
       },
       body: JSON.stringify({
         model: 'canopylabs/orpheus-v1-english',
-        voice: 'tara',
+        voice: 'daniel',
         input: ttsText,
         response_format: 'mp3',
       }),
