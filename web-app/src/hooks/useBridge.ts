@@ -178,14 +178,18 @@ export function useBridge(onAudioDone?: () => void) {
                 const newTarget = getTarget(data.text)
 
                 if (lastTarget && newTarget && lastTarget === newTarget) {
-                  // Same file — collapse into single entry with step count
+                  // Same file — collapse into single entry with step count, keep latest diff lines
                   const countMatch = last.text.match(/\((\d+) steps?\)/)
                   const count = countMatch ? parseInt(countMatch[1], 10) + 1 : 2
-                  const newLine = data.text.split('\n')[0]
-                  const actionMatch = newLine.match(/^(\w+)\s+(.+)$/)
+                  const newLines = data.text.split('\n')
+                  const actionMatch = newLines[0].match(/^(\w+)\s+(.+)$/)
                   if (actionMatch) {
                     const label = count === 1 ? 'step' : 'steps'
-                    return [...prev.slice(0, -1), { role: 'tool' as const, text: `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`, timestamp: Date.now() }]
+                    const header = `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`
+                    // Keep diff lines (⊖/⊕) from the latest tool call
+                    const diffLines = newLines.slice(1).filter(l => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
+                    const merged = diffLines.length > 0 ? header + '\n' + diffLines.join('\n') : header
+                    return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
                   }
                 }
               }
