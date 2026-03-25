@@ -96,6 +96,35 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
 
 const _audioQueue: AudioQueueItem[] = []
 
+// ── Browser SpeechSynthesis for instant real-time narration ──────
+let browserSpeechEnabled = false
+let lastSpokenText = ''
+
+function browserSpeak(text: string) {
+  if (!browserSpeechEnabled || typeof window === 'undefined' || !window.speechSynthesis) return
+  // Don't repeat same text
+  if (text === lastSpokenText) return
+  lastSpokenText = text
+  // Cancel any ongoing browser speech
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.rate = 1.1
+  utterance.pitch = 1.0
+  window.speechSynthesis.speak(utterance)
+}
+
+function cancelBrowserSpeech() {
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel()
+  }
+  lastSpokenText = ''
+}
+
+export function setBrowserSpeechEnabled(enabled: boolean) {
+  browserSpeechEnabled = enabled
+  if (!enabled) cancelBrowserSpeech()
+}
+
 export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [messages, setMessages] = useState<Message[]>([])
@@ -131,7 +160,8 @@ export function useBridge(onAudioDone?: () => void) {
         try {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
-            // Tool call — add as a separate step in the chat
+            // Tool call — add as a separate step + narrate with browser voice
+            browserSpeak(data.text)
             // First, finalize any streaming assistant message above
             setMessages((prev) => {
               const lastStreamIdx = prev.findLastIndex((m) => m.role === 'assistant' && m.streaming)
@@ -143,7 +173,9 @@ export function useBridge(onAudioDone?: () => void) {
               return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
             })
           } else if (data.type === 'status') {
-            // Streaming text — always update/create at the END of the list
+            // Streaming text — narrate with browser voice for real-time speech
+            browserSpeak(data.text)
+            // Always update/create at the END of the list
             setMessages((prev) => {
               const last = prev[prev.length - 1]
               // If the very last message is a streaming assistant message, update it in-place
@@ -165,7 +197,8 @@ export function useBridge(onAudioDone?: () => void) {
               return [...updated, { role: 'assistant' as const, text: data.text, timestamp: Date.now() }]
             })
           } else if (data.type === 'audio' && data.data) {
-            // Queue audio — play immediately or after current audio finishes
+            // ElevenLabs audio arrived — cancel browser speech and play high-quality version
+            cancelBrowserSpeech()
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
               const blob = new Blob([audioBytes], { type: 'audio/mpeg' })

@@ -48,9 +48,11 @@ export class CommandHandler {
         client.sendStatus('Thinking...');
 
         try {
-            const response = await this.runClaude(text, client);
+            await this.runClaude(text, client);
             this.writeEmitter.fire('\r\n');
-            client.sendResult(response);
+            // Send only the last text block as result (not ALL accumulated text)
+            const finalText = this.streamingText.trim() || 'Done';
+            client.sendResult(finalText);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
             this.writeEmitter.fire(`\r\n\x1b[31m❌ Error: ${msg}\x1b[0m\r\n`);
@@ -167,14 +169,9 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone AND send it to TTS, then reset for next block */
-    private flushAndSpeak(client: BridgeClient): void {
+    /** Flush text to phone and reset for next block (no separate TTS — phone handles it) */
+    private flushAndReset(client: BridgeClient): void {
         this.flushStreamingText(client);
-        const text = this.streamingText.trim();
-        if (text.length > 20) {
-            // Only speak if there's meaningful text (not just "Thinking...")
-            client.sendSpeak(text);
-        }
         this.streamingText = '';
     }
 
@@ -201,8 +198,7 @@ export class CommandHandler {
                     this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
                     this.flushStreamingText(client);
                 } else if (block.type === 'tool_use') {
-                    // Flush text AND speak it before showing tool call
-                    this.flushAndSpeak(client);
+                    this.flushAndReset(client);
                     const msg = this.describeToolCall(block);
                     this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
                     client.sendToolStatus(msg);
@@ -218,12 +214,12 @@ export class CommandHandler {
         } else if (event.type === 'result') {
             this.flushStreamingText(client);
         } else if (event.type === 'system' && event.subtype === 'tool_use') {
-            this.flushAndSpeak(client);
+            this.flushAndReset(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
         } else if (event.type === 'tool_use' || event.tool_name || event.name) {
-            this.flushAndSpeak(client);
+            this.flushAndReset(client);
             const msg = this.describeToolCall(event);
             this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
             client.sendToolStatus(msg);
@@ -258,9 +254,14 @@ export class CommandHandler {
             case 'Edit': {
                 let msg = `Editing ${shortPath}`;
                 if (input.old_string) {
-                    const preview = input.old_string.trim().split('\n')[0];
-                    const short = preview.length > 50 ? preview.slice(0, 50) + '...' : preview;
-                    msg += ` — changing "${short}"`;
+                    const oldPreview = input.old_string.trim().split('\n')[0];
+                    const oldShort = oldPreview.length > 40 ? oldPreview.slice(0, 40) + '...' : oldPreview;
+                    msg += `\n  ⊖ ${oldShort}`;
+                }
+                if (input.new_string) {
+                    const newPreview = input.new_string.trim().split('\n')[0];
+                    const newShort = newPreview.length > 40 ? newPreview.slice(0, 40) + '...' : newPreview;
+                    msg += `\n  ⊕ ${newShort}`;
                 }
                 return msg;
             }

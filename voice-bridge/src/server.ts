@@ -43,9 +43,10 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
     return null;
   }
 
-  // Trim text for TTS — don't read code blocks aloud
+  // Trim text for TTS — don't read code blocks aloud, soften ending
   const ttsText = text
     .replace(/```[\s\S]*?```/g, '... code block omitted ...')
+    .replace(/[.!]+\s*$/, '')  // Remove trailing periods/exclamation for smoother endings
     .slice(0, 2000); // ElevenLabs has char limits
 
   try {

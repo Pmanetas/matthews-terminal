@@ -4,7 +4,7 @@ import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePl
 import { cn } from '@/lib/utils'
 import { GeometricSphere } from '@/components/GeometricSphere'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, setBrowserSpeechEnabled } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
 function stopAudioPlayback() {
@@ -41,6 +41,11 @@ export function VoiceChat() {
 
   const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported, micError } =
     useVoice()
+
+  // Sync TTS toggle with browser speech
+  useEffect(() => {
+    setBrowserSpeechEnabled(ttsEnabled)
+  }, [ttsEnabled])
 
   autoListenRef.current = startListening
 
