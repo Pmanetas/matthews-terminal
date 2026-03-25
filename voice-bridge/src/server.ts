@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { spawn } from 'child_process';
+import { readFile, unlink } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -55,43 +56,38 @@ function cleanTextForTTS(text: string): string {
     .slice(0, 2000);
 }
 
-/** Generate speech using Piper TTS (local) → returns MP3 buffer */
+/** Generate speech using Piper TTS (local) → returns WAV buffer */
 function generateSpeechPiper(text: string): Promise<Buffer | null> {
   const ttsText = cleanTextForTTS(text);
   if (!ttsText) return Promise.resolve(null);
 
+  const tmpFile = `/tmp/piper_${Date.now()}_${Math.random().toString(36).slice(2)}.wav`;
+
   return new Promise((resolve) => {
     try {
-      // Piper outputs raw PCM → pipe through ffmpeg to get MP3
       const piper = spawn(PIPER_BIN, [
         '--model', PIPER_MODEL,
-        '--output-raw',
+        '--output_file', tmpFile,
         '--length_scale', '1.0',
       ]);
 
-      const ffmpeg = spawn('ffmpeg', [
-        '-f', 's16le',        // raw PCM input
-        '-ar', '22050',       // Piper sample rate
-        '-ac', '1',           // mono
-        '-i', 'pipe:0',       // stdin
-        '-f', 'mp3',          // output format
-        '-ab', '64k',         // bitrate (small + fast)
-        'pipe:1',             // stdout
-      ]);
+      piper.stdin.write(ttsText);
+      piper.stdin.end();
 
-      // Pipe: piper stdout → ffmpeg stdin → collect MP3
-      piper.stdout.pipe(ffmpeg.stdin);
-
-      const chunks: Buffer[] = [];
-      ffmpeg.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
-
-      ffmpeg.on('close', (code) => {
-        if (code === 0 && chunks.length > 0) {
-          const mp3 = Buffer.concat(chunks);
-          console.log(`[${timestamp()}] Piper TTS: ${ttsText.length} chars → ${Math.round(mp3.length / 1024)}KB MP3`);
-          resolve(mp3);
+      piper.on('close', async (code) => {
+        if (code === 0) {
+          try {
+            const wav = await readFile(tmpFile);
+            await unlink(tmpFile).catch(() => {});
+            console.log(`[${timestamp()}] Piper TTS: ${ttsText.length} chars → ${Math.round(wav.length / 1024)}KB WAV`);
+            resolve(wav);
+          } catch (err) {
+            console.error(`[${timestamp()}] Failed to read Piper output:`, err);
+            resolve(null);
+          }
         } else {
-          console.error(`[${timestamp()}] ffmpeg exited with code ${code}`);
+          console.error(`[${timestamp()}] Piper exited with code ${code}`);
+          await unlink(tmpFile).catch(() => {});
           resolve(null);
         }
       });
@@ -101,14 +97,10 @@ function generateSpeechPiper(text: string): Promise<Buffer | null> {
         resolve(null);
       });
 
-      ffmpeg.on('error', (err) => {
-        console.error(`[${timestamp()}] ffmpeg error:`, err.message);
-        resolve(null);
+      // Log stderr for debugging
+      piper.stderr?.on('data', (data: Buffer) => {
+        console.log(`[${timestamp()}] Piper: ${data.toString().trim()}`);
       });
-
-      // Send text to piper
-      piper.stdin.write(ttsText);
-      piper.stdin.end();
     } catch (err) {
       console.error(`[${timestamp()}] Piper TTS error:`, err);
       resolve(null);

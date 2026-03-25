@@ -209,7 +209,9 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
-              const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
+              // Auto-detect format: WAV starts with "RIFF", otherwise assume MP3
+              const isWav = audioBytes[0] === 0x52 && audioBytes[1] === 0x49 && audioBytes[2] === 0x46 && audioBytes[3] === 0x46
+              const blob = new Blob([audioBytes], { type: isWav ? 'audio/wav' : 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
               audioQueueRef.current.push({ url, isFinal: !!data.final })
               playNextAudio(onAudioDoneRef)
