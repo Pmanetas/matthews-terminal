@@ -340,7 +340,7 @@ export function VoiceChat() {
 
   return (
     <div
-      className="h-[100dvh] flex flex-col bg-[#0a0a0a] text-white relative"
+      className="h-[100dvh] flex flex-col bg-black text-white relative"
       style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none' }}
     >
       <style>{globalCSS}</style>
@@ -388,11 +388,11 @@ export function VoiceChat() {
                   transition={{ duration: 0.25, ease: 'easeOut' }}
                 >
                   {msg.role === 'user' ? (
-                    /* ── User bubble ── */
+                    /* ── User text (no bubble) ── */
                     <div className="flex justify-end">
-                      <div className="max-w-[80%] sm:max-w-[65%] px-4 py-2.5 rounded-2xl rounded-br-md bg-violet-600/20 border border-violet-500/10">
+                      <div className="max-w-[85%] sm:max-w-[70%]">
                         {msg.images && msg.images.length > 0 && (
-                          <div className="flex gap-2 mb-2 flex-wrap">
+                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
                             {msg.images.map((img, j) => (
                               img.data ? (
                                 <img
@@ -408,7 +408,7 @@ export function VoiceChat() {
                             ))}
                           </div>
                         )}
-                        <p className="text-[13px] text-white/90 break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        <p className="text-[13px] text-white/50 break-words whitespace-pre-wrap leading-relaxed text-right">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
@@ -474,7 +474,7 @@ export function VoiceChat() {
 
       {/* ── Bottom input bar ── */}
       <div
-        className="shrink-0 bg-[#0a0a0a]"
+        className="shrink-0 bg-black"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         {/* Transcript / listening state */}
