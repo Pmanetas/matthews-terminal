@@ -39,17 +39,19 @@ export function getAudioLevel(): number {
   return Math.min(1, (sum / analyserData.length / 128))
 }
 
-function unlockAudio() {
-  if (audioUnlocked || !sharedAudio) return
-  sharedAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQAAAAAAAAAAaC0MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=='
-  sharedAudio.play().then(() => { audioUnlocked = true }).catch(() => {})
+/** Unlock audio on user gesture — must be called repeatedly until it succeeds (iOS requirement) */
+export function unlockAudio() {
+  if (!sharedAudio) return
   ensureAnalyser()
   audioContext?.resume()
+  if (audioUnlocked) return
+  sharedAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQAAAAAAAAAAaC0MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=='
+  sharedAudio.play().then(() => { audioUnlocked = true }).catch(() => {})
 }
 
 if (typeof document !== 'undefined') {
-  document.addEventListener('touchstart', unlockAudio, { once: true })
-  document.addEventListener('click', unlockAudio, { once: true })
+  document.addEventListener('touchstart', unlockAudio, { once: false })
+  document.addEventListener('click', unlockAudio, { once: false })
 }
 
 function getWsUrl(): string {
@@ -169,8 +171,13 @@ export function useBridge(onAudioDone?: () => void) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          if (data.type === 'tool_status') {
-            // Each tool call is its own entry — no collapsing
+          if (data.type === 'user_command') {
+            // Replayed from bridge history
+            setMessages((prev) => [
+              ...prev,
+              { role: 'user' as const, text: data.text, timestamp: Date.now() },
+            ])
+          } else if (data.type === 'tool_status') {
             setMessages((prev) => [
               ...prev,
               { role: 'tool' as const, text: data.text, timestamp: Date.now() },
@@ -230,6 +237,8 @@ export function useBridge(onAudioDone?: () => void) {
 
   const sendCommand = useCallback(
     (text: string, images?: ImageAttachment[]) => {
+      // User gesture context — unlock audio for iOS so TTS can play
+      unlockAudio()
       setIsWaiting(true)
       setMessages((prev) => [
         ...prev,

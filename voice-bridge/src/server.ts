@@ -151,6 +151,7 @@ interface ResultMessage { type: 'result'; text: string; }
 interface SpeakMessage { type: 'speak'; text: string; }
 interface WorkspaceMessage { type: 'workspace'; data: { workspace: string; repo: string }; }
 interface ActiveFileMessage { type: 'active_file'; file: string | null; }
+interface StopMessage { type: 'stop'; }
 
 type BridgeMessage =
   | IdentifyMessage
@@ -160,7 +161,8 @@ type BridgeMessage =
   | ResultMessage
   | SpeakMessage
   | WorkspaceMessage
-  | ActiveFileMessage;
+  | ActiveFileMessage
+  | StopMessage;
 
 // ── State ──────────────────────────────────────────────────────────
 
@@ -173,6 +175,25 @@ const state: BridgeState = {
   currentTaskStatus: 'idle',
   lastOutputSummary: null,
 };
+
+// ── Session message history (replayed to phone on reconnect) ──────
+// Stores tool_status, result, and user command messages so reconnecting
+// clients see the full terminal session.
+interface HistoryEntry { type: string; [key: string]: unknown; }
+const messageHistory: HistoryEntry[] = [];
+const MAX_HISTORY = 200;
+
+function pushHistory(msg: HistoryEntry): void {
+  messageHistory.push(msg);
+  if (messageHistory.length > MAX_HISTORY) messageHistory.shift();
+}
+
+function replayHistory(ws: WebSocket): void {
+  for (const msg of messageHistory) {
+    sendJSON(ws, msg);
+  }
+  console.log(`[${timestamp()}] Replayed ${messageHistory.length} messages to reconnecting client`);
+}
 
 // ── Client tracking ────────────────────────────────────────────────
 
@@ -290,7 +311,7 @@ wss.on('connection', (ws) => {
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
-      // Send workspace info and active file to phone on connect
+      // Send workspace info, active file, and message history to phone on connect
       if (role === 'phone') {
         if (state.activeWorkspace) {
           sendJSON(ws, { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
@@ -298,6 +319,7 @@ wss.on('connection', (ws) => {
         if (state.activeFile) {
           sendJSON(ws, { type: 'active_file', file: state.activeFile });
         }
+        replayHistory(ws);
       }
       return;
     }
@@ -314,6 +336,8 @@ wss.on('connection', (ws) => {
     if (role === 'phone' && msg.type === 'command') {
       state.lastCommand = msg.text;
       state.currentTaskStatus = 'running';
+      // Store user message in history (without image data to save memory)
+      pushHistory({ type: 'user_command', text: msg.text });
 
       const ext = getClient('extension');
       if (ext) {
@@ -350,7 +374,9 @@ wss.on('connection', (ws) => {
 
     // ── Extension sends tool status (separate step on phone) ──
     if (role === 'extension' && msg.type === 'tool_status') {
-      broadcastToRole('phone', { type: 'tool_status', text: msg.text });
+      const entry = { type: 'tool_status', text: msg.text };
+      pushHistory(entry);
+      broadcastToRole('phone', entry);
       return;
     }
 
@@ -372,17 +398,17 @@ wss.on('connection', (ws) => {
       state.lastOutputSummary = msg.text;
 
       // Generate TTS FIRST, then send text + audio together so they're synced
+      const resultEntry = { type: 'result', text: msg.text };
+      pushHistory(resultEntry);
       generateSpeech(msg.text).then((audioBuffer) => {
-        // Send text result right before the audio so they arrive together
-        broadcastToRole('phone', { type: 'result', text: msg.text });
+        broadcastToRole('phone', resultEntry);
         if (audioBuffer) {
           const base64 = audioBuffer.toString('base64');
           broadcastToRole('phone', { type: 'audio', data: base64, final: true });
           console.log(`[${timestamp()}] Sent result + TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
         }
       }).catch(() => {
-        // TTS failed — still send the text result
-        broadcastToRole('phone', { type: 'result', text: msg.text });
+        broadcastToRole('phone', resultEntry);
       });
       return;
     }
