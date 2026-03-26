@@ -204,16 +204,30 @@ export function VoiceChat() {
     <div className="h-[100dvh] flex flex-col bg-black text-white relative overflow-hidden">
       {/* Header */}
       <div className="relative z-10 flex flex-col items-center pt-6 pb-2 shrink-0">
-        <h1 className="text-base font-bold tracking-[0.25em] uppercase text-violet-400/80 mb-3"
-            style={{ textShadow: '0 0 20px rgba(139,92,246,0.3)' }}>
-          MATTHEWS TERMINAL
-        </h1>
+        {/* Robot head */}
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="mb-3" style={{ filter: 'drop-shadow(0 0 12px rgba(139,92,246,0.4))' }}>
+          {/* Antenna */}
+          <line x1="24" y1="2" x2="24" y2="10" stroke="rgba(139,92,246,0.6)" strokeWidth="2" />
+          <circle cx="24" cy="2" r="2" fill="rgba(139,92,246,0.8)" />
+          {/* Head */}
+          <rect x="6" y="10" width="36" height="30" rx="3" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" fill="rgba(139,92,246,0.06)" />
+          {/* Eyes */}
+          <rect x="13" y="18" width="8" height="6" rx="1" fill="rgba(139,92,246,0.7)" />
+          <rect x="27" y="18" width="8" height="6" rx="1" fill="rgba(139,92,246,0.7)" />
+          {/* Mouth grid */}
+          <rect x="14" y="30" width="20" height="4" rx="1" fill="rgba(139,92,246,0.3)" />
+          <line x1="19" y1="30" x2="19" y2="34" stroke="rgba(0,0,0,0.5)" strokeWidth="1" />
+          <line x1="24" y1="30" x2="24" y2="34" stroke="rgba(0,0,0,0.5)" strokeWidth="1" />
+          <line x1="29" y1="30" x2="29" y2="34" stroke="rgba(0,0,0,0.5)" strokeWidth="1" />
+          {/* Ear bolts */}
+          <rect x="2" y="20" width="4" height="8" rx="1" fill="rgba(139,92,246,0.3)" />
+          <rect x="42" y="20" width="4" height="8" rx="1" fill="rgba(139,92,246,0.3)" />
+        </svg>
         <VoiceWaveform isActive={waveformActive} size={200} getAudioLevel={getAudioLevel} />
         <div className="flex items-center gap-2 mt-3">
           <span className={cn('h-1.5 w-1.5', statusDot)} />
           <span className="text-[10px] text-white/25 tracking-wide">{statusText}</span>
         </div>
-        <div className="w-full mt-4 h-px bg-gradient-to-r from-transparent via-violet-500/15 to-transparent" />
       </div>
 
       {/* Chat area */}
@@ -237,8 +251,7 @@ export function VoiceChat() {
                 >
                   {msg.role === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="max-w-[60%] border border-violet-500/20 px-5 py-3"
-                           style={{ background: 'rgba(139,92,246,0.06)' }}>
+                      <div className="max-w-[60%] px-5 py-3">
                         <p className="text-sm text-white/80 break-words whitespace-pre-wrap">{msg.text}</p>
                       </div>
                     </div>
@@ -257,21 +270,16 @@ export function VoiceChat() {
                         )}
                         <div className={cn('w-px flex-1', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
                       </div>
-                      {/* Tool box */}
-                      <div className={cn(
-                        'flex-1 flex items-start gap-2.5 py-2.5 px-4 border transition-all',
-                        isExpanded
-                          ? 'border-violet-500/25 bg-violet-500/[0.04]'
-                          : 'border-white/[0.06] bg-white/[0.02]'
-                      )}>
-                        <div className="w-5 h-5 border border-violet-500/20 bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                      {/* Tool content */}
+                      <div className="flex-1 flex items-start gap-2.5 py-2.5 px-2 transition-all">
+                        <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
                           <ToolIcon text={msg.text} />
                         </div>
                         <ToolContent text={msg.text} expanded={isExpanded} />
                       </div>
                     </div>
                   ) : (
-                    <div className="border border-white/[0.06] bg-white/[0.02] px-5 py-4">
+                    <div className="px-5 py-4">
                       <span className="text-[11px] font-medium text-violet-400/50 tracking-wider uppercase mb-2 block">Matthew</span>
                       {i === lastAssistantIndex ? (
                         <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
@@ -289,8 +297,7 @@ export function VoiceChat() {
       </div>
 
       {/* Bottom controls */}
-      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-3 bg-black">
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-violet-500/15 to-transparent mb-1" />
+      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-6 bg-gradient-to-t from-black via-black to-transparent">
 
         <AnimatePresence mode="wait">
           {isListening ? (
@@ -330,10 +337,10 @@ export function VoiceChat() {
           <button
             onClick={() => setTtsEnabled(!ttsEnabled)}
             className={cn(
-              'p-2.5 transition-colors border',
+              'p-2.5 transition-colors',
               ttsEnabled
-                ? 'text-violet-300 border-violet-500/20 bg-violet-500/10'
-                : 'text-white/20 border-white/[0.06] hover:text-white/40',
+                ? 'text-violet-300'
+                : 'text-white/20 hover:text-white/40',
             )}
           >
             {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -344,13 +351,13 @@ export function VoiceChat() {
             disabled={!supported}
             whileTap={{ scale: 0.92 }}
             className={cn(
-              'relative flex items-center justify-center w-14 h-14 transition-all duration-500 border',
+              'relative flex items-center justify-center w-14 h-14 transition-all duration-500 rounded-full',
               isListening
-                ? 'bg-violet-500/20 border-violet-500/50'
-                : 'bg-white/[0.03] border-violet-500/15 hover:border-violet-500/30',
+                ? 'bg-violet-500/20'
+                : 'bg-white/[0.03] hover:bg-white/[0.06]',
               !supported && 'opacity-30 cursor-not-allowed',
             )}
-            style={isListening ? { boxShadow: '0 0 25px rgba(139,92,246,0.3), inset 0 0 15px rgba(139,92,246,0.1)' } : {}}
+            style={isListening ? { boxShadow: '0 0 25px rgba(139,92,246,0.3)' } : {}}
           >
             {isListening && (
               <span className="absolute inset-0 bg-violet-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
@@ -366,8 +373,7 @@ export function VoiceChat() {
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={handleSend}
                 whileTap={{ scale: 0.92 }}
-                className="p-2.5 border border-violet-500/30 bg-violet-500/15 text-violet-300"
-                style={{ boxShadow: '0 0 15px rgba(139,92,246,0.2)' }}
+                className="p-2.5 text-violet-300"
               >
                 <Send className="w-4 h-4" />
               </motion.button>
