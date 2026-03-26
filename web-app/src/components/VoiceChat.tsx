@@ -31,9 +31,9 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   }
 
   return (
-    <div className="flex flex-col min-w-0">
+    <div className="flex flex-col min-w-0 w-full">
       <span className="text-xs text-white/50 leading-tight mb-1.5">{header}</span>
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 overflow-x-auto">
         {diffLines.map((line, i) => {
           const trimmed = line.trim()
           const code = trimmed.replace(/^[⊖⊕]\s*/, '')
@@ -42,14 +42,14 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
           return (
             <div key={i} className="flex items-center gap-2">
               {/* Sub-dot aligned with each line */}
-              <div className="w-1.5 h-1.5 shrink-0 bg-violet-500/30" />
-              {/* Code — inline width only */}
+              <div className="w-1 h-1 shrink-0 bg-violet-500/30" />
+              {/* Code — full line, no truncation */}
               {isRemove ? (
-                <code className="text-[10px] font-mono text-red-300/70 bg-red-500/10 border-l border-red-500/40 px-1.5 py-px">{code}</code>
+                <code className="text-[10px] font-mono text-red-300/70 bg-red-500/10 border-l border-red-500/40 px-1.5 py-px whitespace-pre">{code}</code>
               ) : isAdd ? (
-                <code className="text-[10px] font-mono text-emerald-300/70 bg-emerald-500/10 border-l border-emerald-500/40 px-1.5 py-px">{code}</code>
+                <code className="text-[10px] font-mono text-emerald-300/70 bg-emerald-500/10 border-l border-emerald-500/40 px-1.5 py-px whitespace-pre">{code}</code>
               ) : (
-                <span className="text-[10px] text-white/30">{trimmed}</span>
+                <span className="text-[10px] text-white/30 whitespace-pre">{trimmed}</span>
               )}
             </div>
           )
@@ -254,7 +254,7 @@ export function VoiceChat() {
 
       {/* Chat area — generous padding on desktop */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex flex-col gap-3 pt-3 mx-6 sm:mx-12 md:mx-20 lg:mx-32 xl:mx-48">
+        <div className="flex flex-col gap-3 pt-3 mx-5 sm:mx-12 md:mx-20 lg:mx-32 xl:mx-48 px-3">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12 tracking-wide">Tap the mic to start talking</p>
           ) : (
@@ -278,10 +278,10 @@ export function VoiceChat() {
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
-                    <div className="flex items-start gap-2.5">
-                      {/* Timeline dot */}
-                      <div className="flex flex-col items-center w-4 shrink-0 pt-3">
-                        {isPrevTool && <div className="w-px h-2 bg-violet-500/15" />}
+                    <div className="flex items-stretch gap-3">
+                      {/* Timeline */}
+                      <div className="flex flex-col items-center w-4 shrink-0">
+                        <div className={cn('w-px flex-1', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
                         {isLastTool && isProcessing ? (
                           <LoaderCircle className="w-3.5 h-3.5 text-violet-400 animate-spin shrink-0" />
                         ) : (
@@ -290,10 +290,15 @@ export function VoiceChat() {
                             isLastTool ? 'bg-violet-400' : 'bg-violet-500/30'
                           )} />
                         )}
-                        {isNextTool && <div className="w-px h-2 bg-violet-500/15 mt-auto" />}
+                        <div className={cn('w-px flex-1', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
                       </div>
-                      {/* Tool content — no box */}
-                      <div className="flex items-start gap-2 py-1.5 min-w-0">
+                      {/* Tool box */}
+                      <div className={cn(
+                        'flex-1 flex items-start gap-2.5 py-2.5 px-4 border min-w-0 overflow-hidden',
+                        isExpanded
+                          ? 'border-violet-500/25 bg-violet-500/[0.04]'
+                          : 'border-white/[0.08] bg-white/[0.02]'
+                      )}>
                         <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5">
                           <ToolIcon text={msg.text} />
                         </div>
