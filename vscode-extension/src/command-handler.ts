@@ -93,7 +93,7 @@ export class CommandHandler {
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
 
-        // No filler speech — just let Claude work
+        // No intermediate speech — only the final result gets TTS
 
         // Save images to temp files so Claude can Read them
         const imageFiles: string[] = [];
@@ -191,11 +191,10 @@ export class CommandHandler {
 
                     const toolMsg = this.parseStderrToolCall(trimmed);
                     if (toolMsg) {
-                        this.flushAndSpeak(client);
+                        this.flushAndReset(client);
                         this.lastToolDescription = toolMsg.split('\n')[0];
                         client.sendToolStatus(toolMsg);
                         this.toolCallCount++;
-                        this.maybeSpeak(client);
                     }
                 }
             });
@@ -397,13 +396,9 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, speak it, then reset */
-    private flushAndSpeak(client: BridgeClient): void {
+    /** Flush text to phone, then reset (no intermediate speech) */
+    private flushAndReset(client: BridgeClient): void {
         this.flushStreamingText(client);
-        const text = this.streamingText.trim();
-        if (text.length > 5) {
-            client.sendSpeak(text);
-        }
         this.streamingText = '';
         this.lastFlushedLength = 0;
     }
@@ -432,39 +427,14 @@ export class CommandHandler {
         }, 150);
     }
 
-    /** Send a tool call to the phone — speaks a brief update on first tool */
+    /** Send a tool call to the phone */
     private emitToolCall(block: any, client: BridgeClient): void {
-        this.flushAndSpeak(client);
+        this.flushAndReset(client);
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
         client.sendToolStatus(msg);
         this.toolCallCount++;
-        this.maybeSpeak(client);
-    }
-
-    /** Speak a brief update on first tool call, then stay quiet */
-    private maybeSpeak(client: BridgeClient): void {
-        if (this.hasSpokenToolUpdate) return;
-        // Speak after 2nd tool call (gives filler time to play first)
-        if (this.toolCallCount >= 2) {
-            this.hasSpokenToolUpdate = true;
-            const updates = [
-                "Just working through some changes.",
-                "Making a few edits, won't be long.",
-                "Working on it now.",
-                "Just going through the code.",
-                "Reading through the files to understand what's going on.",
-                "Making some tweaks, almost there.",
-                "Just checking a few things first.",
-                "Going through the codebase now.",
-                "Let me just finish up these changes.",
-                "Nearly there, just a few more adjustments.",
-                "Poking around in the code, one sec.",
-                "Sorting it out now, hang tight.",
-            ];
-            client.sendSpeak(updates[Math.floor(Math.random() * updates.length)]);
-        }
     }
 
     /**
@@ -540,13 +510,12 @@ export class CommandHandler {
                 this.emitToolCall(event.content_block, client);
                 this.pendingToolName = null;
             } else if (this.pendingToolName) {
-                this.flushAndSpeak(client);
+                this.flushAndReset(client);
                 const preliminary = this.describeToolCall({ name: this.pendingToolName, input: {} });
                 this.lastToolDescription = preliminary;
                 client.sendToolStatus(preliminary);
                 this.writeEmitter.fire(`\r\n\x1b[33m${preliminary}\x1b[0m`);
                 this.toolCallCount++;
-                this.maybeSpeak(client);
             }
             return;
         }

@@ -95,27 +95,6 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   audioContext?.resume()
   sharedAudio.volume = 1.0
   sharedAudio.src = item.url
-
-  // iOS fix: start playback muted to wake up audio hardware,
-  // then unmute after 350ms so the first word isn't clipped
-  sharedAudio.muted = true
-  sharedAudio.play().then(() => {
-    setTimeout(() => {
-      if (sharedAudio) {
-        sharedAudio.muted = false
-        sharedAudio.currentTime = 0 // restart from beginning now that hardware is awake
-      }
-      audioStartedForResult = true
-      _onAudioStarted?.()
-    }, 350)
-  }).catch((e) => {
-    console.error('[Audio] Playback failed:', e)
-    URL.revokeObjectURL(item.url)
-    setPlaying(false)
-    if (queue.length > 0) {
-      setTimeout(() => playNextAudio(onAudioDoneRef), 100)
-    }
-  })
   sharedAudio.onended = () => {
     URL.revokeObjectURL(item.url)
     setPlaying(false)
@@ -125,6 +104,22 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
       onAudioDoneRef.current?.()
     }
   }
+  // iOS: preload then delay 400ms so audio hardware wakes up before first word
+  sharedAudio.load()
+  setTimeout(() => {
+    if (!sharedAudio) return
+    sharedAudio.play().then(() => {
+      audioStartedForResult = true
+      _onAudioStarted?.()
+    }).catch((e) => {
+      console.error('[Audio] Playback failed:', e)
+      URL.revokeObjectURL(item.url)
+      setPlaying(false)
+      if (queue.length > 0) {
+        setTimeout(() => playNextAudio(onAudioDoneRef), 100)
+      }
+    })
+  }, 400)
 }
 
 const _audioQueue: AudioQueueItem[] = []
