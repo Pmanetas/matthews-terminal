@@ -467,11 +467,43 @@ export class CommandHandler {
         }
     }
 
+    /**
+     * Extract a tool name from any event structure — searches nested fields
+     */
+    private findToolInEvent(event: any): { name: string; input: any } | null {
+        // Direct tool_use event
+        if (event.tool_name || (event.type === 'tool_use' && event.name)) {
+            return { name: event.tool_name || event.name, input: event.input || {} };
+        }
+        // content_block wrapper
+        if (event.content_block?.type === 'tool_use') {
+            return { name: event.content_block.name || event.content_block.tool_name, input: event.content_block.input || {} };
+        }
+        // message.content array
+        if (event.message?.content) {
+            for (const block of event.message.content) {
+                if (block.type === 'tool_use') {
+                    return { name: block.name || block.tool_name, input: block.input || {} };
+                }
+            }
+        }
+        // subtype pattern
+        if (event.subtype === 'tool_use' || event.subtype === 'tool') {
+            return { name: event.name || event.tool_name || event.tool || 'tool', input: event.input || {} };
+        }
+        return null;
+    }
+
     private handleStreamEvent(
         event: any,
         client: BridgeClient,
         onText: (text: string) => void,
     ): void {
+        // Log every event type to terminal for debugging
+        const eventPreview = JSON.stringify(event).slice(0, 300);
+        this.writeEmitter.fire(`\x1b[2m[event] ${eventPreview}\x1b[0m\r\n`);
+
+        // ── Text content ────────────────────────────────────────
         if (event.type === 'assistant' && event.message?.content) {
             for (const block of event.message.content) {
                 if (block.type === 'text') {
@@ -483,8 +515,11 @@ export class CommandHandler {
                     this.emitToolCall(block, client);
                 }
             }
+            return;
         }
-        else if (event.type === 'content_block_delta') {
+
+        // ── Streaming text deltas ───────────────────────────────
+        if (event.type === 'content_block_delta') {
             if (event.delta?.type === 'text_delta' && event.delta.text) {
                 onText(event.delta.text);
                 this.streamingText += event.delta.text;
@@ -494,16 +529,17 @@ export class CommandHandler {
             else if (event.delta?.type === 'input_json_delta' && event.delta.partial_json) {
                 this.pendingToolInput += event.delta.partial_json;
             }
+            return;
         }
-        else if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+
+        // ── Tool call start (streaming) ─────────────────────────
+        if (event.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
             this.pendingToolName = event.content_block.name || event.content_block.tool_name || null;
             this.pendingToolInput = '';
             if (event.content_block.input && Object.keys(event.content_block.input).length > 0) {
                 this.emitToolCall(event.content_block, client);
                 this.pendingToolName = null;
             } else if (this.pendingToolName) {
-                // Immediately show a preliminary "working on it" status so the phone
-                // doesn't appear frozen while tool input streams in
                 this.flushAndSpeak(client);
                 const preliminary = this.describeToolCall({ name: this.pendingToolName, input: {} });
                 this.lastToolDescription = preliminary;
@@ -512,19 +548,18 @@ export class CommandHandler {
                 this.toolCallCount++;
                 this.maybeSpeak(client);
             }
+            return;
         }
-        else if (event.type === 'content_block_stop') {
+
+        // ── Tool call end (streaming) ───────────────────────────
+        if (event.type === 'content_block_stop') {
             if (this.pendingToolName) {
                 let input = {};
                 try {
                     if (this.pendingToolInput.trim()) {
                         input = JSON.parse(this.pendingToolInput);
                     }
-                } catch {
-                    // partial JSON
-                }
-                // Send detailed tool status now that we have full input
-                // (preliminary was already sent at content_block_start)
+                } catch { /* partial JSON */ }
                 const msg = this.describeToolCall({ name: this.pendingToolName, input });
                 this.lastToolDescription = msg.split('\n')[0];
                 this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
@@ -532,22 +567,47 @@ export class CommandHandler {
                 this.pendingToolName = null;
                 this.pendingToolInput = '';
             }
+            return;
         }
-        else if (event.type === 'result') {
+
+        // ── Result ──────────────────────────────────────────────
+        if (event.type === 'result') {
+            // Result may contain final text and/or tool calls
+            if (event.result) {
+                const resultText = typeof event.result === 'string' ? event.result : '';
+                if (resultText && !this.streamingText.includes(resultText)) {
+                    onText(resultText);
+                    this.streamingText += resultText;
+                }
+            }
             this.flushStreamingText(client);
+            return;
         }
-        else if (event.type === 'system' && event.subtype === 'tool_use') {
-            this.emitToolCall(event, client);
-        }
-        else if (event.type === 'tool_use' || event.tool_name) {
-            this.emitToolCall(event, client);
-        }
-        else if (event.type === 'tool_result') {
+
+        // ── Tool result ─────────────────────────────────────────
+        if (event.type === 'tool_result') {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
             this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
             this.streamingText = '';
             this.lastFlushedLength = 0;
+            return;
+        }
+
+        // ── Catch-all: try to find tool calls in any event ──────
+        const tool = this.findToolInEvent(event);
+        if (tool && tool.name) {
+            this.emitToolCall(tool, client);
+            return;
+        }
+
+        // ── Text in other event formats ─────────────────────────
+        const text = event.text || event.content || event.delta?.text;
+        if (typeof text === 'string' && text.length > 0) {
+            onText(text);
+            this.streamingText += text;
+            this.writeEmitter.fire(`\x1b[36m${text.replace(/\n/g, '\r\n')}\x1b[0m`);
+            this.scheduleStreamFlush(client);
         }
     }
 
