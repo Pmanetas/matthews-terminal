@@ -95,9 +95,19 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   audioContext?.resume()
   sharedAudio.volume = 1.0
   sharedAudio.src = item.url
+
+  // iOS fix: start playback muted to wake up audio hardware,
+  // then unmute after 350ms so the first word isn't clipped
+  sharedAudio.muted = true
   sharedAudio.play().then(() => {
-    audioStartedForResult = true
-    _onAudioStarted?.()
+    setTimeout(() => {
+      if (sharedAudio) {
+        sharedAudio.muted = false
+        sharedAudio.currentTime = 0 // restart from beginning now that hardware is awake
+      }
+      audioStartedForResult = true
+      _onAudioStarted?.()
+    }, 350)
   }).catch((e) => {
     console.error('[Audio] Playback failed:', e)
     URL.revokeObjectURL(item.url)

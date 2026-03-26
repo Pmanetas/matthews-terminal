@@ -93,24 +93,7 @@ export class CommandHandler {
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
 
-        const fillers = [
-            "Alright, give me a sec to think about this.",
-            "Hang tight, just working this out.",
-            "Sure thing, let me have a look.",
-            "One moment, just figuring this out.",
-            "On it, just give me a second.",
-            "Right, let me dig into this for you.",
-            "Cool, let me check that out.",
-            "Okay, looking into it now.",
-            "Let me pull that up real quick.",
-            "Gotcha, working on it now.",
-            "Let me see what we've got here.",
-            "Alright, diving in.",
-            "Sure, just a moment while I sort this out.",
-            "On it, give me a tick.",
-            "Right, let me take a look at the code.",
-        ];
-        client.sendSpeak(fillers[Math.floor(Math.random() * fillers.length)]);
+        // No filler speech — just let Claude work
 
         // Save images to temp files so Claude can Read them
         const imageFiles: string[] = [];
