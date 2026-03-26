@@ -61,30 +61,46 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="flex flex-col gap-0.5 mt-2 overflow-x-auto">
-              {diffLines.map((line, i) => {
-                const trimmed = line.trim()
-                const code = trimmed.replace(/^[⊖⊕]\s*/, '')
-                const isRemove = trimmed.startsWith('⊖')
-                const isAdd = trimmed.startsWith('⊕')
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.15, delay: i * 0.02 }}
-                    className="flex items-start gap-2"
-                  >
-                    {isRemove ? (
-                      <code className="text-[11px] font-mono text-red-300/70 bg-red-500/10 border-l-2 border-red-500/40 px-2 py-0.5 whitespace-pre w-full">{code}</code>
-                    ) : isAdd ? (
-                      <code className="text-[11px] font-mono text-emerald-300/70 bg-emerald-500/10 border-l-2 border-emerald-500/40 px-2 py-0.5 whitespace-pre w-full">{code}</code>
-                    ) : (
-                      <span className="text-[11px] text-white/30 whitespace-pre">{trimmed}</span>
-                    )}
-                  </motion.div>
-                )
-              })}
+            <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.06] bg-black/40">
+              <div className="overflow-x-auto">
+                {diffLines.map((line, i) => {
+                  const trimmed = line.trim()
+                  const code = trimmed.replace(/^[⊖⊕]\s*/, '')
+                  const isRemove = trimmed.startsWith('⊖')
+                  const isAdd = trimmed.startsWith('⊕')
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.12, delay: i * 0.02 }}
+                      className={cn(
+                        'flex items-start font-mono text-[11px] leading-5',
+                        isRemove && 'bg-red-500/[0.08]',
+                        isAdd && 'bg-emerald-500/[0.08]',
+                      )}
+                    >
+                      <span className={cn(
+                        'w-8 shrink-0 text-right pr-2 select-none border-r',
+                        isRemove ? 'text-red-400/40 border-red-500/20' :
+                        isAdd ? 'text-emerald-400/40 border-emerald-500/20' :
+                        'text-white/15 border-white/[0.06]'
+                      )}>{i + 1}</span>
+                      <span className="w-5 shrink-0 text-center select-none">
+                        {isRemove ? <span className="text-red-400/60">−</span> :
+                         isAdd ? <span className="text-emerald-400/60">+</span> :
+                         null}
+                      </span>
+                      <code className={cn(
+                        'whitespace-pre pr-3',
+                        isRemove ? 'text-red-300/70' :
+                        isAdd ? 'text-emerald-300/70' :
+                        'text-white/30'
+                      )}>{code}</code>
+                    </motion.div>
+                  )
+                })}
+              </div>
             </div>
           </motion.div>
         )}
@@ -201,12 +217,22 @@ export function VoiceChat() {
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   const isProcessing = isWaiting || (messages.length > 0 && messages[messages.length - 1].role !== 'assistant')
+
+  // Find the last user message index so we only show spinner on tools from the CURRENT command
+  const lastUserIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') return i }
+    return -1
+  })()
+
   const isThinking = isProcessing && messages.length > 0 && messages[messages.length - 1].role === 'user'
 
   const lastToolIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'tool') return i }
     return -1
   })()
+
+  // Only show spinner if the last tool is from the current command (after last user message)
+  const isCurrentToolLoading = isProcessing && lastToolIndex > lastUserIndex
 
   const lastAssistantIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'assistant') return i }
@@ -352,7 +378,7 @@ export function VoiceChat() {
               const isNextTool = messages[i + 1]?.role === 'tool'
               const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
               const isLastTool = i === lastToolIndex
-              const isExpanded = (isLastTool && isProcessing) || expandedTools.has(i)
+              const isExpanded = !expandedTools.has(i) // expanded by default, click to collapse
 
               return (
                 <motion.div
@@ -395,7 +421,7 @@ export function VoiceChat() {
                     >
                       <div className="flex flex-col items-center w-5 shrink-0">
                         <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                        {isLastTool && isProcessing ? (
+                        {isLastTool && isCurrentToolLoading ? (
                           <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
                         ) : (
                           <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />
