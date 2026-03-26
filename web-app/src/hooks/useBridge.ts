@@ -9,6 +9,7 @@ let audioUnlocked = false
 let audioContext: AudioContext | null = null
 let analyser: AnalyserNode | null = null
 let analyserData: Uint8Array<ArrayBuffer> | null = null
+let gainNode: GainNode | null = null
 let sourceConnected = false
 
 function ensureAnalyser() {
@@ -19,9 +20,12 @@ function ensureAnalyser() {
     analyser.fftSize = 256
     analyser.smoothingTimeConstant = 0.7
     analyserData = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+    gainNode = audioContext.createGain()
+    gainNode.gain.value = 2.0 // Boost volume for iPhone speakers
     if (!sourceConnected) {
       const source = audioContext.createMediaElementSource(sharedAudio)
-      source.connect(analyser)
+      source.connect(gainNode)
+      gainNode.connect(analyser)
       analyser.connect(audioContext.destination)
       sourceConnected = true
     }

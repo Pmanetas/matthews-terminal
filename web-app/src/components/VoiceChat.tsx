@@ -24,37 +24,71 @@ function ToolIcon({ text }: { text: string }) {
   return <CheckCircle2 className="w-3.5 h-3.5 text-violet-400" />
 }
 
+function parseDiffStats(lines: string[]): { added: number; removed: number } {
+  let added = 0, removed = 0
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('⊕')) added++
+    else if (trimmed.startsWith('⊖')) removed++
+  }
+  return { added, removed }
+}
+
 function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
   const diffLines = lines.slice(1)
-
-  if (!expanded || diffLines.length === 0) {
-    return <span className="text-[13px] text-white/50 leading-tight">{header}</span>
-  }
+  const { added, removed } = parseDiffStats(diffLines)
+  const hasDiff = added > 0 || removed > 0
 
   return (
     <div className="flex flex-col min-w-0 w-full">
-      <span className="text-[13px] text-white/50 leading-tight mb-2">{header}</span>
-      <div className="flex flex-col gap-0.5 overflow-x-auto">
-        {diffLines.map((line, i) => {
-          const trimmed = line.trim()
-          const code = trimmed.replace(/^[⊖⊕]\s*/, '')
-          const isRemove = trimmed.startsWith('⊖')
-          const isAdd = trimmed.startsWith('⊕')
-          return (
-            <div key={i} className="flex items-start gap-2">
-              {isRemove ? (
-                <code className="text-[11px] font-mono text-red-300/70 bg-red-500/10 border-l-2 border-red-500/40 px-2 py-0.5 whitespace-pre w-full">{code}</code>
-              ) : isAdd ? (
-                <code className="text-[11px] font-mono text-emerald-300/70 bg-emerald-500/10 border-l-2 border-emerald-500/40 px-2 py-0.5 whitespace-pre w-full">{code}</code>
-              ) : (
-                <span className="text-[11px] text-white/30 whitespace-pre">{trimmed}</span>
-              )}
-            </div>
-          )
-        })}
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] text-white/50 leading-tight">{header}</span>
+        {hasDiff && (
+          <span className="flex items-center gap-1.5 text-[11px] shrink-0 ml-auto">
+            {added > 0 && <span className="text-emerald-400/70">+{added}</span>}
+            {removed > 0 && <span className="text-red-400/70">-{removed}</span>}
+          </span>
+        )}
       </div>
+      <AnimatePresence>
+        {expanded && diffLines.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-0.5 mt-2 overflow-x-auto">
+              {diffLines.map((line, i) => {
+                const trimmed = line.trim()
+                const code = trimmed.replace(/^[⊖⊕]\s*/, '')
+                const isRemove = trimmed.startsWith('⊖')
+                const isAdd = trimmed.startsWith('⊕')
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.15, delay: i * 0.02 }}
+                    className="flex items-start gap-2"
+                  >
+                    {isRemove ? (
+                      <code className="text-[11px] font-mono text-red-300/70 bg-red-500/10 border-l-2 border-red-500/40 px-2 py-0.5 whitespace-pre w-full">{code}</code>
+                    ) : isAdd ? (
+                      <code className="text-[11px] font-mono text-emerald-300/70 bg-emerald-500/10 border-l-2 border-emerald-500/40 px-2 py-0.5 whitespace-pre w-full">{code}</code>
+                    ) : (
+                      <span className="text-[11px] text-white/30 whitespace-pre">{trimmed}</span>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -330,7 +364,7 @@ export function VoiceChat() {
                   {msg.role === 'user' ? (
                     /* ── User bubble ── */
                     <div className="flex justify-end">
-                      <div className="max-w-[85%] sm:max-w-[70%] px-5 py-3.5 rounded-2xl rounded-br-md bg-violet-600/20 border border-violet-500/10">
+                      <div className="max-w-[80%] sm:max-w-[65%] px-4 py-2.5 rounded-2xl rounded-br-md bg-violet-600/20 border border-violet-500/10">
                         {msg.images && msg.images.length > 0 && (
                           <div className="flex gap-2 mb-2 flex-wrap">
                             {msg.images.map((img, j) => (
@@ -348,7 +382,7 @@ export function VoiceChat() {
                             ))}
                           </div>
                         )}
-                        <p className="text-[15px] text-white/90 break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        <p className="text-[13px] text-white/90 break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
@@ -384,15 +418,13 @@ export function VoiceChat() {
                       </motion.div>
                     </motion.div>
                   ) : (
-                    /* ── Assistant bubble ── */
-                    <div className="flex justify-start">
-                      <div className="max-w-[90%] sm:max-w-[80%] px-5 py-3.5 rounded-2xl rounded-bl-md bg-white/[0.05] border border-white/[0.06]">
-                        {i === lastAssistantIndex ? (
-                          <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
-                        ) : (
-                          <MarkdownMessage text={msg.text} />
-                        )}
-                      </div>
+                    /* ── Assistant text (no bubble) ── */
+                    <div className="px-1">
+                      {i === lastAssistantIndex ? (
+                        <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
+                      ) : (
+                        <MarkdownMessage text={msg.text} />
+                      )}
                     </div>
                   )}
                 </motion.div>
@@ -405,10 +437,8 @@ export function VoiceChat() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="flex justify-start">
-                <div className="px-5 py-2 rounded-2xl rounded-bl-md bg-white/[0.05] border border-white/[0.06]">
-                  <ThinkingDots />
-                </div>
+              <div className="px-1">
+                <ThinkingDots />
               </div>
             </motion.div>
           )}
