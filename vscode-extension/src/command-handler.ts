@@ -45,6 +45,8 @@ export class CommandHandler {
     // Only speak one brief update per command when tools start
     private hasSpokenToolUpdate = false;
     private toolCallCount = 0;
+    // Skip speech until first tool call (so Claude's initial "Let me look..." isn't spoken)
+    private hasSeenFirstTool = false;
 
     constructor() {
         this.disposables.push(
@@ -89,6 +91,7 @@ export class CommandHandler {
         this.toolSpeechQueue = [];
         this.hasSpokenToolUpdate = false;
         this.toolCallCount = 0;
+        this.hasSeenFirstTool = false;
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}${images?.length ? ` [+${images.length} image(s)]` : ''}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -396,11 +399,11 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, speak it, then reset */
+    /** Flush text to phone, speak it (only after first tool call), then reset */
     private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
-        if (text.length > 5) {
+        if (text.length > 5 && this.hasSeenFirstTool) {
             client.sendSpeak(text);
         }
         this.streamingText = '';
@@ -434,6 +437,7 @@ export class CommandHandler {
     /** Send a tool call to the phone */
     private emitToolCall(block: any, client: BridgeClient): void {
         this.flushAndSpeak(client);
+        this.hasSeenFirstTool = true;
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);

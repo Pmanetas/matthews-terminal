@@ -104,9 +104,8 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
       onAudioDoneRef.current?.()
     }
   }
-  // iOS: preload then delay 400ms so audio hardware wakes up before first word
-  sharedAudio.load()
-  setTimeout(() => {
+  // iOS: wait for audio to be fully buffered before playing
+  const doPlay = () => {
     if (!sharedAudio) return
     sharedAudio.play().then(() => {
       audioStartedForResult = true
@@ -119,7 +118,16 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
         setTimeout(() => playNextAudio(onAudioDoneRef), 100)
       }
     })
-  }, 400)
+  }
+  sharedAudio.oncanplaythrough = () => {
+    sharedAudio!.oncanplaythrough = null
+    doPlay()
+  }
+  sharedAudio.load()
+  // Fallback if canplaythrough doesn't fire (some iOS versions)
+  setTimeout(() => {
+    if (sharedAudio && sharedAudio.paused) doPlay()
+  }, 800)
 }
 
 const _audioQueue: AudioQueueItem[] = []
