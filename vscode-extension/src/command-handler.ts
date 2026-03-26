@@ -566,6 +566,20 @@ export class CommandHandler {
             const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
             this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
+
+            // Send file content preview to phone for Read results
+            if (this.lastToolDescription.startsWith('Reading') && output.length > 0) {
+                const lines = output.split('\n').slice(0, 20);
+                let contentPreview = this.lastToolDescription;
+                for (const line of lines) {
+                    contentPreview += `\n  ${line}`;
+                }
+                if (output.split('\n').length > 20) {
+                    contentPreview += `\n  ... (${output.split('\n').length - 20} more lines)`;
+                }
+                client.sendToolStatus(contentPreview);
+            }
+
             this.streamingText = '';
             this.lastFlushedLength = 0;
             return;

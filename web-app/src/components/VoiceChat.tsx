@@ -243,7 +243,12 @@ export function VoiceChat() {
     chatEndRef.current?.scrollIntoView({ behavior: 'instant' })
   }, [])
 
-  useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
+  useEffect(() => { scrollToBottom() }, [messages, expandedTools, scrollToBottom])
+  // Scroll again after animations finish (tool expand = 250ms, message enter = 250ms)
+  useEffect(() => {
+    const t = setTimeout(scrollToBottom, 300)
+    return () => clearTimeout(t)
+  }, [messages, expandedTools, scrollToBottom])
   useEffect(() => { if (isListening) hasSentRef.current = false }, [isListening])
 
   useEffect(() => {
