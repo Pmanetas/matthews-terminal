@@ -518,6 +518,16 @@ export class CommandHandler {
             if (event.content_block.input && Object.keys(event.content_block.input).length > 0) {
                 this.emitToolCall(event.content_block, client);
                 this.pendingToolName = null;
+            } else if (this.pendingToolName) {
+                // Immediately show a preliminary "working on it" status so the phone
+                // doesn't appear frozen while tool input streams in
+                this.flushAndSpeak(client);
+                const preliminary = this.describeToolCall({ name: this.pendingToolName, input: {} });
+                this.lastToolDescription = preliminary;
+                client.sendToolStatus(preliminary);
+                this.writeEmitter.fire(`\r\n\x1b[33m${preliminary}\x1b[0m`);
+                this.toolCallCount++;
+                this.maybeSpeak(client);
             }
         }
         else if (event.type === 'content_block_stop') {
@@ -530,7 +540,12 @@ export class CommandHandler {
                 } catch {
                     // partial JSON
                 }
-                this.emitToolCall({ name: this.pendingToolName, input }, client);
+                // Send detailed tool status now that we have full input
+                // (preliminary was already sent at content_block_start)
+                const msg = this.describeToolCall({ name: this.pendingToolName, input });
+                this.lastToolDescription = msg.split('\n')[0];
+                this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
+                client.sendToolStatus(msg);
                 this.pendingToolName = null;
                 this.pendingToolInput = '';
             }
