@@ -60,11 +60,11 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1',
-        voice: 'nova',
+        model: 'tts-1-hd',
+        voice: 'echo',
         input: '...... ' + ttsText,
         response_format: 'mp3',
-        speed: 1.15,
+        speed: 1.12,
       }),
     });
 
@@ -182,6 +182,16 @@ function getClient(role: ClientRole): WebSocket | undefined {
   return latest;
 }
 
+/** Broadcast to ALL clients with a given role (e.g. multiple phone/browser sessions) */
+function broadcastToRole(role: ClientRole, data: unknown): void {
+  const json = JSON.stringify(data);
+  for (const [ws, r] of clients) {
+    if (r === role && ws.readyState === WebSocket.OPEN) {
+      ws.send(json);
+    }
+  }
+}
+
 function sendJSON(ws: WebSocket, data: unknown): void {
   ws.send(JSON.stringify(data));
 }
@@ -263,12 +273,15 @@ wss.on('connection', (ws) => {
     // ── Identify ───────────────────────────────────────────────
     if (msg.type === 'identify') {
       const role = msg.client;
-      // Close any existing connections with the same role (prevents stale sockets)
-      for (const [existingWs, existingRole] of clients) {
-        if (existingRole === role && existingWs !== ws) {
-          console.log(`[${timestamp()}] Closing stale ${role} connection`);
-          clients.delete(existingWs);
-          existingWs.close();
+      // Close stale extension connections (only one extension allowed)
+      // But allow multiple phone/browser sessions for cross-device sync
+      if (role === 'extension') {
+        for (const [existingWs, existingRole] of clients) {
+          if (existingRole === 'extension' && existingWs !== ws) {
+            console.log(`[${timestamp()}] Closing stale extension connection`);
+            clients.delete(existingWs);
+            existingWs.close();
+          }
         }
       }
       clients.set(ws, role);
@@ -322,30 +335,25 @@ wss.on('connection', (ws) => {
 
     // ── Extension sends status ─────────────────────────────────
     if (role === 'extension' && msg.type === 'status') {
-      const phone = getClient('phone');
-      if (phone) sendJSON(phone, { type: 'status', text: msg.text });
+      broadcastToRole('phone', { type: 'status', text: msg.text });
       return;
     }
 
     // ── Extension sends tool status (separate step on phone) ──
     if (role === 'extension' && msg.type === 'tool_status') {
-      const phone = getClient('phone');
-      if (phone) sendJSON(phone, { type: 'tool_status', text: msg.text });
+      broadcastToRole('phone', { type: 'tool_status', text: msg.text });
       return;
     }
 
     // ── Extension sends speak (intermediate TTS) ─────────────
     if (role === 'extension' && msg.type === 'speak') {
-      const phone = getClient('phone');
-      if (phone) {
-        generateSpeech(msg.text).then((audioBuffer) => {
-          if (audioBuffer && phone.readyState === WebSocket.OPEN) {
-            const base64 = audioBuffer.toString('base64');
-            sendJSON(phone, { type: 'audio', data: base64, final: false });
-            console.log(`[${timestamp()}] Sent intermediate TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
-          }
-        });
-      }
+      generateSpeech(msg.text).then((audioBuffer) => {
+        if (audioBuffer) {
+          const base64 = audioBuffer.toString('base64');
+          broadcastToRole('phone', { type: 'audio', data: base64, final: false });
+          console.log(`[${timestamp()}] Sent intermediate TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
+        }
+      });
       return;
     }
 
@@ -354,19 +362,16 @@ wss.on('connection', (ws) => {
       state.currentTaskStatus = 'complete';
       state.lastOutputSummary = msg.text;
 
-      const phone = getClient('phone');
-      if (phone) {
-        sendJSON(phone, { type: 'result', text: msg.text });
+      broadcastToRole('phone', { type: 'result', text: msg.text });
 
-        // Generate TTS audio and send to phone (marked as final)
-        generateSpeech(msg.text).then((audioBuffer) => {
-          if (audioBuffer && phone.readyState === WebSocket.OPEN) {
-            const base64 = audioBuffer.toString('base64');
-            sendJSON(phone, { type: 'audio', data: base64, final: true });
-            console.log(`[${timestamp()}] Sent final TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
-          }
-        });
-      }
+      // Generate TTS audio and send to all phone clients
+      generateSpeech(msg.text).then((audioBuffer) => {
+        if (audioBuffer) {
+          const base64 = audioBuffer.toString('base64');
+          broadcastToRole('phone', { type: 'audio', data: base64, final: true });
+          console.log(`[${timestamp()}] Sent final TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
+        }
+      });
       return;
     }
 
@@ -375,9 +380,7 @@ wss.on('connection', (ws) => {
       state.activeWorkspace = msg.data.workspace;
       state.activeRepo = msg.data.repo;
       console.log(`[${timestamp()}] Workspace updated: ${msg.data.workspace} (${msg.data.repo})`);
-      // Forward to phone so it can show workspace name
-      const phone = getClient('phone');
-      if (phone) sendJSON(phone, { type: 'workspace', workspace: msg.data.workspace, repo: msg.data.repo });
+      broadcastToRole('phone', { type: 'workspace', workspace: msg.data.workspace, repo: msg.data.repo });
       return;
     }
 

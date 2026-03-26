@@ -76,10 +76,10 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     }
   }, [text, animate])
 
-  // Wait up to 6s for audio to start before showing text anyway
+  // Wait up to 8s for audio to start before showing text anyway
   useEffect(() => {
     if (!animate) return
-    const timeout = setTimeout(() => { audioTimedOut.current = true }, 6000)
+    const timeout = setTimeout(() => { audioTimedOut.current = true }, 8000)
     return () => clearTimeout(timeout)
   }, [text, animate])
 
@@ -102,7 +102,8 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         const target = Math.floor(progress * text.length)
         setChars((c) => Math.min(Math.max(c, target), text.length))
       } else if (audioStartedForResult || audioTimedOut.current) {
-        setChars((c) => Math.min(c + 3, text.length))
+        // Slow reveal — ~1 char per frame at 60fps = readable pace
+        setChars((c) => Math.min(c + 1, text.length))
       }
       onUpdate?.()
       rafRef.current = requestAnimationFrame(tick)
@@ -165,6 +166,8 @@ function RobotHead({ isActive, getAudioLevel: getLevel, size = 56 }: { isActive:
 const globalCSS = `
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; }
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
 `
 
 // ── Main Component ───────────────────────────────────────────────
@@ -329,7 +332,7 @@ export function VoiceChat() {
         className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
-        <div className="flex flex-col gap-3 px-4 sm:px-8 md:px-16 lg:px-32 xl:px-48 py-4 max-w-4xl mx-auto">
+        <div className="flex flex-col gap-3 px-5 sm:px-10 md:px-12 lg:px-16 py-6 max-w-5xl mx-auto w-full">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <RobotHead isActive={false} getAudioLevel={() => 0} size={72} />
@@ -440,7 +443,7 @@ export function VoiceChat() {
 
       {/* ── Bottom input bar ── */}
       <div
-        className="shrink-0 border-t border-white/[0.06] bg-[#0a0a0a]"
+        className="shrink-0 bg-[#0a0a0a]"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         {/* Transcript / listening state */}

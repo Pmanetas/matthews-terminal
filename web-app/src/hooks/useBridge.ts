@@ -202,36 +202,11 @@ export function useBridge(onAudioDone?: () => void) {
         try {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'tool') {
-                const getTarget = (text: string) => {
-                  const line = text.split('\n')[0]
-                  const clean = line.replace(/\s*\(\d+\s+steps?\)\s*$/, '')
-                  const m = clean.match(/^\w+\s+(.+)$/)
-                  return m?.[1] || ''
-                }
-                const lastTarget = getTarget(last.text)
-                const newTarget = getTarget(data.text)
-
-                if (lastTarget && newTarget && lastTarget === newTarget) {
-                  // Same file — update header count but only keep LATEST diffs
-                  const countMatch = last.text.match(/\((\d+) steps?\)/)
-                  const count = countMatch ? parseInt(countMatch[1], 10) + 1 : 2
-                  const newLines = data.text.split('\n')
-                  const actionMatch = newLines[0].match(/^(\w+)\s+(.+)$/)
-                  if (actionMatch) {
-                    const label = count === 1 ? 'step' : 'steps'
-                    const header = `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`
-                    // Only keep the LATEST diff lines (not accumulated)
-                    const newDiffs = newLines.slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
-                    const merged = newDiffs.length > 0 ? header + '\n' + newDiffs.join('\n') : header
-                    return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
-                  }
-                }
-              }
-              return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
-            })
+            // Each tool call is its own entry — no collapsing
+            setMessages((prev) => [
+              ...prev,
+              { role: 'tool' as const, text: data.text, timestamp: Date.now() },
+            ])
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {
