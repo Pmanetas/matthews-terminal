@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowUp, Square, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
+import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
 import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
+import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
+import type { ImageAttachment } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -171,8 +173,10 @@ export function VoiceChat() {
   const [pendingMessage, setPendingMessage] = useState('')
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
+  const [pendingImages, setPendingImages] = useState<ImageAttachment[]>([])
   const autoListenRef = useRef<(() => void) | null>(null)
   const hasSentRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     onAudioPlayingChange(setIsAudioPlaying)
@@ -224,11 +228,15 @@ export function VoiceChat() {
 
     if (/\bsend\s*[.!]?\s*$/i.test(trimmed)) {
       const msg = trimmed.replace(/\bsend\s*[.!]?\s*$/i, '').trim()
-      if (msg) {
+      if (msg || pendingImages.length > 0) {
         hasSentRef.current = true
         stopListening()
+        sendCommand(
+          msg || 'What do you see in this image?',
+          pendingImages.length > 0 ? pendingImages : undefined
+        )
         setPendingMessage('')
-        sendCommand(msg)
+        setPendingImages([])
       }
     } else if (!isListening) {
       setPendingMessage(trimmed)
@@ -236,10 +244,32 @@ export function VoiceChat() {
   }, [isListening, transcript, sendCommand, sendStop, stopListening, startListening])
 
   const handleSend = () => {
-    if (pendingMessage && !hasSentRef.current) {
+    if ((pendingMessage || pendingImages.length > 0) && !hasSentRef.current) {
       hasSentRef.current = true
-      sendCommand(pendingMessage)
+      sendCommand(
+        pendingMessage || 'What do you see in this image?',
+        pendingImages.length > 0 ? pendingImages : undefined
+      )
       setPendingMessage('')
+      setPendingImages([])
+    }
+  }
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = '' // reset for re-selection
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      // Will be resized anyway, but warn if extremely large
+      console.warn('[Image] Large file, resizing...')
+    }
+
+    try {
+      const { data, mimeType } = await resizeImage(file)
+      setPendingImages(prev => [...prev, { data, mimeType, name: file.name }])
+    } catch (err) {
+      console.error('[Image] Failed to process:', err)
     }
   }
 
@@ -323,6 +353,23 @@ export function VoiceChat() {
                     /* ── User bubble ── */
                     <div className="flex justify-end">
                       <div className="max-w-[85%] sm:max-w-[70%] px-5 py-3.5 rounded-2xl rounded-br-md bg-violet-600/20 border border-violet-500/10">
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex gap-2 mb-2 flex-wrap">
+                            {msg.images.map((img, j) => (
+                              img.data ? (
+                                <img
+                                  key={j}
+                                  src={`data:${img.mimeType};base64,${img.data}`}
+                                  className="w-28 h-28 rounded-lg object-cover border border-white/10"
+                                />
+                              ) : (
+                                <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
+                                  <Camera className="w-6 h-6 text-white/20" />
+                                </div>
+                              )
+                            ))}
+                          </div>
+                        )}
                         <p className="text-[15px] text-white/90 break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                       </div>
                     </div>
@@ -419,12 +466,58 @@ export function VoiceChat() {
           )}
         </AnimatePresence>
 
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageSelect}
+        />
+
+        {/* Pending image thumbnails */}
+        <AnimatePresence>
+          {pendingImages.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex gap-2 px-4 pt-2 overflow-x-auto no-scrollbar"
+            >
+              {pendingImages.map((img, i) => (
+                <div key={i} className="relative shrink-0">
+                  <img
+                    src={`data:${img.mimeType};base64,${img.data}`}
+                    className="w-16 h-16 rounded-lg object-cover border border-white/10"
+                  />
+                  <button
+                    onClick={() => setPendingImages(prev => prev.filter((_, j) => j !== i))}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full text-white flex items-center justify-center"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input row */}
-        <div className="flex items-end gap-2.5 px-4 pt-2 pb-1">
+        <div className="flex items-end gap-2 px-4 pt-2 pb-1">
+          {/* Camera button */}
+          {!showStop && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center w-12 h-12 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <Camera className="w-5 h-5 text-white/50" />
+            </button>
+          )}
+
           {/* Placeholder input area */}
           <div className="flex-1 flex items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 min-h-[48px]">
             <span className="text-sm text-white/25 flex-1 select-none">
-              {isListening ? 'Listening...' : pendingMessage || 'Tap mic to speak'}
+              {isListening ? 'Listening...' : pendingMessage || (pendingImages.length > 0 ? 'Add a message or tap send' : 'Tap mic to speak')}
             </span>
           </div>
 
@@ -442,7 +535,7 @@ export function VoiceChat() {
               >
                 <Square className="w-4 h-4 text-white fill-white" />
               </motion.button>
-            ) : pendingMessage ? (
+            ) : (pendingMessage || pendingImages.length > 0) ? (
               <motion.button
                 key="send"
                 initial={{ scale: 0.8, opacity: 0 }}

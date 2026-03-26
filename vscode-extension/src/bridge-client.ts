@@ -144,7 +144,7 @@ export class BridgeClient {
         try {
             const msg = JSON.parse(raw);
             if (msg.type === 'command' && typeof msg.text === 'string') {
-                this.commandHandler.handleCommand(msg.text, this);
+                this.commandHandler.handleCommand(msg.text, this, msg.images);
             } else if (msg.type === 'stop') {
                 this.commandHandler.abortCommand(this);
             }

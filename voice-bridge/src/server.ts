@@ -143,7 +143,7 @@ interface BridgeState {
 type ClientRole = 'phone' | 'extension';
 
 interface IdentifyMessage { type: 'identify'; client: ClientRole; }
-interface CommandMessage { type: 'command'; text: string; }
+interface CommandMessage { type: 'command'; text: string; images?: Array<{ data: string; mimeType: string; name?: string }>; }
 interface StatusMessage { type: 'status'; text: string; }
 interface ToolStatusMessage { type: 'tool_status'; text: string; }
 interface ResultMessage { type: 'result'; text: string; }
@@ -234,7 +234,7 @@ app.use((req, res, next) => {
 
 const PORT = parseInt(process.env.PORT || '4800', 10);
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, maxPayload: 10 * 1024 * 1024 });
 
 // Ping/pong to keep connections alive on Render (they timeout idle connections)
 const PING_INTERVAL = 30_000;
@@ -295,7 +295,12 @@ wss.on('connection', (ws) => {
 
       const ext = getClient('extension');
       if (ext) {
-        sendJSON(ext, { type: 'command', text: msg.text });
+        const payload: Record<string, unknown> = { type: 'command', text: msg.text };
+        if (msg.images && msg.images.length > 0) {
+          payload.images = msg.images;
+          console.log(`[${timestamp()}] Forwarding ${msg.images.length} image(s) to extension`);
+        }
+        sendJSON(ext, payload);
         sendJSON(ws, { type: 'status', text: 'Command sent...' });
       } else {
         sendJSON(ws, { type: 'status', text: 'Extension not connected — is VS Code open?' });

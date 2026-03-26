@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ConnectionStatus, Message } from '@/types'
+import type { ConnectionStatus, Message, ImageAttachment } from '@/types'
 
 // Persistent audio element — unlocked on first user tap so autoplay works on mobile
 export const sharedAudio = typeof window !== 'undefined' ? new Audio() : null
@@ -148,9 +148,15 @@ function loadMessages(): Message[] {
 
 function saveMessages(msgs: Message[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_STORED_MESSAGES)))
+    // Strip base64 image data before saving (too large for localStorage)
+    const stripped = msgs.slice(-MAX_STORED_MESSAGES).map(m => {
+      if (m.images && m.images.length > 0) {
+        return { ...m, images: m.images.map(img => ({ ...img, data: '' })) }
+      }
+      return m
+    })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped))
   } catch {
-    // quota exceeded — clear old messages
     try { localStorage.removeItem(STORAGE_KEY) } catch {}
   }
 }
@@ -278,15 +284,19 @@ export function useBridge(onAudioDone?: () => void) {
   }, [connect])
 
   const sendCommand = useCallback(
-    (text: string) => {
+    (text: string, images?: ImageAttachment[]) => {
       setIsWaiting(true)
       setMessages((prev) => [
         ...prev,
-        { role: 'user' as const, text, timestamp: Date.now() },
+        { role: 'user' as const, text, timestamp: Date.now(), images },
       ])
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'command', text }))
+        const payload: Record<string, unknown> = { type: 'command', text }
+        if (images && images.length > 0) {
+          payload.images = images
+        }
+        wsRef.current.send(JSON.stringify(payload))
       }
     },
     [],

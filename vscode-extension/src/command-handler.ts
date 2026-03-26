@@ -2,6 +2,14 @@ import * as vscode from 'vscode';
 import { BridgeClient } from './bridge-client';
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as os from 'os';
+
+interface ImageData {
+    data: string;       // base64
+    mimeType: string;
+    name?: string;
+}
 
 const TERMINAL_NAME = 'VOICE AGENT';
 
@@ -61,7 +69,7 @@ export class CommandHandler {
         client.sendResult("Sorry, I stopped. What's up?");
     }
 
-    async handleCommand(text: string, client: BridgeClient): Promise<void> {
+    async handleCommand(text: string, client: BridgeClient, images?: ImageData[]): Promise<void> {
         if (this.isProcessing) {
             const activity = this.lastToolDescription || 'working';
             client.sendResult(`Still ${activity}...`);
@@ -80,7 +88,7 @@ export class CommandHandler {
         this.toolSpeechQueue = [];
         this.hasSpokenToolUpdate = false;
         this.toolCallCount = 0;
-        this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}\r\n`);
+        this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}${images?.length ? ` [+${images.length} image(s)]` : ''}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
 
@@ -103,8 +111,25 @@ export class CommandHandler {
         ];
         client.sendSpeak(fillers[Math.floor(Math.random() * fillers.length)]);
 
+        // Save images to temp files so Claude can Read them
+        const imageFiles: string[] = [];
+        if (images && images.length > 0) {
+            const tmpDir = path.join(os.tmpdir(), 'matthews-terminal-images');
+            if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+            }
+            for (const img of images) {
+                const ext = img.mimeType.includes('png') ? '.png' : '.jpg';
+                const filename = `image-${Date.now()}-${Math.random().toString(36).slice(2, 6)}${ext}`;
+                const filepath = path.join(tmpDir, filename);
+                fs.writeFileSync(filepath, Buffer.from(img.data, 'base64'));
+                imageFiles.push(filepath);
+                console.log(`[CommandHandler] Saved image to ${filepath}`);
+            }
+        }
+
         try {
-            await this.runClaude(text, client);
+            await this.runClaude(text, client, imageFiles);
             this.writeEmitter.fire('\r\n');
             const finalText = this.streamingText.trim() || 'Done';
             client.sendResult(finalText);
@@ -119,10 +144,14 @@ export class CommandHandler {
                 clearTimeout(this.toolSpeechTimer);
                 this.toolSpeechTimer = undefined;
             }
+            // Clean up temp image files
+            for (const f of imageFiles) {
+                try { fs.unlinkSync(f); } catch {}
+            }
         }
     }
 
-    private runClaude(prompt: string, client: BridgeClient): Promise<string> {
+    private runClaude(prompt: string, client: BridgeClient, imageFiles: string[] = []): Promise<string> {
         return new Promise((resolve, reject) => {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
@@ -187,9 +216,16 @@ export class CommandHandler {
                 }
             });
 
+            let imageInstructions = '';
+            if (imageFiles.length > 0) {
+                imageInstructions = imageFiles.map(f =>
+                    `\n\n[The user attached an image. Use the Read tool to view it at: ${f}]`
+                ).join('');
+            }
+
             const fullPrompt = this.conversationStarted
-                ? prompt
-                : `${SYSTEM_PROMPT}\n\nUser: ${prompt}`;
+                ? prompt + imageInstructions
+                : `${SYSTEM_PROMPT}\n\nUser: ${prompt}${imageInstructions}`;
             this.activeProcess.stdin?.write(fullPrompt);
             this.activeProcess.stdin?.end();
 
