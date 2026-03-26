@@ -85,6 +85,34 @@ function setPlaying(v: boolean) {
   }
 }
 
+/** Generate a short silent WAV buffer (duration in seconds) */
+function createSilentWav(duration: number, sampleRate = 44100): Blob {
+  const numSamples = Math.floor(sampleRate * duration)
+  const dataSize = numSamples * 2 // 16-bit mono
+  const buf = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buf)
+  // WAV header
+  const writeStr = (offset: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
+  writeStr(0, 'RIFF')
+  view.setUint32(4, 36 + dataSize, true)
+  writeStr(8, 'WAVE')
+  writeStr(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeStr(36, 'data')
+  view.setUint32(40, dataSize, true)
+  // Data is already zeros (silence)
+  return new Blob([new Uint8Array(buf)], { type: 'audio/wav' })
+}
+
+// Pre-generate 0.5s silent WAV for iOS audio hardware wake-up
+const silentWavBlob = createSilentWav(0.5)
+
 function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   const queue = _audioQueue
   if (isPlayingAudio || queue.length === 0 || !sharedAudio) return
@@ -94,19 +122,55 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   ensureAnalyser()
   audioContext?.resume()
   sharedAudio.volume = 1.0
-  sharedAudio.src = item.url
-  sharedAudio.onended = () => {
-    URL.revokeObjectURL(item.url)
-    setPlaying(false)
-    if (queue.length > 0) {
-      playNextAudio(onAudioDoneRef)
-    } else if (item.isFinal) {
-      onAudioDoneRef.current?.()
-    }
-  }
-  // iOS: wait for audio to be fully buffered before playing
-  const doPlay = () => {
+
+  // iOS fix: play a short silent WAV first to wake up audio hardware,
+  // then immediately play the real audio
+  const playSilenceThenAudio = () => {
     if (!sharedAudio) return
+    const silentBlob = silentWavBlob
+    const silentUrl = URL.createObjectURL(silentBlob)
+    sharedAudio.src = silentUrl
+    sharedAudio.onended = () => {
+      URL.revokeObjectURL(silentUrl)
+      // Now play the real audio — hardware is awake
+      if (!sharedAudio) return
+      sharedAudio.src = item.url
+      sharedAudio.onended = () => {
+        URL.revokeObjectURL(item.url)
+        setPlaying(false)
+        if (queue.length > 0) {
+          playNextAudio(onAudioDoneRef)
+        } else if (item.isFinal) {
+          onAudioDoneRef.current?.()
+        }
+      }
+      sharedAudio.play().then(() => {
+        audioStartedForResult = true
+        _onAudioStarted?.()
+      }).catch(() => {
+        setPlaying(false)
+        if (queue.length > 0) setTimeout(() => playNextAudio(onAudioDoneRef), 100)
+      })
+    }
+    sharedAudio.play().catch(() => {
+      // If silent play fails, try real audio directly
+      URL.revokeObjectURL(silentUrl)
+      playDirect()
+    })
+  }
+
+  const playDirect = () => {
+    if (!sharedAudio) return
+    sharedAudio.src = item.url
+    sharedAudio.onended = () => {
+      URL.revokeObjectURL(item.url)
+      setPlaying(false)
+      if (queue.length > 0) {
+        playNextAudio(onAudioDoneRef)
+      } else if (item.isFinal) {
+        onAudioDoneRef.current?.()
+      }
+    }
     sharedAudio.play().then(() => {
       audioStartedForResult = true
       _onAudioStarted?.()
@@ -114,20 +178,16 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
       console.error('[Audio] Playback failed:', e)
       URL.revokeObjectURL(item.url)
       setPlaying(false)
-      if (queue.length > 0) {
-        setTimeout(() => playNextAudio(onAudioDoneRef), 100)
-      }
+      if (queue.length > 0) setTimeout(() => playNextAudio(onAudioDoneRef), 100)
     })
   }
-  sharedAudio.oncanplaythrough = () => {
-    sharedAudio!.oncanplaythrough = null
-    doPlay()
+
+  // Use silence primer on first audio of a batch, direct for subsequent
+  if (!audioStartedForResult) {
+    playSilenceThenAudio()
+  } else {
+    playDirect()
   }
-  sharedAudio.load()
-  // Fallback if canplaythrough doesn't fire (some iOS versions)
-  setTimeout(() => {
-    if (sharedAudio && sharedAudio.paused) doPlay()
-  }, 800)
 }
 
 const _audioQueue: AudioQueueItem[] = []

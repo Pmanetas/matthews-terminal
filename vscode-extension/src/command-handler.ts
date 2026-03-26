@@ -444,11 +444,35 @@ export class CommandHandler {
     private emitToolCall(block: any, client: BridgeClient): void {
         this.flushAndSpeak(client);
         this.hasSeenFirstTool = true;
+        const toolName = block.name || block.tool_name || '';
+        const input = block.input || {};
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
         client.sendToolStatus(msg);
         this.toolCallCount++;
+
+        // For Read tool: read the actual file and send content preview
+        if (toolName === 'Read' && input.file_path) {
+            try {
+                const content = fs.readFileSync(input.file_path, 'utf-8');
+                const allLines = content.split('\n');
+                const offset = input.offset ? parseInt(input.offset) - 1 : 0;
+                const limit = input.limit ? parseInt(input.limit) : 40;
+                const lines = allLines.slice(offset, offset + limit);
+                let preview = msg;
+                lines.forEach((line: string, i: number) => {
+                    const lineNum = offset + i + 1;
+                    preview += `\n  ${String(lineNum).padStart(4)} │ ${line}`;
+                });
+                if (allLines.length > offset + limit) {
+                    preview += `\n  ... (${allLines.length - offset - limit} more lines)`;
+                }
+                client.sendToolStatus(preview);
+            } catch {
+                // File not accessible, just show basic status
+            }
+        }
     }
 
     /**
@@ -555,14 +579,9 @@ export class CommandHandler {
 
         // ── Result ──────────────────────────────────────────────
         if (event.type === 'result') {
-            // Result may contain final text and/or tool calls
-            if (event.result) {
-                const resultText = typeof event.result === 'string' ? event.result : '';
-                if (resultText && !this.streamingText.includes(resultText)) {
-                    onText(resultText);
-                    this.streamingText += resultText;
-                }
-            }
+            // Don't add event.result to streamingText — it contains the FULL response
+            // including text that was already streamed and spoken. We only want the
+            // last chunk (whatever's in streamingText now) as the final result.
             this.flushStreamingText(client);
             return;
         }
