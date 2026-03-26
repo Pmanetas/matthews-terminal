@@ -371,15 +371,18 @@ wss.on('connection', (ws) => {
       state.currentTaskStatus = 'complete';
       state.lastOutputSummary = msg.text;
 
-      broadcastToRole('phone', { type: 'result', text: msg.text });
-
-      // Generate TTS audio and send to all phone clients
+      // Generate TTS FIRST, then send text + audio together so they're synced
       generateSpeech(msg.text).then((audioBuffer) => {
+        // Send text result right before the audio so they arrive together
+        broadcastToRole('phone', { type: 'result', text: msg.text });
         if (audioBuffer) {
           const base64 = audioBuffer.toString('base64');
           broadcastToRole('phone', { type: 'audio', data: base64, final: true });
-          console.log(`[${timestamp()}] Sent final TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
+          console.log(`[${timestamp()}] Sent result + TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
         }
+      }).catch(() => {
+        // TTS failed — still send the text result
+        broadcastToRole('phone', { type: 'result', text: msg.text });
       });
       return;
     }

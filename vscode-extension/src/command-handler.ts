@@ -56,8 +56,8 @@ export class CommandHandler {
         );
     }
 
-    /** Abort the current command — kills the Claude process */
-    abortCommand(client: BridgeClient): void {
+    /** Abort the current command — kills the Claude process silently */
+    abortCommand(_client: BridgeClient): void {
         if (!this.isProcessing || !this.activeProcess) {
             return;
         }
@@ -65,8 +65,9 @@ export class CommandHandler {
         this.activeProcess.kill('SIGTERM');
         this.activeProcess = undefined;
         this.isProcessing = false;
-        this.writeEmitter.fire('\r\n\x1b[33m⛔ Command stopped by user\x1b[0m\r\n');
-        client.sendResult("Sorry, I stopped. What's up?");
+        this.streamingText = '';
+        this.lastFlushedLength = 0;
+        this.writeEmitter.fire('\r\n\x1b[33m⛔ Stopped\x1b[0m\r\n');
     }
 
     async handleCommand(text: string, client: BridgeClient, images?: ImageData[]): Promise<void> {

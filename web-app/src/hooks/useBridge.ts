@@ -131,41 +131,11 @@ export let audioStartedForResult = false
 let _onAudioStarted: (() => void) | null = null
 export function onAudioStarted(cb: () => void) { _onAudioStarted = cb }
 
-// ── Chat persistence ─────────────────────────────────────────────
-const STORAGE_KEY = 'mt-messages'
-const MAX_STORED_MESSAGES = 100
-
-function loadMessages(): Message[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as Message[]
-    return Array.isArray(parsed) ? parsed.slice(-MAX_STORED_MESSAGES) : []
-  } catch {
-    return []
-  }
-}
-
-function saveMessages(msgs: Message[]) {
-  try {
-    // Strip base64 image data before saving (too large for localStorage)
-    const stripped = msgs.slice(-MAX_STORED_MESSAGES).map(m => {
-      if (m.images && m.images.length > 0) {
-        return { ...m, images: m.images.map(img => ({ ...img, data: '' })) }
-      }
-      return m
-    })
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped))
-  } catch {
-    try { localStorage.removeItem(STORAGE_KEY) } catch {}
-  }
-}
-
 // ── Hook ─────────────────────────────────────────────────────────
 
 export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
-  const [messages, setMessages] = useState<Message[]>(() => loadMessages())
+  const [messages, setMessages] = useState<Message[]>([])
   const [workspace, setWorkspace] = useState<string | null>(null)
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [isWaiting, setIsWaiting] = useState(false)
@@ -174,9 +144,6 @@ export function useBridge(onAudioDone?: () => void) {
   const onAudioDoneRef = useRef(onAudioDone)
   onAudioDoneRef.current = onAudioDone
   const audioQueueRef = useRef(_audioQueue)
-
-  // Persist messages whenever they change
-  useEffect(() => { saveMessages(messages) }, [messages])
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN ||

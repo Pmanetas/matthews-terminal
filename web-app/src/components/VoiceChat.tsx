@@ -130,36 +130,7 @@ function ThinkingDots() {
   )
 }
 
-// ── Robot Head ───────────────────────────────────────────────────
-
-function RobotHead({ isActive, getAudioLevel: getLevel, size = 56 }: { isActive: boolean; getAudioLevel: () => number; size?: number }) {
-  const scale = size / 56
-  const h = Math.round(52 * scale)
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: h }}>
-      <svg width={size} height={h} viewBox="0 0 56 52" fill="none"
-           style={{ filter: 'drop-shadow(0 0 8px rgba(139,92,246,0.3))' }}>
-        <line x1="28" y1="0" x2="28" y2="8" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" />
-        <circle cx="28" cy="2" r="1.5" fill="rgba(139,92,246,0.7)">
-          <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite" />
-        </circle>
-        <rect x="5" y="8" width="46" height="38" rx="4" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" fill="rgba(139,92,246,0.04)" />
-        <rect x="14" y="16" width="9" height="6" rx="1.5" fill="rgba(139,92,246,0.6)">
-          <animate attributeName="opacity" values="0.6;0.9;0.6" dur="3s" repeatCount="indefinite" />
-        </rect>
-        <rect x="33" y="16" width="9" height="6" rx="1.5" fill="rgba(139,92,246,0.6)">
-          <animate attributeName="opacity" values="0.6;0.9;0.6" dur="3s" repeatCount="indefinite" />
-        </rect>
-        <rect x="12" y="29" width="32" height="12" rx="2" fill="rgba(139,92,246,0.03)" stroke="rgba(139,92,246,0.15)" strokeWidth="0.8" />
-        <rect x="1" y="20" width="4" height="7" rx="1" fill="rgba(139,92,246,0.2)" />
-        <rect x="51" y="20" width="4" height="7" rx="1" fill="rgba(139,92,246,0.2)" />
-      </svg>
-      <div className="absolute" style={{ top: Math.round(28 * scale), left: '50%', transform: 'translateX(-50%)' }}>
-        <VoiceWaveform isActive={isActive} size={Math.round(32 * scale)} getAudioLevel={getLevel} />
-      </div>
-    </div>
-  )
-}
+// (Robot head removed — using VoiceWaveform directly)
 
 // ── Global styles ────────────────────────────────────────────────
 
@@ -209,7 +180,7 @@ export function VoiceChat() {
   })()
 
   const scrollToBottom = useCallback(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    chatEndRef.current?.scrollIntoView({ behavior: 'instant' })
   }, [])
 
   useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
@@ -289,8 +260,6 @@ export function VoiceChat() {
 
   const handleStop = () => {
     sendStop()
-    stopListening()
-    setPendingMessage('')
   }
 
   const toggleToolExpand = (i: number) => {
@@ -319,7 +288,7 @@ export function VoiceChat() {
       {/* ── Header bar ── */}
       <div className="shrink-0 flex items-center justify-center px-5 py-3 border-b border-white/[0.06]">
         <div className="flex flex-col items-center">
-          <RobotHead isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={48} />
+          <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={160} />
           <div className="flex items-center gap-1.5 mt-1">
             <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
             <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
@@ -341,7 +310,7 @@ export function VoiceChat() {
         <div className="flex flex-col gap-3 px-5 sm:px-10 md:px-12 lg:px-16 py-6 max-w-5xl mx-auto w-full">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
-              <RobotHead isActive={false} getAudioLevel={() => 0} size={72} />
+              <VoiceWaveform isActive={false} getAudioLevel={() => 0} size={200} />
               <p className="text-white/20 text-sm">Tap the mic to start talking</p>
             </div>
           ) : (
