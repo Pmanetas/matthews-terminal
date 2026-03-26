@@ -134,6 +134,13 @@ export class BridgeClient {
         this.send({ type: 'result', text });
     }
 
+    /**
+     * Sends the currently active file to the bridge.
+     */
+    sendActiveFile(file: string | null): void {
+        this.send({ type: 'active_file', file });
+    }
+
     private send(payload: Record<string, unknown>): void {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(payload));

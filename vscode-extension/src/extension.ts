@@ -1,8 +1,18 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { BridgeClient, ConnectionState } from './bridge-client';
 
 let bridgeClient: BridgeClient | undefined;
 let statusBarItem: vscode.StatusBarItem;
+
+function getShortPath(uri: vscode.Uri): string {
+    const folders = vscode.workspace.workspaceFolders;
+    if (folders && folders.length > 0) {
+        const rel = path.relative(folders[0].uri.fsPath, uri.fsPath);
+        return rel || path.basename(uri.fsPath);
+    }
+    return path.basename(uri.fsPath);
+}
 
 export function activate(context: vscode.ExtensionContext): void {
     // Create status bar item (bottom left, high priority to appear leftward)
@@ -33,6 +43,26 @@ export function activate(context: vscode.ExtensionContext): void {
             vscode.window.showInformationMessage('Matthews Terminal: Disconnected from voice bridge');
         })
     );
+
+    // Track active file and send to bridge
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor((editor) => {
+            if (editor) {
+                bridgeClient?.sendActiveFile(getShortPath(editor.document.uri));
+            } else {
+                bridgeClient?.sendActiveFile(null);
+            }
+        })
+    );
+
+    // Send initial active file when connecting
+    if (vscode.window.activeTextEditor) {
+        setTimeout(() => {
+            if (vscode.window.activeTextEditor) {
+                bridgeClient?.sendActiveFile(getShortPath(vscode.window.activeTextEditor.document.uri));
+            }
+        }, 2000);
+    }
 
     // No auto-connect — user picks which window to use via the command
 }

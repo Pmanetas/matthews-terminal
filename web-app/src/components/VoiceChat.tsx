@@ -186,7 +186,7 @@ export function VoiceChat() {
     return () => onAudioPlayingChange(() => {})
   }, [])
 
-  const { status, messages, sendCommand, sendStop, workspace, isWaiting } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -324,6 +324,12 @@ export function VoiceChat() {
             <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
             <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
           </div>
+          {activeFile && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <FileText className="w-2.5 h-2.5 text-violet-400/50" />
+              <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
+            </div>
+          )}
         </div>
       </div>
 

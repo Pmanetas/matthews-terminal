@@ -134,6 +134,7 @@ async function generateSpeech(text: string): Promise<Buffer | null> {
 interface BridgeState {
   activeWorkspace: string | null;
   activeRepo: string | null;
+  activeFile: string | null;
   activeTerminal: string;
   lastCommand: string | null;
   currentTaskStatus: 'idle' | 'running' | 'complete' | 'error';
@@ -149,6 +150,7 @@ interface ToolStatusMessage { type: 'tool_status'; text: string; }
 interface ResultMessage { type: 'result'; text: string; }
 interface SpeakMessage { type: 'speak'; text: string; }
 interface WorkspaceMessage { type: 'workspace'; data: { workspace: string; repo: string }; }
+interface ActiveFileMessage { type: 'active_file'; file: string | null; }
 
 type BridgeMessage =
   | IdentifyMessage
@@ -157,13 +159,15 @@ type BridgeMessage =
   | ToolStatusMessage
   | ResultMessage
   | SpeakMessage
-  | WorkspaceMessage;
+  | WorkspaceMessage
+  | ActiveFileMessage;
 
 // ── State ──────────────────────────────────────────────────────────
 
 const state: BridgeState = {
   activeWorkspace: null,
   activeRepo: null,
+  activeFile: null,
   activeTerminal: 'VOICE AGENT',
   lastCommand: null,
   currentTaskStatus: 'idle',
@@ -286,9 +290,14 @@ wss.on('connection', (ws) => {
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
-      // Send workspace info to phone on connect
-      if (role === 'phone' && state.activeWorkspace) {
-        sendJSON(ws, { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
+      // Send workspace info and active file to phone on connect
+      if (role === 'phone') {
+        if (state.activeWorkspace) {
+          sendJSON(ws, { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
+        }
+        if (state.activeFile) {
+          sendJSON(ws, { type: 'active_file', file: state.activeFile });
+        }
       }
       return;
     }
@@ -381,6 +390,14 @@ wss.on('connection', (ws) => {
       state.activeRepo = msg.data.repo;
       console.log(`[${timestamp()}] Workspace updated: ${msg.data.workspace} (${msg.data.repo})`);
       broadcastToRole('phone', { type: 'workspace', workspace: msg.data.workspace, repo: msg.data.repo });
+      return;
+    }
+
+    // ── Extension sends active file ──────────────────────────
+    if (role === 'extension' && msg.type === 'active_file') {
+      state.activeFile = msg.file || null;
+      console.log(`[${timestamp()}] Active file: ${state.activeFile}`);
+      broadcastToRole('phone', { type: 'active_file', file: state.activeFile });
       return;
     }
 
