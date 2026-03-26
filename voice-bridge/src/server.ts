@@ -304,6 +304,17 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // ── Phone sends stop ───────────────────────────────────────
+    if (role === 'phone' && msg.type === 'stop') {
+      const ext = getClient('extension');
+      if (ext) {
+        sendJSON(ext, { type: 'stop' });
+        console.log(`[${timestamp()}] Stop command forwarded to extension`);
+      }
+      state.currentTaskStatus = 'idle';
+      return;
+    }
+
     // ── Extension sends status ─────────────────────────────────
     if (role === 'extension' && msg.type === 'status') {
       const phone = getClient('phone');

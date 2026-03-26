@@ -274,6 +274,13 @@ export function useBridge(onAudioDone?: () => void) {
     [],
   )
 
+  const sendStop = useCallback(() => {
+    stopAllAudio()
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'stop' }))
+    }
+  }, [])
+
   useEffect(() => {
     connect()
     return () => {
@@ -282,5 +289,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, workspace }
+  return { status, messages, sendCommand, sendStop, workspace }
 }

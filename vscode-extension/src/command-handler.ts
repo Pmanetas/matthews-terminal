@@ -47,6 +47,19 @@ export class CommandHandler {
         );
     }
 
+    /** Abort the current command — kills the Claude process */
+    abortCommand(client: BridgeClient): void {
+        if (!this.isProcessing || !this.activeProcess) {
+            return;
+        }
+        console.log('[CommandHandler] Aborting active command');
+        this.activeProcess.kill('SIGTERM');
+        this.activeProcess = undefined;
+        this.isProcessing = false;
+        this.writeEmitter.fire('\r\n\x1b[33m⛔ Command stopped by user\x1b[0m\r\n');
+        client.sendResult("Sorry, I stopped. What's up?");
+    }
+
     async handleCommand(text: string, client: BridgeClient): Promise<void> {
         if (this.isProcessing) {
             const activity = this.lastToolDescription || 'working';

@@ -145,6 +145,8 @@ export class BridgeClient {
             const msg = JSON.parse(raw);
             if (msg.type === 'command' && typeof msg.text === 'string') {
                 this.commandHandler.handleCommand(msg.text, this);
+            } else if (msg.type === 'stop') {
+                this.commandHandler.abortCommand(this);
             }
         } catch {
             console.error('[Matthews Terminal] Failed to parse message:', raw);

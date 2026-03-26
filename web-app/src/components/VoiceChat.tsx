@@ -190,7 +190,7 @@ export function VoiceChat() {
     return () => onAudioPlayingChange(() => {})
   }, [])
 
-  const { status, messages, sendCommand, workspace } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, workspace } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -236,12 +236,14 @@ export function VoiceChat() {
     const trimmed = transcript.trim()
     if (!trimmed) return
 
-    const stopPattern = /^(stop|shut up|quiet|be quiet|enough)\s*[.!]?\s*$/i
+    const stopPattern = /^(matthew\s+stop|stop|shut up|quiet|be quiet|enough)\s*[.!]?\s*$/i
     if (stopPattern.test(trimmed)) {
       hasSentRef.current = true
-      stopAllAudio()
+      sendStop()
       stopListening()
       setPendingMessage('')
+      // Auto-start listening again after a brief pause
+      setTimeout(() => startListening(), 1500)
       return
     }
 
@@ -327,8 +329,9 @@ export function VoiceChat() {
                 >
                   {msg.role === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="max-w-[70%] py-2">
-                        <p className="text-sm text-white/80 break-words whitespace-pre-wrap">{msg.text}</p>
+                      <div className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-br-sm"
+                           style={{ background: 'rgba(139,92,246,0.15)' }}>
+                        <p className="text-sm text-white/90 break-words whitespace-pre-wrap">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
@@ -341,7 +344,7 @@ export function VoiceChat() {
                         ) : (
                           <div className={cn(
                             'w-1.5 h-1.5 shrink-0',
-                            isLastTool ? 'bg-violet-400' : 'bg-violet-500/30'
+                            isLastTool && isProcessing ? 'bg-violet-400' : 'bg-violet-500/30'
                           )} />
                         )}
                         <div className={cn('w-px flex-1', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
@@ -360,13 +363,16 @@ export function VoiceChat() {
                       </div>
                     </div>
                   ) : (
-                    <div className="py-3">
-                      <span className="text-[11px] font-medium text-violet-400/50 tracking-wider uppercase mb-2 block">Matthew</span>
-                      {i === lastAssistantIndex ? (
-                        <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
-                      ) : (
-                        <MarkdownMessage text={msg.text} />
-                      )}
+                    <div className="flex justify-start">
+                      <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-bl-sm"
+                           style={{ background: 'rgba(255,255,255,0.05)' }}>
+                        <span className="text-[11px] font-medium text-violet-400/50 tracking-wider uppercase mb-2 block">Matthew</span>
+                        {i === lastAssistantIndex ? (
+                          <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
+                        ) : (
+                          <MarkdownMessage text={msg.text} />
+                        )}
+                      </div>
                     </div>
                   )}
                 </motion.div>
