@@ -4,7 +4,7 @@ import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePl
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, getAudioLevel, onAudioPlayingChange, stopAllAudio } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
 function ToolIcon({ text }: { text: string }) {
@@ -20,7 +20,7 @@ function ToolIcon({ text }: { text: string }) {
   return <CheckCircle2 className="w-3 h-3 text-violet-400" />
 }
 
-/** Expanded tool: show header + all accumulated diff lines with sub-dots */
+/** Expanded tool: show header + all accumulated diff lines with aligned dots */
 function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
@@ -31,51 +31,39 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   }
 
   return (
-    <div className="flex flex-col min-w-0 w-full">
+    <div className="flex flex-col min-w-0">
       <span className="text-xs text-white/50 leading-tight mb-1.5">{header}</span>
-      <div className="flex gap-2.5">
-        {/* Mini sub-timeline */}
-        <div className="flex flex-col items-center w-2 shrink-0">
-          {diffLines.map((_, idx) => (
-            <div key={idx} className="flex flex-col items-center flex-1 min-h-[18px]">
-              <div className="w-1 h-1 bg-violet-500/40 shrink-0 mt-1.5" />
-              {idx < diffLines.length - 1 && <div className="w-px flex-1 bg-violet-500/10" />}
+      <div className="flex flex-col gap-0.5">
+        {diffLines.map((line, i) => {
+          const trimmed = line.trim()
+          const code = trimmed.replace(/^[⊖⊕]\s*/, '')
+          const isRemove = trimmed.startsWith('⊖')
+          const isAdd = trimmed.startsWith('⊕')
+          return (
+            <div key={i} className="flex items-center gap-2">
+              {/* Sub-dot aligned with each line */}
+              <div className="w-1.5 h-1.5 shrink-0 bg-violet-500/30" />
+              {/* Code — inline width only */}
+              {isRemove ? (
+                <code className="text-[10px] font-mono text-red-300/70 bg-red-500/10 border-l border-red-500/40 px-1.5 py-px">{code}</code>
+              ) : isAdd ? (
+                <code className="text-[10px] font-mono text-emerald-300/70 bg-emerald-500/10 border-l border-emerald-500/40 px-1.5 py-px">{code}</code>
+              ) : (
+                <span className="text-[10px] text-white/30">{trimmed}</span>
+              )}
             </div>
-          ))}
-        </div>
-        {/* Diff content */}
-        <div className="flex flex-col gap-px flex-1 min-w-0">
-          {diffLines.map((line, i) => {
-            const trimmed = line.trim()
-            const code = trimmed.replace(/^[⊖⊕]\s*/, '')
-            if (trimmed.startsWith('⊖')) {
-              return (
-                <div key={i} className="bg-red-500/10 border-l border-red-500/40 px-2 py-0.5">
-                  <span className="text-[10px] font-mono text-red-300/70 leading-tight block">{code}</span>
-                </div>
-              )
-            }
-            if (trimmed.startsWith('⊕')) {
-              return (
-                <div key={i} className="bg-emerald-500/10 border-l border-emerald-500/40 px-2 py-0.5">
-                  <span className="text-[10px] font-mono text-emerald-300/70 leading-tight block">{code}</span>
-                </div>
-              )
-            }
-            return (
-              <span key={i} className="text-[10px] text-white/30 leading-tight px-2">{trimmed}</span>
-            )
-          })}
-        </div>
+          )
+        })}
       </div>
     </div>
   )
 }
 
-/** Typing animation — scrolls as it types */
+/** Typing that syncs to audio playback — words appear as Matthew speaks */
 function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: boolean; onUpdate?: () => void }) {
   const [chars, setChars] = useState(animate ? 0 : text.length)
   const prevTextRef = useRef(text)
+  const rafRef = useRef(0)
 
   useEffect(() => {
     if (!animate) { setChars(text.length); return }
@@ -83,19 +71,73 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
       prevTextRef.current = text
       setChars(0)
     }
-    if (chars >= text.length) return
-    const id = setInterval(() => {
-      setChars((c) => {
-        const next = c + 3
-        if (next >= text.length) { clearInterval(id); return text.length }
-        return next
-      })
+  }, [text, animate])
+
+  useEffect(() => {
+    if (!animate || chars >= text.length) return
+
+    const tick = () => {
+      // If audio is playing, sync text reveal to audio progress
+      if (sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
+        const progress = sharedAudio.currentTime / sharedAudio.duration
+        const target = Math.floor(progress * text.length)
+        setChars((c) => {
+          const next = Math.max(c, target)
+          return Math.min(next, text.length)
+        })
+      } else {
+        // No audio / audio finished — reveal remaining text quickly
+        setChars((c) => {
+          const next = c + 4
+          return next >= text.length ? text.length : next
+        })
+      }
       onUpdate?.()
-    }, 8)
-    return () => clearInterval(id)
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafRef.current)
   }, [text, animate, chars, onUpdate])
 
   return <MarkdownMessage text={text.slice(0, chars)} />
+}
+
+/** Robot head SVG with waveform as mouth */
+function RobotHead({ isActive, getAudioLevel: getLevel }: { isActive: boolean; getAudioLevel: () => number }) {
+  return (
+    <div className="relative flex flex-col items-center">
+      <svg width="120" height="110" viewBox="0 0 120 110" fill="none"
+           style={{ filter: 'drop-shadow(0 0 15px rgba(139,92,246,0.3))' }}>
+        {/* Antenna */}
+        <line x1="60" y1="0" x2="60" y2="16" stroke="rgba(139,92,246,0.5)" strokeWidth="2" />
+        <circle cx="60" cy="3" r="3" fill="rgba(139,92,246,0.7)">
+          <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite" />
+        </circle>
+        {/* Head outline */}
+        <rect x="10" y="16" width="100" height="80" rx="6" stroke="rgba(139,92,246,0.4)" strokeWidth="1.5" fill="rgba(139,92,246,0.04)" />
+        {/* Eyes */}
+        <rect x="28" y="32" width="20" height="12" rx="2" fill="rgba(139,92,246,0.6)">
+          <animate attributeName="opacity" values="0.6;0.8;0.6" dur="3s" repeatCount="indefinite" />
+        </rect>
+        <rect x="72" y="32" width="20" height="12" rx="2" fill="rgba(139,92,246,0.6)">
+          <animate attributeName="opacity" values="0.6;0.8;0.6" dur="3s" repeatCount="indefinite" />
+        </rect>
+        {/* Eye glint */}
+        <rect x="30" y="34" width="6" height="4" rx="1" fill="rgba(200,180,255,0.3)" />
+        <rect x="74" y="34" width="6" height="4" rx="1" fill="rgba(200,180,255,0.3)" />
+        {/* Ear bolts */}
+        <rect x="2" y="42" width="8" height="14" rx="2" fill="rgba(139,92,246,0.2)" stroke="rgba(139,92,246,0.3)" strokeWidth="1" />
+        <rect x="110" y="42" width="8" height="14" rx="2" fill="rgba(139,92,246,0.2)" stroke="rgba(139,92,246,0.3)" strokeWidth="1" />
+        {/* Mouth area — transparent so waveform shows through */}
+        <rect x="25" y="60" width="70" height="26" rx="3" fill="rgba(139,92,246,0.03)" stroke="rgba(139,92,246,0.15)" strokeWidth="1" />
+      </svg>
+      {/* Waveform positioned inside the mouth */}
+      <div className="absolute" style={{ top: 60, left: '50%', transform: 'translateX(-50%)' }}>
+        <VoiceWaveform isActive={isActive} size={70} getAudioLevel={getLevel} />
+      </div>
+    </div>
+  )
 }
 
 export function VoiceChat() {
@@ -118,7 +160,6 @@ export function VoiceChat() {
 
   autoListenRef.current = startListening
   const chatEndRef = useRef<HTMLDivElement>(null)
-  const waveformActive = isAudioPlaying
 
   const isProcessing = messages.length > 0 && messages[messages.length - 1].role !== 'assistant'
 
@@ -202,37 +243,18 @@ export function VoiceChat() {
 
   return (
     <div className="h-[100dvh] flex flex-col bg-black text-white relative overflow-hidden">
-      {/* Header */}
-      <div className="relative z-10 flex flex-col items-center pt-6 pb-2 shrink-0">
-        {/* Robot head */}
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="mb-3" style={{ filter: 'drop-shadow(0 0 12px rgba(139,92,246,0.4))' }}>
-          {/* Antenna */}
-          <line x1="24" y1="2" x2="24" y2="10" stroke="rgba(139,92,246,0.6)" strokeWidth="2" />
-          <circle cx="24" cy="2" r="2" fill="rgba(139,92,246,0.8)" />
-          {/* Head */}
-          <rect x="6" y="10" width="36" height="30" rx="3" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" fill="rgba(139,92,246,0.06)" />
-          {/* Eyes */}
-          <rect x="13" y="18" width="8" height="6" rx="1" fill="rgba(139,92,246,0.7)" />
-          <rect x="27" y="18" width="8" height="6" rx="1" fill="rgba(139,92,246,0.7)" />
-          {/* Mouth grid */}
-          <rect x="14" y="30" width="20" height="4" rx="1" fill="rgba(139,92,246,0.3)" />
-          <line x1="19" y1="30" x2="19" y2="34" stroke="rgba(0,0,0,0.5)" strokeWidth="1" />
-          <line x1="24" y1="30" x2="24" y2="34" stroke="rgba(0,0,0,0.5)" strokeWidth="1" />
-          <line x1="29" y1="30" x2="29" y2="34" stroke="rgba(0,0,0,0.5)" strokeWidth="1" />
-          {/* Ear bolts */}
-          <rect x="2" y="20" width="4" height="8" rx="1" fill="rgba(139,92,246,0.3)" />
-          <rect x="42" y="20" width="4" height="8" rx="1" fill="rgba(139,92,246,0.3)" />
-        </svg>
-        <VoiceWaveform isActive={waveformActive} size={200} getAudioLevel={getAudioLevel} />
-        <div className="flex items-center gap-2 mt-3">
+      {/* Header — robot + status */}
+      <div className="relative z-10 flex flex-col items-center pt-4 pb-2 shrink-0">
+        <RobotHead isActive={isAudioPlaying} getAudioLevel={getAudioLevel} />
+        <div className="flex items-center gap-2 mt-2">
           <span className={cn('h-1.5 w-1.5', statusDot)} />
           <span className="text-[10px] text-white/25 tracking-wide">{statusText}</span>
         </div>
       </div>
 
-      {/* Chat area */}
+      {/* Chat area — generous padding on desktop */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex flex-col gap-3 pt-3 mx-8">
+        <div className="flex flex-col gap-3 pt-3 mx-6 sm:mx-12 md:mx-20 lg:mx-32 xl:mx-48">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12 tracking-wide">Tap the mic to start talking</p>
           ) : (
@@ -251,35 +273,35 @@ export function VoiceChat() {
                 >
                   {msg.role === 'user' ? (
                     <div className="flex justify-end">
-                      <div className="max-w-[60%] px-5 py-3">
+                      <div className="max-w-[70%] py-2">
                         <p className="text-sm text-white/80 break-words whitespace-pre-wrap">{msg.text}</p>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
-                    <div className="flex items-stretch gap-3">
-                      {/* Timeline */}
-                      <div className="flex flex-col items-center w-4 shrink-0">
-                        <div className={cn('w-px flex-1', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                    <div className="flex items-start gap-2.5">
+                      {/* Timeline dot */}
+                      <div className="flex flex-col items-center w-4 shrink-0 pt-3">
+                        {isPrevTool && <div className="w-px h-2 bg-violet-500/15" />}
                         {isLastTool && isProcessing ? (
-                          <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
+                          <LoaderCircle className="w-3.5 h-3.5 text-violet-400 animate-spin shrink-0" />
                         ) : (
                           <div className={cn(
-                            'w-2 h-2 shrink-0',
+                            'w-1.5 h-1.5 shrink-0',
                             isLastTool ? 'bg-violet-400' : 'bg-violet-500/30'
                           )} />
                         )}
-                        <div className={cn('w-px flex-1', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                        {isNextTool && <div className="w-px h-2 bg-violet-500/15 mt-auto" />}
                       </div>
-                      {/* Tool content */}
-                      <div className="flex-1 flex items-start gap-2.5 py-2.5 px-2 transition-all">
-                        <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+                      {/* Tool content — no box */}
+                      <div className="flex items-start gap-2 py-1.5 min-w-0">
+                        <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5">
                           <ToolIcon text={msg.text} />
                         </div>
                         <ToolContent text={msg.text} expanded={isExpanded} />
                       </div>
                     </div>
                   ) : (
-                    <div className="px-5 py-4">
+                    <div className="py-3">
                       <span className="text-[11px] font-medium text-violet-400/50 tracking-wider uppercase mb-2 block">Matthew</span>
                       {i === lastAssistantIndex ? (
                         <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
@@ -296,7 +318,7 @@ export function VoiceChat() {
         </div>
       </div>
 
-      {/* Bottom controls */}
+      {/* Bottom controls — gradient fade */}
       <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-6 bg-gradient-to-t from-black via-black to-transparent">
 
         <AnimatePresence mode="wait">
@@ -360,7 +382,7 @@ export function VoiceChat() {
             style={isListening ? { boxShadow: '0 0 25px rgba(139,92,246,0.3)' } : {}}
           >
             {isListening && (
-              <span className="absolute inset-0 bg-violet-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+              <span className="absolute inset-0 rounded-full bg-violet-500/20 animate-ping" style={{ animationDuration: '1.5s' }} />
             )}
             <Mic className={cn('w-5 h-5 relative z-10', isListening ? 'text-violet-300' : 'text-white/50')} />
           </motion.button>
