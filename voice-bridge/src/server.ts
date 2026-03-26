@@ -60,8 +60,8 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'tts-1-hd',
-        voice: 'echo',
+        model: 'tts-1',
+        voice: 'onyx',
         input: '...... ' + ttsText,
         response_format: 'mp3',
         speed: 1.12,
