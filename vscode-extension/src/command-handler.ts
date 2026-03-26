@@ -191,7 +191,7 @@ export class CommandHandler {
 
                     const toolMsg = this.parseStderrToolCall(trimmed);
                     if (toolMsg) {
-                        this.flushAndReset(client);
+                        this.flushAndSpeak(client);
                         this.lastToolDescription = toolMsg.split('\n')[0];
                         client.sendToolStatus(toolMsg);
                         this.toolCallCount++;
@@ -396,9 +396,13 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, then reset (no intermediate speech) */
-    private flushAndReset(client: BridgeClient): void {
+    /** Flush text to phone, speak it, then reset */
+    private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
+        const text = this.streamingText.trim();
+        if (text.length > 5) {
+            client.sendSpeak(text);
+        }
         this.streamingText = '';
         this.lastFlushedLength = 0;
     }
@@ -429,7 +433,7 @@ export class CommandHandler {
 
     /** Send a tool call to the phone */
     private emitToolCall(block: any, client: BridgeClient): void {
-        this.flushAndReset(client);
+        this.flushAndSpeak(client);
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
@@ -510,7 +514,7 @@ export class CommandHandler {
                 this.emitToolCall(event.content_block, client);
                 this.pendingToolName = null;
             } else if (this.pendingToolName) {
-                this.flushAndReset(client);
+                this.flushAndSpeak(client);
                 const preliminary = this.describeToolCall({ name: this.pendingToolName, input: {} });
                 this.lastToolDescription = preliminary;
                 client.sendToolStatus(preliminary);
