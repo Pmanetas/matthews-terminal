@@ -62,7 +62,8 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
       body: JSON.stringify({
         model: 'tts-1',
         voice: 'onyx',
-        input: ttsText,
+        // Leading "..." adds a brief pause so bluetooth headphones don't cut off the first word
+        input: '... ' + ttsText,
         response_format: 'mp3',
       }),
     });
@@ -272,6 +273,10 @@ wss.on('connection', (ws) => {
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
+      // Send workspace info to phone on connect
+      if (role === 'phone' && state.activeWorkspace) {
+        sendJSON(ws, { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
+      }
       return;
     }
 
@@ -354,6 +359,9 @@ wss.on('connection', (ws) => {
       state.activeWorkspace = msg.data.workspace;
       state.activeRepo = msg.data.repo;
       console.log(`[${timestamp()}] Workspace updated: ${msg.data.workspace} (${msg.data.repo})`);
+      // Forward to phone so it can show workspace name
+      const phone = getClient('phone');
+      if (phone) sendJSON(phone, { type: 'workspace', workspace: msg.data.workspace, repo: msg.data.repo });
       return;
     }
 

@@ -94,7 +94,10 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   audioContext?.resume()
   sharedAudio.volume = 1.0
   sharedAudio.src = item.url
-  sharedAudio.play().catch((e) => {
+  sharedAudio.play().then(() => {
+    audioStartedForResult = true
+    _onAudioStarted?.()
+  }).catch((e) => {
     console.error('[Audio] Playback failed:', e)
     setPlaying(false)
   })
@@ -128,9 +131,15 @@ export function stopAllAudio() {
   setPlaying(false)
 }
 
+/** Track whether audio has started for the latest result (for text sync) */
+export let audioStartedForResult = false
+let _onAudioStarted: (() => void) | null = null
+export function onAudioStarted(cb: () => void) { _onAudioStarted = cb }
+
 export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [messages, setMessages] = useState<Message[]>([])
+  const [workspace, setWorkspace] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onAudioDoneRef = useRef(onAudioDone)
@@ -202,10 +211,13 @@ export function useBridge(onAudioDone?: () => void) {
             // Just ignore for visual display
           } else if (data.type === 'result') {
             // Final response — the only visible assistant message
+            audioStartedForResult = false
             setMessages((prev) => [
               ...prev,
               { role: 'assistant' as const, text: data.text, timestamp: Date.now() },
             ])
+          } else if (data.type === 'workspace') {
+            setWorkspace(data.workspace || data.repo || null)
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
@@ -270,5 +282,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand }
+  return { status, messages, sendCommand, workspace }
 }

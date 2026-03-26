@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, Send, Volume2, VolumeX, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
+import { Mic, Send, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 
 function ToolIcon({ text }: { text: string }) {
@@ -41,9 +41,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
           const isAdd = trimmed.startsWith('⊕')
           return (
             <div key={i} className="flex items-center gap-2">
-              {/* Sub-dot aligned with each line */}
               <div className="w-1 h-1 shrink-0 bg-violet-500/30" />
-              {/* Code — full line, no truncation */}
               {isRemove ? (
                 <code className="text-[10px] font-mono text-red-300/70 bg-red-500/10 border-l border-red-500/40 px-1.5 py-px whitespace-pre">{code}</code>
               ) : isAdd ? (
@@ -59,34 +57,58 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
   )
 }
 
-/** Typing that syncs to audio playback — words appear as Matthew speaks */
+/** Typing that syncs to audio playback — waits for audio to start, then reveals with speech */
 function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: boolean; onUpdate?: () => void }) {
   const [chars, setChars] = useState(animate ? 0 : text.length)
   const prevTextRef = useRef(text)
   const rafRef = useRef(0)
+  const waitingForAudio = useRef(true)
+  const audioTimedOut = useRef(false)
 
   useEffect(() => {
     if (!animate) { setChars(text.length); return }
     if (text !== prevTextRef.current) {
       prevTextRef.current = text
       setChars(0)
+      waitingForAudio.current = true
+      audioTimedOut.current = false
     }
+  }, [text, animate])
+
+  // If audio doesn't start within 2s, give up waiting and just type it out
+  useEffect(() => {
+    if (!animate) return
+    const timeout = setTimeout(() => {
+      audioTimedOut.current = true
+    }, 2000)
+    return () => clearTimeout(timeout)
+  }, [text, animate])
+
+  // Listen for audio start signal
+  useEffect(() => {
+    if (!animate) return
+    const cb = () => { waitingForAudio.current = false }
+    onAudioStarted(cb)
+    return () => onAudioStarted(() => {})
   }, [text, animate])
 
   useEffect(() => {
     if (!animate || chars >= text.length) return
 
     const tick = () => {
-      // If audio is playing, sync text reveal to audio progress
+      // Wait for audio to actually start (unless timed out)
+      if (waitingForAudio.current && !audioTimedOut.current && !audioStartedForResult) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      // Audio is playing — sync text to playback progress
       if (sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
         const progress = sharedAudio.currentTime / sharedAudio.duration
         const target = Math.floor(progress * text.length)
-        setChars((c) => {
-          const next = Math.max(c, target)
-          return Math.min(next, text.length)
-        })
-      } else {
-        // No audio / audio finished — reveal remaining text quickly
+        setChars((c) => Math.min(Math.max(c, target), text.length))
+      } else if (audioStartedForResult || audioTimedOut.current) {
+        // Audio finished or timed out — reveal remaining quickly
         setChars((c) => {
           const next = c + 4
           return next >= text.length ? text.length : next
@@ -101,6 +123,23 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
   }, [text, animate, chars, onUpdate])
 
   return <MarkdownMessage text={text.slice(0, chars)} />
+}
+
+/** Thinking dots animation */
+function ThinkingDots() {
+  return (
+    <div className="flex items-center gap-1.5 py-3 px-1">
+      <span className="text-[11px] font-medium text-violet-400/50 tracking-wider uppercase mr-2">Thinking</span>
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={i}
+          className="w-1.5 h-1.5 bg-violet-400/60 rounded-full"
+          animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
+          transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+        />
+      ))}
+    </div>
+  )
 }
 
 /** Robot head SVG with waveform as mouth */
@@ -129,10 +168,10 @@ function RobotHead({ isActive, getAudioLevel: getLevel }: { isActive: boolean; g
         {/* Ear bolts */}
         <rect x="2" y="42" width="8" height="14" rx="2" fill="rgba(139,92,246,0.2)" stroke="rgba(139,92,246,0.3)" strokeWidth="1" />
         <rect x="110" y="42" width="8" height="14" rx="2" fill="rgba(139,92,246,0.2)" stroke="rgba(139,92,246,0.3)" strokeWidth="1" />
-        {/* Mouth area — transparent so waveform shows through */}
+        {/* Mouth area */}
         <rect x="25" y="60" width="70" height="26" rx="3" fill="rgba(139,92,246,0.03)" stroke="rgba(139,92,246,0.15)" strokeWidth="1" />
       </svg>
-      {/* Waveform positioned inside the mouth */}
+      {/* Waveform inside mouth */}
       <div className="absolute" style={{ top: 60, left: '50%', transform: 'translateX(-50%)' }}>
         <VoiceWaveform isActive={isActive} size={70} getAudioLevel={getLevel} />
       </div>
@@ -151,17 +190,20 @@ export function VoiceChat() {
     return () => onAudioPlayingChange(() => {})
   }, [])
 
-  const { status, messages, sendCommand } = useBridge(() => {
+  const { status, messages, sendCommand, workspace } = useBridge(() => {
     autoListenRef.current?.()
   })
 
-  const { isListening, transcript, ttsEnabled, setTtsEnabled, startListening, stopListening, supported, micError } =
+  const { isListening, transcript, startListening, stopListening, supported, micError } =
     useVoice()
 
   autoListenRef.current = startListening
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   const isProcessing = messages.length > 0 && messages[messages.length - 1].role !== 'assistant'
+  // Show thinking when we have a user message but no tool calls or result yet
+  const isThinking = isProcessing && messages.length > 0 &&
+    messages[messages.length - 1].role === 'user'
 
   const lastToolIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -238,23 +280,35 @@ export function VoiceChat() {
 
   const statusDot =
     status === 'connected' ? 'bg-emerald-400' : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
-  const statusText =
-    status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'
+  const statusLabel = status === 'connected'
+    ? (workspace ? `Connected — ${workspace}` : 'Connected')
+    : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
   return (
-    <div className="h-[100dvh] flex flex-col bg-black text-white relative overflow-hidden">
+    <div
+      className="h-[100dvh] flex flex-col bg-black text-white relative"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        overscrollBehavior: 'none',
+      }}
+    >
       {/* Header — robot + status */}
       <div className="relative z-10 flex flex-col items-center pt-4 pb-2 shrink-0">
         <RobotHead isActive={isAudioPlaying} getAudioLevel={getAudioLevel} />
         <div className="flex items-center gap-2 mt-2">
           <span className={cn('h-1.5 w-1.5', statusDot)} />
-          <span className="text-[10px] text-white/25 tracking-wide">{statusText}</span>
+          <span className="text-[10px] text-white/25 tracking-wide">{statusLabel}</span>
         </div>
       </div>
 
-      {/* Chat area — generous padding on desktop */}
-      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-        <div className="flex flex-col gap-3 pt-3 mx-5 sm:mx-12 md:mx-20 lg:mx-32 xl:mx-48 px-3">
+      {/* Chat area */}
+      <div
+        className="relative z-10 flex-1 min-h-0 overflow-y-auto pb-4"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none', scrollbarWidth: 'none' }}
+      >
+        <style>{`.chat-scroll::-webkit-scrollbar { display: none; }`}</style>
+        <div className="flex flex-col gap-3 pt-3 mx-5 sm:mx-12 md:mx-20 lg:mx-32 xl:mx-48 px-3 chat-scroll">
           {messages.length === 0 ? (
             <p className="text-white/15 text-sm text-center mt-12 tracking-wide">Tap the mic to start talking</p>
           ) : (
@@ -319,12 +373,19 @@ export function VoiceChat() {
               )
             })
           )}
+          {/* Thinking dots */}
+          {isThinking && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <ThinkingDots />
+            </motion.div>
+          )}
           <div ref={chatEndRef} />
         </div>
       </div>
 
       {/* Bottom controls — gradient fade */}
-      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-8 pt-6 bg-gradient-to-t from-black via-black to-transparent">
+      <div className="relative z-50 shrink-0 flex flex-col items-center gap-3 pb-6 pt-6 bg-gradient-to-t from-black via-black to-transparent"
+           style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
 
         <AnimatePresence mode="wait">
           {isListening ? (
@@ -361,18 +422,6 @@ export function VoiceChat() {
         </AnimatePresence>
 
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setTtsEnabled(!ttsEnabled)}
-            className={cn(
-              'p-2.5 transition-colors',
-              ttsEnabled
-                ? 'text-violet-300'
-                : 'text-white/20 hover:text-white/40',
-            )}
-          >
-            {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
-
           <motion.button
             onClick={handleMicClick}
             disabled={!supported}
