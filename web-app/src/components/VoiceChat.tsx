@@ -247,13 +247,14 @@ export function VoiceChat() {
   }
 
   const handleMicClick = () => {
-    stopAllAudio()
     if (isListening) {
       stopListening()
     } else {
+      stopAllAudio()
       setPendingMessage('')
       hasSentRef.current = false
-      startListening()
+      // iOS needs a beat after stopping audio before mic can activate
+      setTimeout(() => startListening(), 120)
     }
   }
 

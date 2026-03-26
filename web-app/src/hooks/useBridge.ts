@@ -99,7 +99,12 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
     _onAudioStarted?.()
   }).catch((e) => {
     console.error('[Audio] Playback failed:', e)
+    URL.revokeObjectURL(item.url)
     setPlaying(false)
+    // Don't get stuck — try next item in queue
+    if (queue.length > 0) {
+      setTimeout(() => playNextAudio(onAudioDoneRef), 100)
+    }
   })
   sharedAudio.onended = () => {
     URL.revokeObjectURL(item.url)
@@ -121,12 +126,12 @@ export function stopAllAudio() {
     const item = _audioQueue.pop()
     if (item) URL.revokeObjectURL(item.url)
   }
-  // Stop current playback
+  // Stop current playback (keep a silent src so iOS doesn't break the element)
   if (sharedAudio) {
     sharedAudio.pause()
-    sharedAudio.currentTime = 0
     sharedAudio.onended = null
-    sharedAudio.src = ''
+    sharedAudio.removeAttribute('src')
+    sharedAudio.load()
   }
   setPlaying(false)
 }

@@ -106,8 +106,17 @@ export function useVoice() {
     try {
       recognition.start()
     } catch (err) {
-      console.error('[Voice] Failed to start recognition:', err)
-      setIsListening(false)
+      console.error('[Voice] Failed to start recognition, retrying:', err)
+      // iOS can throw if called too fast — retry once after a short delay
+      setTimeout(() => {
+        try {
+          recognition.start()
+        } catch (retryErr) {
+          console.error('[Voice] Retry failed:', retryErr)
+          setIsListening(false)
+          recognitionRef.current = null
+        }
+      }, 200)
     }
   }, [])
 
