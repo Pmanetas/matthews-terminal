@@ -119,6 +119,7 @@ export class CommandHandler {
             await this.runClaude(text, client, imageFiles);
             this.writeEmitter.fire('\r\n');
             const finalText = this.streamingText.trim() || 'Done';
+            console.log(`[CommandHandler] Sending RESULT: "${finalText.slice(0, 100)}..."`);
             client.sendResult(finalText);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -403,8 +404,13 @@ export class CommandHandler {
     private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
-        if (text.length > 5 && this.hasSeenFirstTool) {
-            client.sendSpeak(text);
+        if (text.length > 5) {
+            if (this.hasSeenFirstTool) {
+                console.log(`[CommandHandler] Speaking narration: "${text.slice(0, 80)}..."`);
+                client.sendSpeak(text);
+            } else {
+                console.log(`[CommandHandler] SKIPPED speech (before first tool): "${text.slice(0, 80)}..."`);
+            }
         }
         this.streamingText = '';
         this.lastFlushedLength = 0;
@@ -561,11 +567,13 @@ export class CommandHandler {
             return;
         }
 
-        // ── Tool result ─────────────────────────────────────────
-        if (event.type === 'tool_result') {
-            const output = typeof event.output === 'string' ? event.output : JSON.stringify(event.output || '');
+        // ── Tool result (try multiple field names) ────────────────
+        const toolOutput = event.output || event.content || event.result_text || event.data;
+        if (event.type === 'tool_result' || (event.type === 'result' && event.subtype === 'tool_result') || (toolOutput && event.tool_use_id)) {
+            const output = typeof toolOutput === 'string' ? toolOutput : JSON.stringify(toolOutput || '');
             const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
             this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
+            console.log(`[CommandHandler] Tool result for "${this.lastToolDescription}": ${output.length} chars`);
 
             // Send file content preview to phone for Read results
             if (this.lastToolDescription.startsWith('Reading') && output.length > 0) {
