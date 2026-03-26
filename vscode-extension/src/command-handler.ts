@@ -313,8 +313,8 @@ export class CommandHandler {
                 return `Reading ${shortPath || 'a file'}`;
             case 'Edit': {
                 let msg = `Editing ${shortPath || 'a file'}`;
-                const oldMatch = cleanDetails.match(/old_string:\s*["']([^"']{0,60})/);
-                const newMatch = cleanDetails.match(/new_string:\s*["']([^"']{0,60})/);
+                const oldMatch = cleanDetails.match(/old_string:\s*["']([^"']{0,120})/);
+                const newMatch = cleanDetails.match(/new_string:\s*["']([^"']{0,120})/);
                 if (oldMatch) msg += `\n  ⊖ ${oldMatch[1]}`;
                 if (newMatch) msg += `\n  ⊕ ${newMatch[1]}`;
                 return msg;
@@ -499,14 +499,18 @@ export class CommandHandler {
             case 'Edit': {
                 let msg = `Editing ${shortPath}`;
                 if (input.old_string) {
-                    const oldPreview = input.old_string.trim().split('\n')[0];
-                    const oldShort = oldPreview.length > 50 ? oldPreview.slice(0, 50) + '...' : oldPreview;
-                    msg += `\n  ⊖ ${oldShort}`;
+                    const oldLines = input.old_string.trim().split('\n');
+                    for (const line of oldLines.slice(0, 8)) {
+                        msg += `\n  ⊖ ${line}`;
+                    }
+                    if (oldLines.length > 8) msg += `\n  ⊖ ... (${oldLines.length - 8} more lines)`;
                 }
                 if (input.new_string) {
-                    const newPreview = input.new_string.trim().split('\n')[0];
-                    const newShort = newPreview.length > 50 ? newPreview.slice(0, 50) + '...' : newPreview;
-                    msg += `\n  ⊕ ${newShort}`;
+                    const newLines = input.new_string.trim().split('\n');
+                    for (const line of newLines.slice(0, 8)) {
+                        msg += `\n  ⊕ ${line}`;
+                    }
+                    if (newLines.length > 8) msg += `\n  ⊕ ... (${newLines.length - 8} more lines)`;
                 }
                 return msg;
             }
