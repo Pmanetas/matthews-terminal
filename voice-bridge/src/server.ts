@@ -61,10 +61,10 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
       },
       body: JSON.stringify({
         model: 'tts-1',
-        voice: 'onyx',
-        // Leading "..." adds a brief pause so bluetooth headphones don't cut off the first word
-        input: '... ' + ttsText,
+        voice: 'nova',
+        input: '...... ' + ttsText,
         response_format: 'mp3',
+        speed: 1.15,
       }),
     });
 

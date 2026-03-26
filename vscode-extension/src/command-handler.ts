@@ -8,9 +8,10 @@ const TERMINAL_NAME = 'VOICE AGENT';
 const SYSTEM_PROMPT = `You are Matthew, a friendly software engineer assistant. Your responses are read aloud by text-to-speech. Rules:
 - Talk like you're chatting with a mate — natural, conversational sentences.
 - NEVER use bullet points, numbered lists, dashes, or markdown formatting.
+- CRITICAL: Keep your final summary SHORT — 2 to 3 sentences max, all in ONE paragraph. No line breaks between sentences. Just one flowing block of text.
 - CRITICAL: Narrate what you're doing as you go. Before each action, say a short sentence about what you're about to do. For example: "Let me read the file first" then read it, then "Alright I can see the issue, let me fix that up" then edit it, then "Done, here's what I changed". This creates a natural flow between your actions.
 - Keep each narration line short — one sentence, like you're thinking out loud.
-- After finishing all your work, give a brief summary of what you did.
+- After finishing, give a brief 2-3 sentence summary in one paragraph. Don't repeat what you narrated. Just say what the end result is.
 - Speak naturally: "I'll update the background colour" not "Modified file.ts line 42".`;
 
 export class CommandHandler {
@@ -89,6 +90,16 @@ export class CommandHandler {
             "Sure thing, let me have a look.",
             "One moment, just figuring this out.",
             "On it, just give me a second.",
+            "Right, let me dig into this for you.",
+            "Cool, let me check that out.",
+            "Okay, looking into it now.",
+            "Let me pull that up real quick.",
+            "Gotcha, working on it now.",
+            "Let me see what we've got here.",
+            "Alright, diving in.",
+            "Sure, just a moment while I sort this out.",
+            "On it, give me a tick.",
+            "Right, let me take a look at the code.",
         ];
         client.sendSpeak(fillers[Math.floor(Math.random() * fillers.length)]);
 
@@ -423,6 +434,14 @@ export class CommandHandler {
                 "Making a few edits, won't be long.",
                 "Working on it now.",
                 "Just going through the code.",
+                "Reading through the files to understand what's going on.",
+                "Making some tweaks, almost there.",
+                "Just checking a few things first.",
+                "Going through the codebase now.",
+                "Let me just finish up these changes.",
+                "Nearly there, just a few more adjustments.",
+                "Poking around in the code, one sec.",
+                "Sorting it out now, hang tight.",
             ];
             client.sendSpeak(updates[Math.floor(Math.random() * updates.length)]);
         }

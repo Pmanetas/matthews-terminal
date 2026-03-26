@@ -41,21 +41,17 @@ export function getAudioLevel(): number {
 
 function unlockAudio() {
   if (audioUnlocked || !sharedAudio) return
-  // Play a silent buffer to unlock audio on iOS
   sharedAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQAAAAAAAAAAaC0MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=='
   sharedAudio.play().then(() => { audioUnlocked = true }).catch(() => {})
-  // Also init analyser on user gesture (required for AudioContext)
   ensureAnalyser()
   audioContext?.resume()
 }
 
-// Call this on any user interaction
 if (typeof document !== 'undefined') {
   document.addEventListener('touchstart', unlockAudio, { once: true })
   document.addEventListener('click', unlockAudio, { once: true })
 }
 
-// Auto-detect: if served from the bridge, use same host. Otherwise use env var or localhost.
 function getWsUrl(): string {
   if (import.meta.env.VITE_BRIDGE_URL) return import.meta.env.VITE_BRIDGE_URL
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -72,7 +68,6 @@ interface AudioQueueItem {
 let isPlayingAudio = false
 let _onPlayingChange: ((playing: boolean) => void) | null = null
 
-/** Subscribe to audio playing state changes */
 export function onAudioPlayingChange(cb: (playing: boolean) => void) {
   _onPlayingChange = cb
 }
@@ -101,7 +96,6 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
     console.error('[Audio] Playback failed:', e)
     URL.revokeObjectURL(item.url)
     setPlaying(false)
-    // Don't get stuck — try next item in queue
     if (queue.length > 0) {
       setTimeout(() => playNextAudio(onAudioDoneRef), 100)
     }
@@ -119,14 +113,11 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
 
 const _audioQueue: AudioQueueItem[] = []
 
-/** Stop all audio playback and clear the queue */
 export function stopAllAudio() {
-  // Clear queue
   while (_audioQueue.length > 0) {
     const item = _audioQueue.pop()
     if (item) URL.revokeObjectURL(item.url)
   }
-  // Stop current playback (keep a silent src so iOS doesn't break the element)
   if (sharedAudio) {
     sharedAudio.pause()
     sharedAudio.onended = null
@@ -136,20 +127,49 @@ export function stopAllAudio() {
   setPlaying(false)
 }
 
-/** Track whether audio has started for the latest result (for text sync) */
 export let audioStartedForResult = false
 let _onAudioStarted: (() => void) | null = null
 export function onAudioStarted(cb: () => void) { _onAudioStarted = cb }
 
+// ── Chat persistence ─────────────────────────────────────────────
+const STORAGE_KEY = 'mt-messages'
+const MAX_STORED_MESSAGES = 100
+
+function loadMessages(): Message[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Message[]
+    return Array.isArray(parsed) ? parsed.slice(-MAX_STORED_MESSAGES) : []
+  } catch {
+    return []
+  }
+}
+
+function saveMessages(msgs: Message[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_STORED_MESSAGES)))
+  } catch {
+    // quota exceeded — clear old messages
+    try { localStorage.removeItem(STORAGE_KEY) } catch {}
+  }
+}
+
+// ── Hook ─────────────────────────────────────────────────────────
+
 export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
-  const [messages, setMessages] = useState<Message[]>([])
+  const [messages, setMessages] = useState<Message[]>(() => loadMessages())
   const [workspace, setWorkspace] = useState<string | null>(null)
+  const [isWaiting, setIsWaiting] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onAudioDoneRef = useRef(onAudioDone)
   onAudioDoneRef.current = onAudioDone
   const audioQueueRef = useRef(_audioQueue)
+
+  // Persist messages whenever they change
+  useEffect(() => { saveMessages(messages) }, [messages])
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN ||
@@ -165,7 +185,6 @@ export function useBridge(onAudioDone?: () => void) {
 
       ws.onopen = () => {
         setStatus('connected')
-        // Identify as phone client
         ws.send(JSON.stringify({ type: 'identify', client: 'phone' }))
         if (reconnectTimer.current) {
           clearTimeout(reconnectTimer.current)
@@ -178,10 +197,8 @@ export function useBridge(onAudioDone?: () => void) {
           const data = JSON.parse(event.data)
           if (data.type === 'tool_status') {
             setMessages((prev) => {
-              // Aggressively collapse consecutive tool calls on the SAME file
               const last = prev[prev.length - 1]
               if (last && last.role === 'tool') {
-                // Extract file/target from tool text (everything after the action word, minus count suffix)
                 const getTarget = (text: string) => {
                   const line = text.split('\n')[0]
                   const clean = line.replace(/\s*\(\d+\s+steps?\)\s*$/, '')
@@ -192,7 +209,7 @@ export function useBridge(onAudioDone?: () => void) {
                 const newTarget = getTarget(data.text)
 
                 if (lastTarget && newTarget && lastTarget === newTarget) {
-                  // Same file — collapse, ACCUMULATE all diff lines from every step
+                  // Same file — update header count but only keep LATEST diffs
                   const countMatch = last.text.match(/\((\d+) steps?\)/)
                   const count = countMatch ? parseInt(countMatch[1], 10) + 1 : 2
                   const newLines = data.text.split('\n')
@@ -200,11 +217,9 @@ export function useBridge(onAudioDone?: () => void) {
                   if (actionMatch) {
                     const label = count === 1 ? 'step' : 'steps'
                     const header = `${actionMatch[1]} ${actionMatch[2]} (${count} ${label})`
-                    // Keep ALL existing diff lines + append new ones
-                    const existingDiffs = last.text.split('\n').slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
+                    // Only keep the LATEST diff lines (not accumulated)
                     const newDiffs = newLines.slice(1).filter((l: string) => l.trim().startsWith('⊖') || l.trim().startsWith('⊕'))
-                    const allDiffs = [...existingDiffs, ...newDiffs]
-                    const merged = allDiffs.length > 0 ? header + '\n' + allDiffs.join('\n') : header
+                    const merged = newDiffs.length > 0 ? header + '\n' + newDiffs.join('\n') : header
                     return [...prev.slice(0, -1), { role: 'tool' as const, text: merged, timestamp: Date.now() }]
                   }
                 }
@@ -212,11 +227,10 @@ export function useBridge(onAudioDone?: () => void) {
               return [...prev, { role: 'tool' as const, text: data.text, timestamp: Date.now() }]
             })
           } else if (data.type === 'status') {
-            // Intermediate streaming text — don't show on screen (spoken via TTS only)
-            // Just ignore for visual display
+            // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {
-            // Final response — the only visible assistant message
             audioStartedForResult = false
+            setIsWaiting(false)
             setMessages((prev) => [
               ...prev,
               { role: 'assistant' as const, text: data.text, timestamp: Date.now() },
@@ -226,7 +240,6 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
-              // Auto-detect format: WAV starts with "RIFF", otherwise assume MP3
               const isWav = audioBytes[0] === 0x52 && audioBytes[1] === 0x49 && audioBytes[2] === 0x46 && audioBytes[3] === 0x46
               const blob = new Blob([audioBytes], { type: isWav ? 'audio/wav' : 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
@@ -266,7 +279,7 @@ export function useBridge(onAudioDone?: () => void) {
 
   const sendCommand = useCallback(
     (text: string) => {
-      // Add user message immediately
+      setIsWaiting(true)
       setMessages((prev) => [
         ...prev,
         { role: 'user' as const, text, timestamp: Date.now() },
@@ -281,6 +294,7 @@ export function useBridge(onAudioDone?: () => void) {
 
   const sendStop = useCallback(() => {
     stopAllAudio()
+    setIsWaiting(false)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'stop' }))
     }
@@ -294,5 +308,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, sendStop, workspace }
+  return { status, messages, sendCommand, sendStop, workspace, isWaiting }
 }
