@@ -125,13 +125,10 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     if (!animate || chars >= text.length) return
     const tick = (now: number) => {
       if (startTimeRef.current === 0) startTimeRef.current = now
-      // Reveal at ~120 chars/sec (roughly matches speech pace)
+      // ~40 chars/sec = readable word-by-word pace
       const elapsed = now - startTimeRef.current
-      const target = Math.floor(elapsed * 0.12)
-      setChars((c) => {
-        const next = Math.min(Math.max(c, target), text.length)
-        return next
-      })
+      const target = Math.floor(elapsed * 0.04)
+      setChars((c) => Math.min(Math.max(c, target), text.length))
       onUpdate?.()
       if (target < text.length) {
         rafRef.current = requestAnimationFrame(tick)
@@ -159,8 +156,6 @@ function ThinkingDots() {
   )
 }
 
-// (Robot head removed — using VoiceWaveform directly)
-
 // ── Global styles ────────────────────────────────────────────────
 
 const globalCSS = `
@@ -168,6 +163,19 @@ const globalCSS = `
   .no-scrollbar { scrollbar-width: none; }
   * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
+
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.15); opacity: 0.7; }
+  }
+  @keyframes heartbeat-ring1 {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.25); opacity: 0.5; }
+  }
+  @keyframes heartbeat-ring2 {
+    0%, 100% { transform: scale(1); opacity: 0.15; }
+    50% { transform: scale(1.35); opacity: 0.3; }
+  }
 `
 
 // ── Main Component ───────────────────────────────────────────────
@@ -312,7 +320,6 @@ export function VoiceChat() {
     e.target.value = '' // reset for re-selection
 
     if (file.size > MAX_IMAGE_SIZE) {
-      // Will be resized anyway, but warn if extremely large
       console.warn('[Image] Large file, resizing...')
     }
 
@@ -362,20 +369,13 @@ export function VoiceChat() {
     >
       <style>{globalCSS}</style>
 
-      {/* ── Header (gradient fade, no hard line) ── */}
-      <div className="shrink-0 relative">
-        <div className="flex items-center justify-center px-5 pt-3 pb-6">
-          <div className="flex flex-col items-center">
-            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={240} />
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
-              <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
-            </div>
-            {/* activeFile hidden — was cluttering header */}
-          </div>
+      {/* ── Header ── */}
+      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-2">
+        <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={240} />
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
+          <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
         </div>
-        {/* Gradient fade instead of border */}
-        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-b from-black/0 to-black pointer-events-none" />
       </div>
 
       {/* ── Chat messages ── */}
@@ -384,7 +384,7 @@ export function VoiceChat() {
         className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
-        <div className="flex flex-col gap-3 px-5 sm:px-10 md:px-12 lg:px-16 py-6 max-w-5xl mx-auto w-full">
+        <div className="flex flex-col gap-3 px-4 py-4 max-w-5xl mx-auto w-full">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <VoiceWaveform isActive={false} getAudioLevel={() => 0} size={200} />
@@ -402,7 +402,7 @@ export function VoiceChat() {
               const isRecent = i >= messages.length - 3
 
               const content = msg.role === 'user' ? (
-                /* ── User message (no bubble) ── */
+                /* ── User message — flush right, no bubble ── */
                 <div className="flex justify-end">
                   <div className="max-w-[85%] sm:max-w-[70%] lg:max-w-[55%]">
                     {msg.images && msg.images.length > 0 && (
@@ -422,7 +422,7 @@ export function VoiceChat() {
                         ))}
                       </div>
                     )}
-                    <p className="text-[15px] text-white/60 break-words whitespace-pre-wrap leading-relaxed text-right">{msg.text}</p>
+                    <p className="text-[15px] text-white/50 break-words whitespace-pre-wrap leading-relaxed text-right">{msg.text}</p>
                   </div>
                 </div>
               ) : msg.role === 'tool' ? (
@@ -608,17 +608,26 @@ export function VoiceChat() {
                 className={cn(
                   'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-all',
                   isListening
-                    ? 'bg-violet-500 shadow-[0_0_30px_rgba(139,92,246,0.5)]'
+                    ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
                     : 'bg-white/[0.06] hover:bg-white/[0.1]',
                   !supported && 'opacity-30 cursor-not-allowed',
                 )}
               >
-                {/* Heartbeat pulse rings when listening */}
+                {/* Heartbeat pulse rings — real animation, not ping */}
                 {isListening && (
                   <>
-                    <span className="absolute inset-0 rounded-full bg-violet-500/20 animate-ping" style={{ animationDuration: '2s' }} />
-                    <span className="absolute -inset-2 rounded-full border border-violet-500/20 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
-                    <span className="absolute -inset-4 rounded-full border border-violet-500/10 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.6s' }} />
+                    <span
+                      className="absolute inset-0 rounded-full bg-violet-500/30"
+                      style={{ animation: 'heartbeat 1.2s ease-in-out infinite' }}
+                    />
+                    <span
+                      className="absolute -inset-2 rounded-full border-2 border-violet-400/30"
+                      style={{ animation: 'heartbeat-ring1 1.2s ease-in-out infinite' }}
+                    />
+                    <span
+                      className="absolute -inset-5 rounded-full border border-violet-400/15"
+                      style={{ animation: 'heartbeat-ring2 1.2s ease-in-out infinite' }}
+                    />
                   </>
                 )}
                 {isListening ? (

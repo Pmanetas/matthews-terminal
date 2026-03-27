@@ -234,11 +234,8 @@ export function useBridge(onAudioDone?: () => void) {
             const buffered = replayBufferRef.current
             replayBufferRef.current = []
             if (buffered.length > 0) {
-              // Merge replay with any locally-added messages (preserve user's current input)
-              setMessages((prev) => {
-                const local = prev.filter(m => !m.replayed)
-                return [...buffered, ...local]
-              })
+              // Replace all messages with replay — prevents duplicate re-typing on tab switch
+              setMessages(buffered)
             }
             return
           } else if (data.type === 'clear_history') {
