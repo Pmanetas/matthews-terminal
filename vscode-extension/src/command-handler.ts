@@ -49,8 +49,6 @@ export class CommandHandler {
     private hasSeenFirstTool = false;
     // Abort flag — prevents result from being sent after stop
     private aborted = false;
-    // Track if we've already seen the initial assistant event (to skip duplicates)
-    private seenAssistantEvent = false;
 
     constructor() {
         this.disposables.push(
@@ -108,7 +106,6 @@ export class CommandHandler {
         this.toolCallCount = 0;
         this.hasSeenFirstTool = false;
         this.aborted = false;
-        this.seenAssistantEvent = false;
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}${images?.length ? ` [+${images.length} image(s)]` : ''}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -547,18 +544,13 @@ export class CommandHandler {
         // Don't process events after abort
         if (this.aborted) return;
 
-        // Log every event type to terminal for debugging
-        const eventPreview = JSON.stringify(event).slice(0, 300);
-        this.writeEmitter.fire(`\x1b[2m[event] ${eventPreview}\x1b[0m\r\n`);
+        // Log event type only (not full JSON) for cleaner terminal
+        if (event.type !== 'assistant' && event.type !== 'user' && event.type !== 'rate_limit_event') {
+            this.writeEmitter.fire(`\x1b[2m[${event.type}${event.subtype ? ':' + event.subtype : ''}]\x1b[0m\r\n`);
+        }
 
-        // ── Text content (initial assistant event) ────────────────
-        // Only process the FIRST assistant event — subsequent ones may contain
-        // duplicate text that was already streamed via content_block_delta events
+        // ── Assistant message (each content block comes as a separate event) ──
         if (event.type === 'assistant' && event.message?.content) {
-            if (this.seenAssistantEvent) {
-                return; // Skip duplicate assistant events
-            }
-            this.seenAssistantEvent = true;
             for (const block of event.message.content) {
                 if (block.type === 'text') {
                     onText(block.text);
@@ -567,6 +559,23 @@ export class CommandHandler {
                     this.flushStreamingText(client);
                 } else if (block.type === 'tool_use') {
                     this.emitToolCall(block, client);
+                }
+                // Skip thinking blocks silently
+            }
+            return;
+        }
+
+        // ── Tool results (come as "user" events in stream-json) ──────
+        if (event.type === 'user' && event.message?.content) {
+            for (const block of event.message.content) {
+                if (block.type === 'tool_result') {
+                    const output = typeof block.content === 'string' ? block.content : '';
+                    if (output) {
+                        const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
+                        this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
+                    }
+                    this.streamingText = '';
+                    this.lastFlushedLength = 0;
                 }
             }
             return;
@@ -623,10 +632,12 @@ export class CommandHandler {
 
         // ── Result ──────────────────────────────────────────────
         if (event.type === 'result') {
-            // Don't add event.result to streamingText — it contains the FULL response
-            // including text that was already streamed and spoken. We only want the
-            // last chunk (whatever's in streamingText now) as the final result.
             this.flushStreamingText(client);
+            // If streamingText is empty (all text was spoken as narration),
+            // use the result text as fallback so we don't just say "Done"
+            if (!this.streamingText.trim() && event.result) {
+                this.streamingText = event.result;
+            }
             return;
         }
 
