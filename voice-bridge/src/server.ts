@@ -438,19 +438,19 @@ wss.on('connection', (ws) => {
       state.currentTaskStatus = 'complete';
       state.lastOutputSummary = msg.text;
 
-      // Generate TTS FIRST, then send text + audio together so they're synced
+      // Send result text IMMEDIATELY so phone shows it right away
       const resultEntry = { type: 'result', text: msg.text };
       pushHistory(resultEntry);
+      broadcastToRole('phone', resultEntry);
+
+      // Generate TTS in background — audio arrives after text
       generateSpeech(msg.text).then((audioBuffer) => {
-        broadcastToRole('phone', resultEntry);
         if (audioBuffer) {
           const base64 = audioBuffer.toString('base64');
           broadcastToRole('phone', { type: 'audio', data: base64, final: true });
-          console.log(`[${timestamp()}] Sent result + TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
+          console.log(`[${timestamp()}] Sent TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
         }
-      }).catch(() => {
-        broadcastToRole('phone', resultEntry);
-      });
+      }).catch(() => {});
       return;
     }
 
