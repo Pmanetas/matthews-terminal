@@ -48,7 +48,8 @@ export function unlockAudio() {
   if (!sharedAudio) return
   ensureAnalyser()
   audioContext?.resume()
-  if (audioUnlocked) return
+  // Don't overwrite src if audio is currently playing or already unlocked
+  if (audioUnlocked || isPlayingAudio) return
   sharedAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV////////////////////////////////////////////AAAAAExhdmM1OC4xMwAAAAAAAAAAAAAAACQAAAAAAAAAAaC0MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4wAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=='
   sharedAudio.play().then(() => { audioUnlocked = true }).catch(() => {})
 }
@@ -58,18 +59,14 @@ if (typeof document !== 'undefined') {
   document.addEventListener('click', unlockAudio, { once: false })
 
   // iOS suspends AudioContext and pauses audio when page goes to background.
-  // When returning: resume the context, unstick the playing state, and restart the queue.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return
-    // Resume suspended AudioContext
     audioContext?.resume()
     if (!sharedAudio) return
 
     if (isPlayingAudio) {
-      // Audio was playing when iOS suspended us — try to resume it
       if (sharedAudio.paused && sharedAudio.src) {
         sharedAudio.play().catch(() => {
-          // Can't resume (iOS requires gesture) — skip to next or unstick
           setPlaying(false)
           if (_audioQueue.length > 0) {
             playNextAudio(_fallbackAudioDoneRef)
@@ -77,13 +74,11 @@ if (typeof document !== 'undefined') {
         })
       }
     } else if (_audioQueue.length > 0) {
-      // Queue built up while backgrounded — start draining
       playNextAudio(_fallbackAudioDoneRef)
     }
   })
 }
 
-// Fallback ref for visibility-change-triggered playback
 const _fallbackAudioDoneRef: { current: (() => void) | undefined } = { current: undefined }
 
 function getWsUrl(): string {
@@ -106,6 +101,10 @@ export function onAudioPlayingChange(cb: (playing: boolean) => void) {
   _onPlayingChange = cb
 }
 
+// Callback to stop mic when audio starts — set by VoiceChat
+let _onAudioWillPlay: (() => void) | null = null
+export function onAudioWillPlay(cb: () => void) { _onAudioWillPlay = cb }
+
 function setPlaying(v: boolean) {
   if (isPlayingAudio !== v) {
     isPlayingAudio = v
@@ -116,6 +115,9 @@ function setPlaying(v: boolean) {
 function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   const queue = _audioQueue
   if (isPlayingAudio || queue.length === 0 || !sharedAudio) return
+
+  // Stop mic BEFORE playing audio so it doesn't pick up Matthew's voice
+  _onAudioWillPlay?.()
 
   setPlaying(true)
   const item = queue.shift()!
@@ -134,7 +136,7 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   }
   sharedAudio.play().then(() => {
     audioStartedForResult = true
-    clearResultFallback() // Audio is playing — no need for fallback
+    clearResultFallback()
     _onAudioStarted?.()
   }).catch((e) => {
     console.error('[Audio] Playback failed:', e)
@@ -171,7 +173,6 @@ let _resultFallbackTimer: ReturnType<typeof setTimeout> | null = null
 function startResultFallback(onAudioDoneRef: { current: (() => void) | undefined }) {
   clearResultFallback()
   _resultFallbackTimer = setTimeout(() => {
-    // No audio arrived/started for this result — trigger auto-listen anyway
     if (!isPlayingAudio && _audioQueue.length === 0) {
       onAudioDoneRef.current?.()
     }
@@ -234,24 +235,21 @@ export function useBridge(onAudioDone?: () => void) {
             const buffered = replayBufferRef.current
             replayBufferRef.current = []
             if (buffered.length > 0) {
-              // Replace all messages with replay — prevents duplicate re-typing on tab switch
               setMessages(buffered)
             }
             return
           } else if (data.type === 'clear_history') {
-            // Only clear replayed messages — keep locally-sent ones
             setMessages((prev) => prev.filter(m => !m.replayed))
             setIsWaiting(false)
             return
           } else if (data.type === 'user_command') {
-            const msg: Message = { role: 'user' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+            // Only add if replaying — live user_commands duplicate the local message
             if (isReplayingRef.current) {
+              const msg: Message = { role: 'user' as const, text: data.text, timestamp: Date.now(), replayed: true }
               replayBufferRef.current.push(msg)
-            } else {
-              setMessages((prev) => [...prev, msg])
             }
+            // Skip live user_command — we already added it locally in sendCommand
           } else if (data.type === 'tool_status') {
-            // Narration text is sent as tool_status with 💬 prefix
             const isNarration = typeof data.text === 'string' && data.text.startsWith('💬 ')
             const msg: Message = isNarration
               ? { role: 'assistant' as const, text: data.text.slice(2), timestamp: Date.now(), replayed: isReplayingRef.current, narration: true }
@@ -328,7 +326,6 @@ export function useBridge(onAudioDone?: () => void) {
 
   const sendCommand = useCallback(
     (text: string, images?: ImageAttachment[]) => {
-      // User gesture context — unlock audio for iOS so TTS can play
       unlockAudio()
       setIsWaiting(true)
       setMessages((prev) => [

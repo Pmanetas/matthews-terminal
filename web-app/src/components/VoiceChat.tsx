@@ -4,7 +4,7 @@ import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pe
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted, onAudioWillPlay } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
 import type { ImageAttachment } from '@/types'
@@ -336,9 +336,16 @@ export function VoiceChat() {
   const hasSentRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const stopListeningRef = useRef<(() => void) | null>(null)
+
   useEffect(() => {
     onAudioPlayingChange(setIsAudioPlaying)
-    return () => onAudioPlayingChange(() => {})
+    // Stop mic when audio is about to play so it doesn't pick up Matthew's voice
+    onAudioWillPlay(() => { stopListeningRef.current?.() })
+    return () => {
+      onAudioPlayingChange(() => {})
+      onAudioWillPlay(() => {})
+    }
   }, [])
 
   const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting } = useBridge(() => {
@@ -348,6 +355,7 @@ export function VoiceChat() {
   const { isListening, transcript, startListening, stopListening, supported, micError } = useVoice()
 
   autoListenRef.current = startListening
+  stopListeningRef.current = stopListening
   const chatEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const userScrolledRef = useRef(false)
@@ -552,8 +560,8 @@ export function VoiceChat() {
 
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
-                <div className="flex justify-end min-w-0">
-                  <div className="max-w-[75%] min-w-0">
+                <div className="flex justify-end w-full min-w-0 overflow-hidden">
+                  <div className="max-w-[75%] min-w-0 shrink-0">
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
