@@ -419,6 +419,26 @@ wss.on('connection', (ws) => {
       const entry = { type: 'tool_status', text: msg.text };
       pushHistory(entry);
       broadcastToRole('phone', entry);
+
+      // Generate TTS for narration messages (💬 prefix) directly here
+      // instead of relying on separate 'speak' message which may get lost
+      if (typeof msg.text === 'string' && msg.text.startsWith('💬 ')) {
+        const narrationText = msg.text.slice(2).trim();
+        if (narrationText.length > 3) {
+          console.log(`[${timestamp()}] Narration TTS: "${narrationText.slice(0, 80)}"`);
+          generateSpeech(narrationText).then((audioBuffer) => {
+            if (audioBuffer) {
+              const base64 = audioBuffer.toString('base64');
+              broadcastToRole('phone', { type: 'audio', data: base64, final: false });
+              console.log(`[${timestamp()}] Sent narration TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
+            } else {
+              console.error(`[${timestamp()}] Narration TTS returned null for: "${narrationText.slice(0, 50)}"`);
+            }
+          }).catch((err: any) => {
+            console.error(`[${timestamp()}] Narration TTS failed:`, err.message);
+          });
+        }
+      }
       return;
     }
 
@@ -432,15 +452,12 @@ wss.on('connection', (ws) => {
     }
 
     // ── Extension sends speak (TTS only, no display) ─────────
+    // NOTE: narration TTS is now also handled in tool_status above (💬 prefix)
+    // This handler is kept as a fallback for any direct speak messages
     if (role === 'extension' && msg.type === 'speak') {
-      console.log(`[${timestamp()}] SPEAK received: "${(msg.text || '').slice(0, 100)}"`);
-      generateSpeech(msg.text).then((audioBuffer) => {
-        if (audioBuffer) {
-          const base64 = audioBuffer.toString('base64');
-          broadcastToRole('phone', { type: 'audio', data: base64, final: false });
-          console.log(`[${timestamp()}] Sent intermediate TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
-        }
-      });
+      // Skip if this text was already handled as a 💬 narration in tool_status
+      // (the extension sends both tool_status and speak for the same text)
+      console.log(`[${timestamp()}] SPEAK received (skipping — handled via tool_status): "${(msg.text || '').slice(0, 80)}"`);
       return;
     }
 

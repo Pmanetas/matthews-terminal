@@ -1,49 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConnectionStatus, Message, ImageAttachment } from '@/types'
 
-// ── Browser TTS fallback for narrations ─────────────────────────
-// If bridge TTS audio doesn't arrive within timeout, use browser speech
-let _narrationFallbackTimer: ReturnType<typeof setTimeout> | null = null
-let _lastNarrationText = ''
-
-function speakWithBrowserTTS(text: string) {
-  if (typeof speechSynthesis === 'undefined') return
-  // Cancel any ongoing browser speech
-  speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.rate = 1.1
-  utterance.pitch = 0.9
-  // Try to find a male English voice
-  const voices = speechSynthesis.getVoices()
-  const preferred = voices.find(v => v.lang.startsWith('en') && v.name.toLowerCase().includes('male'))
-    || voices.find(v => v.lang.startsWith('en'))
-  if (preferred) utterance.voice = preferred
-  speechSynthesis.speak(utterance)
-}
-
-function queueNarrationFallback(text: string) {
-  // If audio is already playing or queued, bridge TTS is working — skip fallback
-  if (isPlayingAudio || _audioQueue.length > 0) return
-  _lastNarrationText = text
-  if (_narrationFallbackTimer) clearTimeout(_narrationFallbackTimer)
-  _narrationFallbackTimer = setTimeout(() => {
-    _narrationFallbackTimer = null
-    // If still no audio playing after 3s, use browser TTS
-    if (!isPlayingAudio && _audioQueue.length === 0 && _lastNarrationText === text) {
-      console.log('[TTS Fallback] No bridge audio arrived, using browser speech')
-      speakWithBrowserTTS(text)
-    }
-  }, 3000)
-}
-
-function cancelNarrationFallback() {
-  if (_narrationFallbackTimer) {
-    clearTimeout(_narrationFallbackTimer)
-    _narrationFallbackTimer = null
-  }
-  _lastNarrationText = ''
-}
-
 // Persistent audio element — unlocked on first user tap so autoplay works on mobile
 export const sharedAudio = typeof window !== 'undefined' ? new Audio() : null
 let audioUnlocked = false
@@ -301,10 +258,6 @@ export function useBridge(onAudioDone?: () => void) {
               replayBufferRef.current.push(msg)
             } else {
               setMessages((prev) => [...prev, msg])
-              // Queue browser TTS fallback for narrations in case bridge TTS doesn't arrive
-              if (isNarration) {
-                queueNarrationFallback(data.text.slice(2).trim())
-              }
             }
           } else if (data.type === 'narration') {
             const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, narration: true }
@@ -312,7 +265,6 @@ export function useBridge(onAudioDone?: () => void) {
               replayBufferRef.current.push(msg)
             } else {
               setMessages((prev) => [...prev, msg])
-              queueNarrationFallback(data.text.trim())
             }
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
@@ -334,9 +286,6 @@ export function useBridge(onAudioDone?: () => void) {
             setActiveFile(data.file || null)
           } else if (data.type === 'audio' && data.data) {
             try {
-              // Bridge TTS arrived — cancel browser fallback
-              cancelNarrationFallback()
-              if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel()
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
               const isWav = audioBytes[0] === 0x52 && audioBytes[1] === 0x49 && audioBytes[2] === 0x46 && audioBytes[3] === 0x46
               const blob = new Blob([audioBytes], { type: isWav ? 'audio/wav' : 'audio/mpeg' })
