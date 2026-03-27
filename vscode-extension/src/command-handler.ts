@@ -471,6 +471,14 @@ export class CommandHandler {
         this.hasSeenFirstTool = true;
         const toolName = block.name || block.tool_name || '';
         const input = block.input || {};
+
+        // Skip Claude CLI internal temp files entirely — don't display or speak them
+        const filePath = input.file_path || '';
+        if (filePath.includes('tool-results/') || filePath.includes('tool-results\\')) {
+            this.toolCallCount++;
+            return;
+        }
+
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
@@ -484,10 +492,6 @@ export class CommandHandler {
 
         // For Read tool: read the actual file and send content preview
         if (toolName === 'Read' && input.file_path) {
-            // Skip Claude CLI internal temp files like "tool-results/xxx.txt"
-            if (input.file_path.includes('tool-results/') || input.file_path.includes('tool-results\\')) {
-                return;
-            }
             try {
                 // Try absolute path first, then resolve relative to workspace
                 let filePath = input.file_path;
