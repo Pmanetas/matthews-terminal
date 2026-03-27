@@ -69,11 +69,8 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
                   const isRemove = trimmed.startsWith('⊖')
                   const isAdd = trimmed.startsWith('⊕')
                   return (
-                    <motion.div
+                    <div
                       key={i}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.12, delay: i * 0.02 }}
                       className={cn(
                         'flex items-start font-mono text-[11px] leading-5',
                         isRemove && 'bg-red-500/[0.08]',
@@ -97,7 +94,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
                         isAdd ? 'text-emerald-300/70' :
                         'text-white/30'
                       )}>{code}</code>
-                    </motion.div>
+                    </div>
                   )
                 })}
               </div>
@@ -407,89 +404,91 @@ export function VoiceChat() {
               const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
               const isLastTool = i === lastToolIndex
               // Only the last tool is auto-expanded; collapse when result arrives
-              // Click toggles: expandedTools tracks user overrides
               const defaultExpanded = isLastTool && !hasResultAfterTools
               const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
+              // Only animate the last 3 messages — older ones render instantly
+              const isRecent = i >= messages.length - 3
 
-              return (
+              const content = msg.role === 'user' ? (
+                /* ── User bubble (purple) ── */
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] sm:max-w-[70%]">
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                        {msg.images.map((img, j) => (
+                          img.data ? (
+                            <img
+                              key={j}
+                              src={`data:${img.mimeType};base64,${img.data}`}
+                              className="w-28 h-28 rounded-lg object-cover border border-white/10"
+                            />
+                          ) : (
+                            <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
+                              <Camera className="w-6 h-6 text-white/20" />
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    )}
+                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-2.5">
+                      <p className="text-[13px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : msg.role === 'tool' ? (
+                /* ── Tool call ── */
+                <div
+                  className="flex items-stretch gap-2.5 ml-1 cursor-pointer"
+                  onClick={() => toggleToolExpand(i)}
+                >
+                  <div className="flex flex-col items-center w-5 shrink-0">
+                    <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                    {isLastTool && isCurrentToolLoading ? (
+                      <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
+                    ) : (
+                      <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />
+                    )}
+                    <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                  </div>
+                  <div
+                    className={cn(
+                      'flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden border transition-all duration-200',
+                      isExpanded
+                        ? 'border-violet-500/20 bg-violet-500/[0.04]'
+                        : 'border-white/[0.06] bg-white/[0.02]'
+                    )}
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+                      <ToolIcon text={msg.text} />
+                    </div>
+                    <ToolContent text={msg.text} expanded={isExpanded} />
+                  </div>
+                </div>
+              ) : (
+                /* ── Assistant text ── */
+                <div className="px-1">
+                  {msg.narration ? (
+                    <p className="text-[13px] text-white/40 leading-relaxed italic">{msg.text}</p>
+                  ) : i === lastResultIndex && !msg.replayed ? (
+                    <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
+                  ) : (
+                    <MarkdownMessage text={msg.text} />
+                  )}
+                </div>
+              )
+
+              // Only wrap recent non-replayed messages in motion.div for enter animation
+              return isRecent && !msg.replayed ? (
                 <motion.div
                   key={i}
-                  initial={msg.replayed ? false : { opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.25, ease: 'easeOut' }}
                 >
-                  {msg.role === 'user' ? (
-                    /* ── User bubble (purple) ── */
-                    <div className="flex justify-end">
-                      <div className="max-w-[85%] sm:max-w-[70%]">
-                        {msg.images && msg.images.length > 0 && (
-                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
-                            {msg.images.map((img, j) => (
-                              img.data ? (
-                                <img
-                                  key={j}
-                                  src={`data:${img.mimeType};base64,${img.data}`}
-                                  className="w-28 h-28 rounded-lg object-cover border border-white/10"
-                                />
-                              ) : (
-                                <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
-                                  <Camera className="w-6 h-6 text-white/20" />
-                                </div>
-                              )
-                            ))}
-                          </div>
-                        )}
-                        <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-2.5">
-                          <p className="text-[13px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : msg.role === 'tool' ? (
-                    /* ── Tool call ── */
-                    <motion.div
-                      className="flex items-stretch gap-2.5 ml-1 cursor-pointer"
-                      onClick={() => toggleToolExpand(i)}
-                      layout
-                      transition={{ duration: 0.2, ease: 'easeOut' }}
-                    >
-                      <div className="flex flex-col items-center w-5 shrink-0">
-                        <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                        {isLastTool && isCurrentToolLoading ? (
-                          <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
-                        ) : (
-                          <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />
-                        )}
-                        <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                      </div>
-                      <motion.div
-                        layout
-                        className={cn(
-                          'flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden border transition-colors',
-                          isExpanded
-                            ? 'border-violet-500/20 bg-violet-500/[0.04]'
-                            : 'border-white/[0.06] bg-white/[0.02]'
-                        )}
-                      >
-                        <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                          <ToolIcon text={msg.text} />
-                        </div>
-                        <ToolContent text={msg.text} expanded={isExpanded} />
-                      </motion.div>
-                    </motion.div>
-                  ) : (
-                    /* ── Assistant text ── */
-                    <div className="px-1">
-                      {msg.narration ? (
-                        /* Narration: lighter, no typing animation */
-                        <p className="text-[13px] text-white/40 leading-relaxed italic">{msg.text}</p>
-                      ) : i === lastResultIndex && !msg.replayed ? (
-                        <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
-                      ) : (
-                        <MarkdownMessage text={msg.text} />
-                      )}
-                    </div>
-                  )}
+                  {content}
                 </motion.div>
+              ) : (
+                <div key={i}>{content}</div>
               )
             })
           )}
