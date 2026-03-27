@@ -380,21 +380,25 @@ export function VoiceChat() {
     >
       <style>{globalCSS}</style>
 
-      {/* ── Header bar ── */}
-      <div className="shrink-0 flex items-center justify-center px-5 py-3 border-b border-white/[0.06]">
-        <div className="flex flex-col items-center">
-          <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={160} />
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
-            <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
-          </div>
-          {activeFile && (
-            <div className="flex items-center gap-1 mt-0.5">
-              <FileText className="w-2.5 h-2.5 text-violet-400/50" />
-              <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
+      {/* ── Header (gradient fade, no hard line) ── */}
+      <div className="shrink-0 relative">
+        <div className="flex items-center justify-center px-5 pt-3 pb-6">
+          <div className="flex flex-col items-center">
+            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={240} />
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
+              <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
             </div>
-          )}
+            {activeFile && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <FileText className="w-2.5 h-2.5 text-violet-400/50" />
+                <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
+              </div>
+            )}
+          </div>
         </div>
+        {/* Gradient fade instead of border */}
+        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-b from-black/0 to-black pointer-events-none" />
       </div>
 
       {/* ── Chat messages ── */}
@@ -518,33 +522,29 @@ export function VoiceChat() {
         </div>
       </div>
 
-      {/* ── Bottom input bar ── */}
+      {/* ── Bottom controls ── */}
       <div
         className="shrink-0 bg-black"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        {/* Transcript / listening state */}
+        {/* Transcript while listening */}
         <AnimatePresence mode="wait">
-          {(isListening || micError || pendingMessage) && (
+          {(isListening && transcript) && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="px-5 pt-2 overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="px-5 pb-2"
             >
-              {isListening ? (
-                <p className="text-xs text-violet-300 text-center">
-                  {transcript ? `"${transcript}"` : 'Listening... say "send" when done'}
-                </p>
-              ) : micError ? (
-                <p className="text-xs text-red-400 text-center">{micError}</p>
-              ) : pendingMessage ? (
-                <p className="text-xs text-white/40 text-center line-clamp-2">&ldquo;{pendingMessage}&rdquo;</p>
-              ) : null}
+              <p className="text-xs text-violet-300/60 text-center line-clamp-2">&ldquo;{transcript}&rdquo;</p>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {micError && (
+          <p className="text-xs text-red-400 text-center px-5 pb-2">{micError}</p>
+        )}
 
         {/* Hidden file input */}
         <input
@@ -562,7 +562,7 @@ export function VoiceChat() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="flex gap-2 px-4 pt-2 overflow-x-auto no-scrollbar"
+              className="flex gap-2 px-4 pb-2 overflow-x-auto no-scrollbar justify-center"
             >
               {pendingImages.map((img, i) => (
                 <div key={i} className="relative shrink-0">
@@ -582,26 +582,19 @@ export function VoiceChat() {
           )}
         </AnimatePresence>
 
-        {/* Input row */}
-        <div className="flex items-end gap-2 px-4 pt-2 pb-1">
-          {/* Camera button */}
+        {/* Action row — centered orb with flanking buttons */}
+        <div className="flex items-center justify-center gap-5 px-4 pb-2">
+          {/* Camera button (left) */}
           {!showStop && (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center w-12 h-12 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
             >
-              <Camera className="w-5 h-5 text-white/50" />
+              <Camera className="w-4 h-4 text-white/40" />
             </button>
           )}
 
-          {/* Placeholder input area */}
-          <div className="flex-1 flex items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 min-h-[48px]">
-            <span className="text-sm text-white/25 flex-1 select-none">
-              {isListening ? 'Listening...' : pendingMessage || (pendingImages.length > 0 ? 'Add a message or tap send' : 'Tap mic to speak')}
-            </span>
-          </div>
-
-          {/* Action buttons */}
+          {/* Central mic orb / stop / send */}
           <AnimatePresence mode="wait">
             {showStop ? (
               <motion.button
@@ -611,9 +604,9 @@ export function VoiceChat() {
                 exit={{ scale: 0.8, opacity: 0 }}
                 transition={{ duration: 0.15 }}
                 onClick={handleStop}
-                className="flex items-center justify-center w-12 h-12 rounded-full bg-red-500/80 shrink-0 active:scale-90 transition-transform"
+                className="relative flex items-center justify-center w-16 h-16 rounded-full bg-red-500/80 shrink-0 active:scale-90 transition-transform"
               >
-                <Square className="w-4 h-4 text-white fill-white" />
+                <Square className="w-5 h-5 text-white fill-white" />
               </motion.button>
             ) : (pendingMessage || pendingImages.length > 0) ? (
               <motion.button
@@ -623,9 +616,9 @@ export function VoiceChat() {
                 exit={{ scale: 0.8, opacity: 0 }}
                 transition={{ duration: 0.15 }}
                 onClick={handleSend}
-                className="flex items-center justify-center w-12 h-12 rounded-full bg-violet-500 shrink-0"
+                className="relative flex items-center justify-center w-16 h-16 rounded-full bg-violet-500 shrink-0"
               >
-                <ArrowUp className="w-5 h-5 text-white" />
+                <ArrowUp className="w-6 h-6 text-white" />
               </motion.button>
             ) : (
               <motion.button
@@ -638,24 +631,34 @@ export function VoiceChat() {
                 disabled={!supported}
                 whileTap={{ scale: 0.9 }}
                 className={cn(
-                  'relative flex items-center justify-center w-12 h-12 rounded-full shrink-0 transition-all',
+                  'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-all',
                   isListening
-                    ? 'bg-violet-500'
-                    : 'bg-white/[0.08] hover:bg-white/[0.12]',
+                    ? 'bg-violet-500 shadow-[0_0_30px_rgba(139,92,246,0.5)]'
+                    : 'bg-white/[0.06] hover:bg-white/[0.1]',
                   !supported && 'opacity-30 cursor-not-allowed',
                 )}
               >
+                {/* Heartbeat pulse rings when listening */}
                 {isListening && (
-                  <span className="absolute inset-0 rounded-full bg-violet-500/30 animate-ping" style={{ animationDuration: '1.5s' }} />
+                  <>
+                    <span className="absolute inset-0 rounded-full bg-violet-500/20 animate-ping" style={{ animationDuration: '2s' }} />
+                    <span className="absolute -inset-2 rounded-full border border-violet-500/20 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
+                    <span className="absolute -inset-4 rounded-full border border-violet-500/10 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.6s' }} />
+                  </>
                 )}
                 {isListening ? (
-                  <MicOff className="w-5 h-5 text-white relative z-10" />
+                  <MicOff className="w-6 h-6 text-white relative z-10" />
                 ) : (
-                  <Mic className="w-5 h-5 text-white/60 relative z-10" />
+                  <Mic className="w-6 h-6 text-white/50 relative z-10" />
                 )}
               </motion.button>
             )}
           </AnimatePresence>
+
+          {/* Spacer to balance camera button */}
+          {!showStop && (
+            <div className="w-10 h-10 shrink-0" />
+          )}
         </div>
       </div>
     </div>
