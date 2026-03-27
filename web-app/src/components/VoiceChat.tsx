@@ -383,7 +383,10 @@ export function VoiceChat() {
               const isNextTool = messages[i + 1]?.role === 'tool'
               const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
               const isLastTool = i === lastToolIndex
-              const isExpanded = !expandedTools.has(i) // expanded by default, click to collapse
+              // Only the last tool is auto-expanded; previous ones auto-collapse
+              // Click toggles: expandedTools tracks user overrides
+              const defaultExpanded = isLastTool
+              const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
 
               return (
                 <motion.div

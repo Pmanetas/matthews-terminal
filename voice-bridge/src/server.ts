@@ -177,6 +177,7 @@ interface SpeakMessage { type: 'speak'; text: string; }
 interface WorkspaceMessage { type: 'workspace'; data: { workspace: string; repo: string }; }
 interface ActiveFileMessage { type: 'active_file'; file: string | null; }
 interface StopMessage { type: 'stop'; }
+interface NewSessionMessage { type: 'new_session'; }
 
 type BridgeMessage =
   | IdentifyMessage
@@ -187,7 +188,8 @@ type BridgeMessage =
   | SpeakMessage
   | WorkspaceMessage
   | ActiveFileMessage
-  | StopMessage;
+  | StopMessage
+  | NewSessionMessage;
 
 // ── State ──────────────────────────────────────────────────────────
 
@@ -336,10 +338,8 @@ wss.on('connection', (ws) => {
             existingWs.close();
           }
         }
-        // Extension (re)connected — clear old session history and notify phones
-        messageHistory.length = 0;
-        broadcastToRole('phone', { type: 'clear_history' });
-        console.log(`[${timestamp()}] Cleared message history (extension reconnected)`);
+        // Don't clear history on reconnect — extension may just be recovering from a blip
+        // History is cleared only when extension sends explicit 'new_session' message
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
@@ -395,6 +395,14 @@ wss.on('connection', (ws) => {
         console.log(`[${timestamp()}] Stop command forwarded to extension`);
       }
       state.currentTaskStatus = 'idle';
+      return;
+    }
+
+    // ── Extension signals new session (clear old history) ──────
+    if (role === 'extension' && msg.type === 'new_session') {
+      messageHistory.length = 0;
+      broadcastToRole('phone', { type: 'clear_history' });
+      console.log(`[${timestamp()}] New session — cleared message history`);
       return;
     }
 

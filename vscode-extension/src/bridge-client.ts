@@ -135,6 +135,13 @@ export class BridgeClient {
     }
 
     /**
+     * Signals a new conversation session — bridge clears history, phone clears messages.
+     */
+    sendNewSession(): void {
+        this.send({ type: 'new_session' });
+    }
+
+    /**
      * Sends the currently active file to the bridge.
      */
     sendActiveFile(file: string | null): void {

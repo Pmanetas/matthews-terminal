@@ -106,11 +106,14 @@ export class CommandHandler {
         this.toolCallCount = 0;
         this.hasSeenFirstTool = false;
         this.aborted = false;
+        // Signal new session on first command (clears phone history)
+        if (!this.conversationStarted) {
+            client.sendNewSession();
+        }
+
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}${images?.length ? ` [+${images.length} image(s)]` : ''}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
-
-        // No intermediate speech — only the final result gets TTS
 
         // Save images to temp files so Claude can Read them
         const imageFiles: string[] = [];
