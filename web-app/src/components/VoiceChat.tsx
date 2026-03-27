@@ -422,7 +422,9 @@ export function VoiceChat() {
                         ))}
                       </div>
                     )}
-                    <p className="text-[15px] text-white/50 break-words whitespace-pre-wrap leading-relaxed text-right">{msg.text}</p>
+                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-3">
+                      <p className="text-[15px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                    </div>
                   </div>
                 </div>
               ) : msg.role === 'tool' ? (
