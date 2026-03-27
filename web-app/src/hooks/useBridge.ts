@@ -231,7 +231,11 @@ export function useBridge(onAudioDone?: () => void) {
               setMessages((prev) => [...prev, msg])
             }
           } else if (data.type === 'tool_status') {
-            const msg: Message = { role: 'tool' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+            // Narration text is sent as tool_status with 💬 prefix
+            const isNarration = typeof data.text === 'string' && data.text.startsWith('💬 ')
+            const msg: Message = isNarration
+              ? { role: 'assistant' as const, text: data.text.slice(2), timestamp: Date.now(), replayed: isReplayingRef.current, narration: true }
+              : { role: 'tool' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {

@@ -414,7 +414,7 @@ export function VoiceChat() {
               const content = msg.role === 'user' ? (
                 /* ── User bubble (purple) ── */
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-[70%]">
+                  <div className="max-w-[80%] sm:max-w-[60%] lg:max-w-[45%]">
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
