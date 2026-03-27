@@ -532,10 +532,8 @@ export class CommandHandler {
         }
         this.toolCallCount++;
 
-        // If no narration preceded this tool and it's not the first, queue brief speech
-        if (!hadNarration && this.toolCallCount > 1) {
-            this.queueToolSpeech(this.lastToolDescription, client);
-        }
+        // Tool descriptions are displayed on phone but NOT spoken —
+        // only Claude's narration text gets spoken via flushAndSpeak
 
         // For Read tool: read the actual file and send content preview
         if (toolName === 'Read' && input.file_path) {
@@ -602,7 +600,14 @@ export class CommandHandler {
         // Don't process events after abort
         if (this.aborted) return;
 
-        // Reset idle timer — an event arrived, Claude is active
+        // Suppress noisy system events — don't log, don't reset idle timer
+        if (event.type === 'system' && (event.subtype === 'task_progress' || event.subtype === 'init')) {
+            // Send a "Working..." status to phone so it doesn't look frozen
+            client.sendStatus('Working...');
+            return;
+        }
+
+        // Reset idle timer — a meaningful event arrived
         this.resetIdleTimer(client);
 
         // Log event type only (not full JSON) for cleaner terminal
