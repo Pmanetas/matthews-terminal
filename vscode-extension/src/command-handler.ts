@@ -53,6 +53,9 @@ export class CommandHandler {
     private aborted = false;
     // Track whether streaming events were received (to avoid double-processing with assistant summary)
     private receivedStreamingEvents = false;
+    // Idle timer — shows "working" indicator when no events arrive for a while
+    private idleTimer: ReturnType<typeof setTimeout> | undefined;
+    private idleDotCount = 0;
 
     constructor() {
         this.disposables.push(
@@ -120,6 +123,7 @@ export class CommandHandler {
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}${images?.length ? ` [+${images.length} image(s)]` : ''}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
+        this.resetIdleTimer(client);
 
         // Save images to temp files so Claude can Read them
         const imageFiles: string[] = [];
@@ -159,6 +163,7 @@ export class CommandHandler {
         } finally {
             this.isProcessing = false;
             this.activeProcess = undefined;
+            this.clearIdleTimer();
             if (this.toolSpeechTimer) {
                 clearTimeout(this.toolSpeechTimer);
                 this.toolSpeechTimer = undefined;
@@ -439,6 +444,30 @@ export class CommandHandler {
         }
     }
 
+    /** Reset the idle timer — call this whenever any event arrives from Claude */
+    private resetIdleTimer(client: BridgeClient): void {
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+        }
+        this.idleDotCount = 0;
+        const tick = () => {
+            if (this.aborted || !this.isProcessing) return;
+            this.idleDotCount++;
+            const dots = '.'.repeat((this.idleDotCount % 3) + 1);
+            client.sendStatus(`Working${dots}`);
+            this.idleTimer = setTimeout(tick, 1500);
+        };
+        // Start showing "Working..." after 2s of silence
+        this.idleTimer = setTimeout(tick, 2000);
+    }
+
+    private clearIdleTimer(): void {
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = undefined;
+        }
+    }
+
     /** Flush text to phone, display + speak it, then reset */
     private flushAndSpeak(client: BridgeClient, caller?: string): void {
         this.flushStreamingText(client);
@@ -572,6 +601,9 @@ export class CommandHandler {
     ): void {
         // Don't process events after abort
         if (this.aborted) return;
+
+        // Reset idle timer — an event arrived, Claude is active
+        this.resetIdleTimer(client);
 
         // Log event type only (not full JSON) for cleaner terminal
         if (event.type !== 'assistant' && event.type !== 'user' && event.type !== 'rate_limit_event') {
