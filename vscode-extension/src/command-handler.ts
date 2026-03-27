@@ -221,14 +221,9 @@ export class CommandHandler {
 
                     this.writeEmitter.fire(`\x1b[2m${trimmed.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
 
-                    const toolMsg = this.parseStderrToolCall(trimmed);
-                    if (toolMsg) {
-                        this.flushAndSpeak(client);
-                        this.hasSeenFirstTool = true;
-                        this.lastToolDescription = toolMsg.split('\n')[0];
-                        client.sendToolStatus(toolMsg);
-                        this.toolCallCount++;
-                    }
+                    // stderr tool parsing disabled — stdout stream-json events handle
+                    // tool calls with correct timing. stderr can race ahead of stdout,
+                    // causing flushAndSpeak to find empty text and skip the first narration.
                 }
             });
 
@@ -430,14 +425,16 @@ export class CommandHandler {
     }
 
     /** Flush text to phone, display + speak it, then reset */
-    private flushAndSpeak(client: BridgeClient): void {
+    private flushAndSpeak(client: BridgeClient, caller?: string): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
+        const tag = caller ? `[${caller}]` : '';
         if (text.length > 5) {
-            this.writeEmitter.fire(`\r\n\x1b[35m🔊 Narrating: "${text.slice(0, 60)}..."\x1b[0m\r\n`);
-            // Send as tool_status with 💬 marker — bridge generates TTS from this
+            this.writeEmitter.fire(`\r\n\x1b[35m🔊 ${tag} Narrating: "${text.slice(0, 80)}"\x1b[0m\r\n`);
             client.sendToolStatus(`💬 ${text}`);
             client.sendSpeak(text);
+        } else {
+            this.writeEmitter.fire(`\r\n\x1b[2m🔇 ${tag} flushAndSpeak called but text too short (${text.length} chars): "${text}"\x1b[0m\r\n`);
         }
         this.streamingText = '';
         this.lastFlushedLength = 0;
@@ -470,7 +467,7 @@ export class CommandHandler {
     /** Send a tool call to the phone */
     private emitToolCall(block: any, client: BridgeClient): void {
         const hadNarration = this.streamingText.trim().length > 5;
-        this.flushAndSpeak(client);
+        this.flushAndSpeak(client, 'emitToolCall');
         this.hasSeenFirstTool = true;
         const toolName = block.name || block.tool_name || '';
         const input = block.input || {};
@@ -563,8 +560,11 @@ export class CommandHandler {
         if (event.type === 'assistant' && event.message?.content) {
             // If streaming events already handled this turn, skip to avoid double-processing
             if (this.receivedStreamingEvents) {
+                this.writeEmitter.fire(`\x1b[2m[assistant event SKIPPED — streaming already handled this turn]\x1b[0m\r\n`);
                 return;
             }
+            const blockTypes = event.message.content.map((b: any) => b.type).join(', ');
+            this.writeEmitter.fire(`\x1b[2m[assistant event: ${event.message.content.length} blocks (${blockTypes}), streamingText="${this.streamingText.slice(0, 40)}"]\x1b[0m\r\n`);
             let hasToolsInThisEvent = false;
             for (const block of event.message.content) {
                 if (block.type === 'text') {
@@ -580,7 +580,7 @@ export class CommandHandler {
             }
             // Speak any narration text that follows the last tool_use
             if (hasToolsInThisEvent && this.streamingText.trim().length > 5) {
-                this.flushAndSpeak(client);
+                this.flushAndSpeak(client, 'assistant-trailing');
             }
             return;
         }
@@ -596,7 +596,7 @@ export class CommandHandler {
                     }
                     // Speak any narration that accumulated after the last tool call
                     if (this.streamingText.trim().length > 5) {
-                        this.flushAndSpeak(client);
+                        this.flushAndSpeak(client, 'tool-result');
                     }
                     this.streamingText = '';
                     this.lastFlushedLength = 0;
@@ -632,7 +632,7 @@ export class CommandHandler {
                 this.emitToolCall(event.content_block, client);
                 this.pendingToolName = null;
             } else if (this.pendingToolName) {
-                this.flushAndSpeak(client);
+                this.flushAndSpeak(client, 'streaming-tool-start');
                 const preliminary = this.describeToolCall({ name: this.pendingToolName, input: {} });
                 this.lastToolDescription = preliminary;
                 client.sendToolStatus(preliminary);

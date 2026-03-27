@@ -114,7 +114,13 @@ function setPlaying(v: boolean) {
 
 function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   const queue = _audioQueue
-  if (isPlayingAudio || queue.length === 0 || !sharedAudio) return
+  if (isPlayingAudio || queue.length === 0 || !sharedAudio) {
+    if (isPlayingAudio) console.log('[Audio] playNextAudio skipped — already playing')
+    if (queue.length === 0) console.log('[Audio] playNextAudio skipped — queue empty')
+    return
+  }
+
+  console.log(`[Audio] ▶ Starting playback, queue=${queue.length}`)
 
   // Stop mic BEFORE playing audio so it doesn't pick up Matthew's voice
   _onAudioWillPlay?.()
@@ -126,6 +132,7 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   sharedAudio.volume = 1.0
   sharedAudio.src = item.url
   sharedAudio.onended = () => {
+    console.log(`[Audio] ⏹ Playback ended, remaining=${queue.length}`)
     URL.revokeObjectURL(item.url)
     setPlaying(false)
     if (queue.length > 0) {
@@ -135,11 +142,12 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
     }
   }
   sharedAudio.play().then(() => {
+    console.log('[Audio] ✓ play() succeeded')
     audioStartedForResult = true
     clearResultFallback()
     _onAudioStarted?.()
   }).catch((e) => {
-    console.error('[Audio] Playback failed:', e)
+    console.error('[Audio] ✗ Playback failed:', e)
     URL.revokeObjectURL(item.url)
     setPlaying(false)
     if (queue.length > 0) {
@@ -290,6 +298,7 @@ export function useBridge(onAudioDone?: () => void) {
               const isWav = audioBytes[0] === 0x52 && audioBytes[1] === 0x49 && audioBytes[2] === 0x46 && audioBytes[3] === 0x46
               const blob = new Blob([audioBytes], { type: isWav ? 'audio/wav' : 'audio/mpeg' })
               const url = URL.createObjectURL(blob)
+              console.log(`[Audio] Received ${Math.round(audioBytes.length / 1024)}KB ${isWav ? 'WAV' : 'MP3'}, queue=${audioQueueRef.current.length}, playing=${isPlayingAudio}, final=${!!data.final}`)
               audioQueueRef.current.push({ url, isFinal: !!data.final })
               playNextAudio(onAudioDoneRef)
             } catch (e) {

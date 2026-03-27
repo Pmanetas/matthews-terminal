@@ -434,12 +434,16 @@ wss.on('connection', (ws) => {
 
     // ── Extension sends speak (TTS only, no display) ─────────
     if (role === 'extension' && msg.type === 'speak') {
-      console.log(`[${timestamp()}] SPEAK received: "${(msg.text || '').slice(0, 100)}"`);
+      const phoneCount = [...clients].filter(([w, r]) => r === 'phone' && w.readyState === WebSocket.OPEN).length;
+      console.log(`[${timestamp()}] SPEAK received (${phoneCount} phone(s) online): "${(msg.text || '').slice(0, 100)}"`);
       generateSpeech(msg.text).then((audioBuffer) => {
         if (audioBuffer) {
+          const phoneCountNow = [...clients].filter(([w, r]) => r === 'phone' && w.readyState === WebSocket.OPEN).length;
           const base64 = audioBuffer.toString('base64');
           broadcastToRole('phone', { type: 'audio', data: base64, final: false });
-          console.log(`[${timestamp()}] Sent intermediate TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
+          console.log(`[${timestamp()}] Sent TTS audio (${Math.round(audioBuffer.length / 1024)}KB) to ${phoneCountNow} phone(s)`);
+        } else {
+          console.error(`[${timestamp()}] SPEAK TTS returned null!`);
         }
       }).catch((err: any) => {
         console.error(`[${timestamp()}] SPEAK TTS error:`, err.message);
