@@ -529,7 +529,7 @@ export function VoiceChat() {
       {/* ── Chat messages ── */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
         <div className="flex flex-col gap-3 px-6 py-4 w-full">
@@ -547,10 +547,13 @@ export function VoiceChat() {
               const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
               const isRecent = i >= messages.length - 3
 
+              // Narrations are spoken via TTS but not displayed
+              if (msg.narration) return null
+
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
-                <div className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-[70%]">
+                <div className="flex justify-end min-w-0">
+                  <div className="max-w-[75%] min-w-0">
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
@@ -605,9 +608,7 @@ export function VoiceChat() {
               ) : (
                 /* ── Assistant text ── */
                 <div className="px-1">
-                  {msg.narration ? (
-                    <p className="text-[13px] text-white/40 leading-relaxed italic">{msg.text}</p>
-                  ) : i === lastResultIndex && !msg.replayed ? (
+                  {i === lastResultIndex && !msg.replayed ? (
                     <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
                   ) : (
                     <MarkdownMessage text={msg.text} />
