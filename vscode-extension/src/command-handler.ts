@@ -45,6 +45,8 @@ export class CommandHandler {
     // Only speak one brief update per command when tools start
     private hasSpokenToolUpdate = false;
     private toolCallCount = 0;
+    // Track tool descriptions already sent via stderr (avoid duplicates on stdout)
+    private stderrToolsSent = new Set<string>();
     // Skip speech until first tool call (so Claude's initial "Let me look..." isn't spoken)
     private hasSeenFirstTool = false;
     // Abort flag — prevents result from being sent after stop
@@ -107,6 +109,7 @@ export class CommandHandler {
         this.hasSpokenToolUpdate = false;
         this.toolCallCount = 0;
         this.hasSeenFirstTool = false;
+        this.stderrToolsSent.clear();
         this.aborted = false;
         this.receivedStreamingEvents = false;
         // Signal new session on first command (clears phone history)
@@ -221,9 +224,21 @@ export class CommandHandler {
 
                     this.writeEmitter.fire(`\x1b[2m${trimmed.replace(/\n/g, '\r\n')}\x1b[0m\r\n`);
 
-                    // stderr tool parsing disabled — stdout stream-json events handle
-                    // tool calls with correct timing. stderr can race ahead of stdout,
-                    // causing flushAndSpeak to find empty text and skip the first narration.
+                    // Use stderr tool detection for EARLY status display only (not speech).
+                    // stderr fires before stdout stream-json delivers the complete tool_use
+                    // event, so this fills the gap and prevents perceived pauses.
+                    // Speech is NOT triggered here — stdout handles that correctly.
+                    const toolMsg = this.parseStderrToolCall(trimmed);
+                    if (toolMsg) {
+                        const filePath = toolMsg.match(/(?:Reading|Editing|Creating)\s+(.+)/)?.[1] || '';
+                        // Skip internal tool-results temp files
+                        if (!filePath.includes('tool-results/') && !filePath.includes('tool-results\\')) {
+                            const shortDesc = toolMsg.split('\n')[0];
+                            this.stderrToolsSent.add(shortDesc);
+                            client.sendToolStatus(toolMsg);
+                            this.writeEmitter.fire(`\r\n\x1b[33m${shortDesc}\x1b[0m\r\n`);
+                        }
+                    }
                 }
             });
 
@@ -481,8 +496,11 @@ export class CommandHandler {
 
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
-        this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
-        client.sendToolStatus(msg);
+        // Only send to phone if stderr didn't already send this tool status
+        if (!this.stderrToolsSent.delete(this.lastToolDescription)) {
+            this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
+            client.sendToolStatus(msg);
+        }
         this.toolCallCount++;
 
         // If no narration preceded this tool and it's not the first, queue brief speech
