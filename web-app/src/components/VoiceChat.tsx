@@ -338,6 +338,17 @@ const globalCSS = `
     to { opacity: 1; transform: translateY(0); }
   }
   .msg-fade-in { animation: msgFadeIn 0.25s ease-out; }
+  .user-bubble {
+    margin-left: auto !important;
+    width: fit-content !important;
+    max-width: 75% !important;
+    background: rgb(124, 58, 237) !important;
+    border-radius: 1rem !important;
+    border-bottom-right-radius: 0.375rem !important;
+    padding: 1rem !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
 `
 
 // Track which result texts have already been animated (survives re-renders and remounts)
@@ -578,10 +589,7 @@ export function VoiceChat() {
 
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
-                <div
-                  className="bg-violet-600 rounded-2xl rounded-br-md p-4"
-                  style={{ marginLeft: 'auto', maxWidth: '75%', width: 'fit-content', overflowWrap: 'break-word', wordBreak: 'break-word' as const }}
-                >
+                <div className="user-bubble">
                   {msg.images && msg.images.length > 0 && (
                     <div className="flex gap-2 mb-2 flex-wrap justify-end">
                       {msg.images.map((img, j) => (
