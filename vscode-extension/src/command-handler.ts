@@ -594,10 +594,16 @@ export class CommandHandler {
                         const preview = output.length > 200 ? output.slice(0, 200) + '...' : output;
                         this.writeEmitter.fire(`\x1b[2m   ${preview.replace(/\n/g, '\r\n   ')}\x1b[0m\r\n`);
                     }
+                    // Speak any narration that accumulated after the last tool call
+                    if (this.streamingText.trim().length > 5) {
+                        this.flushAndSpeak(client);
+                    }
                     this.streamingText = '';
                     this.lastFlushedLength = 0;
                 }
             }
+            // Reset for next assistant turn so we don't skip it
+            this.receivedStreamingEvents = false;
             return;
         }
 
