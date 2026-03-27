@@ -107,21 +107,31 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
 }
 
 function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: boolean; onUpdate?: () => void }) {
-  const [chars, setChars] = useState(animate ? 0 : text.length)
+  // Skip animation entirely if this text was already shown
+  const alreadyDone = animatedTexts.has(text)
+  const [chars, setChars] = useState(animate && !alreadyDone ? 0 : text.length)
   const prevTextRef = useRef(text)
   const rafRef = useRef(0)
   const waitingForAudio = useRef(true)
   const fallbackStartRef = useRef(0)
 
   useEffect(() => {
-    if (!animate) { setChars(text.length); return }
+    if (!animate || alreadyDone) { setChars(text.length); return }
     if (text !== prevTextRef.current) {
       prevTextRef.current = text
+      if (animatedTexts.has(text)) { setChars(text.length); return }
       setChars(0)
       waitingForAudio.current = true
       fallbackStartRef.current = 0
     }
-  }, [text, animate])
+  }, [text, animate, alreadyDone])
+
+  // Mark text as animated once complete
+  useEffect(() => {
+    if (chars >= text.length && text.length > 0) {
+      animatedTexts.add(text)
+    }
+  }, [chars, text])
 
   // Listen for audio start
   useEffect(() => {
@@ -323,7 +333,15 @@ const globalCSS = `
   .no-scrollbar { scrollbar-width: none; }
   * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
+  @keyframes msgFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg-fade-in { animation: msgFadeIn 0.25s ease-out; }
 `
+
+// Track which result texts have already been animated (survives re-renders and remounts)
+const animatedTexts = new Set<string>()
 
 // ── Main Component ───────────────────────────────────────────────
 
@@ -562,7 +580,7 @@ export function VoiceChat() {
                 /* ── User bubble — flush right ── */
                 <div
                   className="bg-violet-600 rounded-2xl rounded-br-md p-4"
-                  style={{ marginLeft: '25%', overflowWrap: 'break-word', wordBreak: 'break-word' as const }}
+                  style={{ marginLeft: 'auto', maxWidth: '75%', width: 'fit-content', overflowWrap: 'break-word', wordBreak: 'break-word' as const }}
                 >
                   {msg.images && msg.images.length > 0 && (
                     <div className="flex gap-2 mb-2 flex-wrap justify-end">
@@ -624,16 +642,8 @@ export function VoiceChat() {
               )
 
               return (
-                <div key={i} className="min-w-0 overflow-hidden">
-                  {isRecent && !msg.replayed ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, ease: 'easeOut' }}
-                    >
-                      {content}
-                    </motion.div>
-                  ) : content}
+                <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>
+                  {content}
                 </div>
               )
             })
