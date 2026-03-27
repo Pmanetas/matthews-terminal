@@ -15,6 +15,7 @@ function getShortPath(uri: vscode.Uri): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+    console.log('[Matthews Terminal] Extension v0.3.0 activated');
     // Create status bar item (bottom left, high priority to appear leftward)
     statusBarItem = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Left,

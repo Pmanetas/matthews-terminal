@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(rm -f .gitkeep)",
+      "Bash(npm init:*)",
+      "Bash(npx vite:*)",
+      "WebFetch(domain:21st.dev)",
+      "Bash(npx tsc:*)",
+      "Bash(gh auth:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI\")",
+      "Bash(gh repo:*)",
+      "Bash(curl -s https://matthews-terminal.onrender.com/health)",
+      "Bash(npm run:*)",
+      "Bash(npx @vscode/vsce package --no-dependencies)",
+      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.1.0.vsix\")",
+      "Bash(curl -s https://matthews-terminal.onrender.com/state)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5176)",
+      "Bash(code --install-extension \"/c/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.1.0.vsix\" --force)",
+      "Bash(code --list-extensions)",
+      "Bash(where claude:*)",
+      "Bash(claude --print \"say hello in one sentence\")",
+      "Bash(code --install-extension \"./matthews-terminal-0.1.0.vsix\" --force)",
+      "Bash(code --install-extension \"/c/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.1.1.vsix\" --force)",
+      "Bash(code --uninstall-extension undefined_publisher.matthews-terminal)",
+      "Bash(code --uninstall-extension pmanetas.matthews-terminal)",
+      "Bash(code --install-extension matthews-terminal-0.1.2.vsix --force)",
+      "Bash(code --install-extension \"/c/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.1.2.vsix\" --force)",
+      "Bash(code --install-extension \"/c/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.1.3.vsix\" --force)",
+      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.1.9.vsix\" --force)",
+      "Bash(xxd 'c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/voice-bridge/setup-piper.sh')",
+      "Bash(gh release:*)",
+      "WebFetch(domain:api.github.com)",
+      "WebSearch",
+      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.2.0.vsix\" --force)",
+      "Bash(npm list:*)",
+      "Bash(claude --version)",
+      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.2.1.vsix\" --force)",
+      "Bash(npx vsce:*)",
+      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.3.0.vsix\" --force)"
+    ]
+  }
+}

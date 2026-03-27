@@ -46,6 +46,29 @@ function cleanTextForTTS(text: string): string {
     .slice(0, 4000);
 }
 
+/** Wrap raw PCM (24kHz 16-bit mono) in a WAV container, with optional silence prepended */
+function pcmToWav(pcm: Buffer, sampleRate: number, silenceMs = 0): Buffer {
+  const silenceSamples = Math.floor(sampleRate * silenceMs / 1000);
+  const silenceBytes = silenceSamples * 2; // 16-bit
+  const dataSize = silenceBytes + pcm.length;
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);       // chunk size
+  header.writeUInt16LE(1, 20);        // PCM
+  header.writeUInt16LE(1, 22);        // mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  header.writeUInt16LE(2, 32);        // block align
+  header.writeUInt16LE(16, 34);       // bits per sample
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+  const silence = Buffer.alloc(silenceBytes, 0);
+  return Buffer.concat([header, silence, pcm]);
+}
+
 async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
   if (!OPENAI_API_KEY) return null;
 
@@ -63,7 +86,7 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
         model: 'tts-1',
         voice: 'onyx',
         input: ttsText,
-        response_format: 'mp3',
+        response_format: 'pcm',  // raw 24kHz 16-bit mono
         speed: 1.12,
       }),
     });
@@ -74,9 +97,11 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
       return null;
     }
 
-    const buffer = Buffer.from(await res.arrayBuffer());
-    console.log(`[${timestamp()}] OpenAI TTS: ${ttsText.length} chars → ${Math.round(buffer.length / 1024)}KB MP3`);
-    return buffer;
+    const pcmBuffer = Buffer.from(await res.arrayBuffer());
+    // Prepend 600ms of silence so iOS audio hardware wakes up before speech starts
+    const wavBuffer = pcmToWav(pcmBuffer, 24000, 600);
+    console.log(`[${timestamp()}] OpenAI TTS: ${ttsText.length} chars → ${Math.round(wavBuffer.length / 1024)}KB WAV (with 600ms silence)`);
+    return wavBuffer;
   } catch (err: any) {
     console.error(`[${timestamp()}] OpenAI TTS error:`, err.message);
     return null;
