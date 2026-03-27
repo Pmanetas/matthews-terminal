@@ -287,6 +287,7 @@ export function VoiceChat() {
       if (msg || pendingImages.length > 0) {
         hasSentRef.current = true
         userScrolledRef.current = false
+        setExpandedTools(new Set())
         stopListening()
         sendCommand(
           msg || 'What do you see in this image?',
@@ -304,6 +305,7 @@ export function VoiceChat() {
     if ((pendingMessage || pendingImages.length > 0) && !hasSentRef.current) {
       hasSentRef.current = true
       userScrolledRef.current = false
+      setExpandedTools(new Set())
       sendCommand(
         pendingMessage || 'What do you see in this image?',
         pendingImages.length > 0 ? pendingImages : undefined

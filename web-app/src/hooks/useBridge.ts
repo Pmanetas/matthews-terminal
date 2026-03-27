@@ -56,7 +56,35 @@ export function unlockAudio() {
 if (typeof document !== 'undefined') {
   document.addEventListener('touchstart', unlockAudio, { once: false })
   document.addEventListener('click', unlockAudio, { once: false })
+
+  // iOS suspends AudioContext and pauses audio when page goes to background.
+  // When returning: resume the context, unstick the playing state, and restart the queue.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return
+    // Resume suspended AudioContext
+    audioContext?.resume()
+    if (!sharedAudio) return
+
+    if (isPlayingAudio) {
+      // Audio was playing when iOS suspended us — try to resume it
+      if (sharedAudio.paused && sharedAudio.src) {
+        sharedAudio.play().catch(() => {
+          // Can't resume (iOS requires gesture) — skip to next or unstick
+          setPlaying(false)
+          if (_audioQueue.length > 0) {
+            playNextAudio(_fallbackAudioDoneRef)
+          }
+        })
+      }
+    } else if (_audioQueue.length > 0) {
+      // Queue built up while backgrounded — start draining
+      playNextAudio(_fallbackAudioDoneRef)
+    }
+  })
 }
+
+// Fallback ref for visibility-change-triggered playback
+const _fallbackAudioDoneRef: { current: (() => void) | undefined } = { current: undefined }
 
 function getWsUrl(): string {
   if (import.meta.env.VITE_BRIDGE_URL) return import.meta.env.VITE_BRIDGE_URL
@@ -151,6 +179,7 @@ export function useBridge(onAudioDone?: () => void) {
   const replayBufferRef = useRef<Message[]>([])
   const onAudioDoneRef = useRef(onAudioDone)
   onAudioDoneRef.current = onAudioDone
+  _fallbackAudioDoneRef.current = onAudioDone
   const audioQueueRef = useRef(_audioQueue)
 
   const connect = useCallback(() => {
