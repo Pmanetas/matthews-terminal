@@ -62,7 +62,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             className="overflow-hidden"
           >
             <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.06] bg-black/40">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
                   const code = trimmed.replace(/^[⊖⊕]\s*/, '')
@@ -123,10 +123,10 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     }
   }, [text, animate])
 
-  // Wait up to 8s for audio to start before showing text anyway
+  // Wait up to 3s for audio to start before showing text anyway
   useEffect(() => {
     if (!animate) return
-    const timeout = setTimeout(() => { audioTimedOut.current = true }, 8000)
+    const timeout = setTimeout(() => { audioTimedOut.current = true }, 3000)
     return () => clearTimeout(timeout)
   }, [text, animate])
 
@@ -226,6 +226,15 @@ export function VoiceChat() {
     el.addEventListener('scroll', handleScroll, { passive: true })
     return () => el.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // Clear stale expanded tools when messages get replaced (replay/clear)
+  const prevMsgLenRef = useRef(messages.length)
+  useEffect(() => {
+    if (messages.length < prevMsgLenRef.current) {
+      setExpandedTools(new Set())
+    }
+    prevMsgLenRef.current = messages.length
+  }, [messages.length])
 
   const isProcessing = isWaiting || (messages.length > 0 && messages[messages.length - 1].role !== 'assistant')
 
@@ -432,8 +441,8 @@ export function VoiceChat() {
                         ))}
                       </div>
                     )}
-                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-2.5">
-                      <p className="text-[13px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-3">
+                      <p className="text-[15px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                     </div>
                   </div>
                 </div>

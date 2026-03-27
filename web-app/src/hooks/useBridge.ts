@@ -212,15 +212,19 @@ export function useBridge(onAudioDone?: () => void) {
             return
           } else if (data.type === 'replay_end') {
             isReplayingRef.current = false
-            // Apply all replayed messages in one batch — no animations
             const buffered = replayBufferRef.current
             replayBufferRef.current = []
             if (buffered.length > 0) {
-              setMessages(buffered)
+              // Merge replay with any locally-added messages (preserve user's current input)
+              setMessages((prev) => {
+                const local = prev.filter(m => !m.replayed)
+                return [...buffered, ...local]
+              })
             }
             return
           } else if (data.type === 'clear_history') {
-            setMessages([])
+            // Only clear replayed messages — keep locally-sent ones
+            setMessages((prev) => prev.filter(m => !m.replayed))
             setIsWaiting(false)
             return
           } else if (data.type === 'user_command') {
