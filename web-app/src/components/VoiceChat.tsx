@@ -215,6 +215,20 @@ export function VoiceChat() {
 
   autoListenRef.current = startListening
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const userScrolledRef = useRef(false)
+
+  // Detect when user scrolls up — pause auto-scroll
+  useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const handleScroll = () => {
+      const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+      userScrolledRef.current = !isAtBottom
+    }
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const isProcessing = isWaiting || (messages.length > 0 && messages[messages.length - 1].role !== 'assistant')
 
@@ -234,13 +248,19 @@ export function VoiceChat() {
   // Only show spinner if the last tool is from the current command (after last user message)
   const isCurrentToolLoading = isProcessing && lastToolIndex > lastUserIndex
 
-  const lastAssistantIndex = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'assistant') return i }
+  // Find the last result (non-narration assistant message) for typing animation
+  const lastResultIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'assistant' && !messages[i].narration) return i }
     return -1
   })()
 
+  // Collapse all tools once the result arrives
+  const hasResultAfterTools = lastResultIndex > lastToolIndex
+
   const scrollToBottom = useCallback(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'instant' })
+    if (!userScrolledRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'instant' })
+    }
   }, [])
 
   useEffect(() => { scrollToBottom() }, [messages, expandedTools, scrollToBottom])
@@ -269,6 +289,7 @@ export function VoiceChat() {
       const msg = trimmed.replace(/\bsend\s*[.!]?\s*$/i, '').trim()
       if (msg || pendingImages.length > 0) {
         hasSentRef.current = true
+        userScrolledRef.current = false
         stopListening()
         sendCommand(
           msg || 'What do you see in this image?',
@@ -285,6 +306,7 @@ export function VoiceChat() {
   const handleSend = () => {
     if ((pendingMessage || pendingImages.length > 0) && !hasSentRef.current) {
       hasSentRef.current = true
+      userScrolledRef.current = false
       sendCommand(
         pendingMessage || 'What do you see in this image?',
         pendingImages.length > 0 ? pendingImages : undefined
@@ -369,6 +391,7 @@ export function VoiceChat() {
 
       {/* ── Chat messages ── */}
       <div
+        ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
@@ -383,9 +406,9 @@ export function VoiceChat() {
               const isNextTool = messages[i + 1]?.role === 'tool'
               const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
               const isLastTool = i === lastToolIndex
-              // Only the last tool is auto-expanded; previous ones auto-collapse
+              // Only the last tool is auto-expanded; collapse when result arrives
               // Click toggles: expandedTools tracks user overrides
-              const defaultExpanded = isLastTool
+              const defaultExpanded = isLastTool && !hasResultAfterTools
               const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
 
               return (
@@ -396,7 +419,7 @@ export function VoiceChat() {
                   transition={{ duration: 0.25, ease: 'easeOut' }}
                 >
                   {msg.role === 'user' ? (
-                    /* ── User text (no bubble) ── */
+                    /* ── User bubble (purple) ── */
                     <div className="flex justify-end">
                       <div className="max-w-[85%] sm:max-w-[70%]">
                         {msg.images && msg.images.length > 0 && (
@@ -416,7 +439,9 @@ export function VoiceChat() {
                             ))}
                           </div>
                         )}
-                        <p className="text-[13px] text-white/50 break-words whitespace-pre-wrap leading-relaxed text-right">{msg.text}</p>
+                        <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-2.5">
+                          <p className="text-[13px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        </div>
                       </div>
                     </div>
                   ) : msg.role === 'tool' ? (
@@ -452,9 +477,12 @@ export function VoiceChat() {
                       </motion.div>
                     </motion.div>
                   ) : (
-                    /* ── Assistant text (no bubble) ── */
+                    /* ── Assistant text ── */
                     <div className="px-1">
-                      {i === lastAssistantIndex && !msg.replayed ? (
+                      {msg.narration ? (
+                        /* Narration: lighter, no typing animation */
+                        <p className="text-[13px] text-white/40 leading-relaxed italic">{msg.text}</p>
+                      ) : i === lastResultIndex && !msg.replayed ? (
                         <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
                       ) : (
                         <MarkdownMessage text={msg.text} />

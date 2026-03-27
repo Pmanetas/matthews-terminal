@@ -426,14 +426,14 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, speak it (only after first tool call), then reset */
+    /** Flush text to phone, display + speak it (only after first tool call), then reset */
     private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
         if (text.length > 5) {
             if (this.hasSeenFirstTool) {
-                console.log(`[CommandHandler] Speaking narration: "${text.slice(0, 80)}..."`);
-                client.sendSpeak(text);
+                console.log(`[CommandHandler] Narration: "${text.slice(0, 80)}..."`);
+                client.sendNarration(text);
             } else {
                 console.log(`[CommandHandler] SKIPPED speech (before first tool): "${text.slice(0, 80)}..."`);
             }
@@ -468,6 +468,7 @@ export class CommandHandler {
 
     /** Send a tool call to the phone */
     private emitToolCall(block: any, client: BridgeClient): void {
+        const hadNarration = this.streamingText.trim().length > 5;
         this.flushAndSpeak(client);
         this.hasSeenFirstTool = true;
         const toolName = block.name || block.tool_name || '';
@@ -477,6 +478,11 @@ export class CommandHandler {
         this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
         client.sendToolStatus(msg);
         this.toolCallCount++;
+
+        // If no narration preceded this tool and it's not the first, queue brief speech
+        if (!hadNarration && this.toolCallCount > 1) {
+            this.queueToolSpeech(this.lastToolDescription, client);
+        }
 
         // For Read tool: read the actual file and send content preview
         if (toolName === 'Read' && input.file_path) {

@@ -208,6 +208,13 @@ export function useBridge(onAudioDone?: () => void) {
             } else {
               setMessages((prev) => [...prev, msg])
             }
+          } else if (data.type === 'narration') {
+            const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, narration: true }
+            if (isReplayingRef.current) {
+              replayBufferRef.current.push(msg)
+            } else {
+              setMessages((prev) => [...prev, msg])
+            }
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {

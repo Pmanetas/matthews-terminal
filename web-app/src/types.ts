@@ -15,4 +15,5 @@ export interface Message {
   streaming?: boolean
   images?: ImageAttachment[]
   replayed?: boolean
+  narration?: boolean
 }

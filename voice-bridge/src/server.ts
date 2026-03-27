@@ -178,6 +178,7 @@ interface WorkspaceMessage { type: 'workspace'; data: { workspace: string; repo:
 interface ActiveFileMessage { type: 'active_file'; file: string | null; }
 interface StopMessage { type: 'stop'; }
 interface NewSessionMessage { type: 'new_session'; }
+interface NarrationMessage { type: 'narration'; text: string; }
 
 type BridgeMessage =
   | IdentifyMessage
@@ -189,7 +190,8 @@ type BridgeMessage =
   | WorkspaceMessage
   | ActiveFileMessage
   | StopMessage
-  | NewSessionMessage;
+  | NewSessionMessage
+  | NarrationMessage;
 
 // ── State ──────────────────────────────────────────────────────────
 
@@ -420,7 +422,25 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension sends speak (intermediate TTS) ─────────────
+    // ── Extension sends narration (displayed on phone + TTS) ──
+    if (role === 'extension' && msg.type === 'narration') {
+      console.log(`[${timestamp()}] NARRATION: "${(msg.text || '').slice(0, 100)}"`);
+      const narrationEntry = { type: 'narration', text: msg.text };
+      pushHistory(narrationEntry);
+      broadcastToRole('phone', narrationEntry);
+
+      // Generate TTS in background
+      generateSpeech(msg.text).then((audioBuffer) => {
+        if (audioBuffer) {
+          const base64 = audioBuffer.toString('base64');
+          broadcastToRole('phone', { type: 'audio', data: base64, final: false });
+          console.log(`[${timestamp()}] Sent narration TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
+        }
+      });
+      return;
+    }
+
+    // ── Extension sends speak (TTS only, no display) ─────────
     if (role === 'extension' && msg.type === 'speak') {
       console.log(`[${timestamp()}] SPEAK received: "${(msg.text || '').slice(0, 100)}"`);
       generateSpeech(msg.text).then((audioBuffer) => {

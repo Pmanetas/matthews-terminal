@@ -121,10 +121,18 @@ export class BridgeClient {
     }
 
     /**
-     * Sends text to be spoken via TTS immediately (intermediate speech).
+     * Sends text to be spoken via TTS immediately (intermediate speech, no display).
      */
     sendSpeak(text: string): void {
         this.send({ type: 'speak', text });
+    }
+
+    /**
+     * Sends narration text — displayed on phone AND spoken via TTS.
+     * Used for Claude's natural narration between tool calls.
+     */
+    sendNarration(text: string): void {
+        this.send({ type: 'narration', text });
     }
 
     /**
