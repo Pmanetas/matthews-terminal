@@ -560,29 +560,28 @@ export function VoiceChat() {
 
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
-                <div className="w-full overflow-hidden" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <div style={{ maxWidth: 'min(75%, calc(100vw - 48px))' }}>
-                    {msg.images && msg.images.length > 0 && (
-                      <div className="flex gap-2 mb-2 flex-wrap justify-end">
-                        {msg.images.map((img, j) => (
-                          img.data ? (
-                            <img
-                              key={j}
-                              src={`data:${img.mimeType};base64,${img.data}`}
-                              className="w-28 h-28 rounded-lg object-cover border border-white/10"
-                            />
-                          ) : (
-                            <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
-                              <Camera className="w-6 h-6 text-white/20" />
-                            </div>
-                          )
-                        ))}
-                      </div>
-                    )}
-                    <div className="bg-violet-600 rounded-2xl rounded-br-md p-4">
-                      <p className="text-[15px] text-white leading-relaxed" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{msg.text}</p>
+                <div
+                  className="bg-violet-600 rounded-2xl rounded-br-md p-4"
+                  style={{ marginLeft: '25%', overflowWrap: 'break-word', wordBreak: 'break-word' as const }}
+                >
+                  {msg.images && msg.images.length > 0 && (
+                    <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                      {msg.images.map((img, j) => (
+                        img.data ? (
+                          <img
+                            key={j}
+                            src={`data:${img.mimeType};base64,${img.data}`}
+                            className="w-28 h-28 rounded-lg object-cover border border-white/10"
+                          />
+                        ) : (
+                          <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
+                            <Camera className="w-6 h-6 text-white/20" />
+                          </div>
+                        )
+                      ))}
                     </div>
-                  </div>
+                  )}
+                  <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
                 </div>
               ) : msg.role === 'tool' ? (
                 /* ── Tool call ── */
@@ -624,18 +623,18 @@ export function VoiceChat() {
                 </div>
               )
 
-              return isRecent && !msg.replayed ? (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: 'easeOut' }}
-                  className="min-w-0 overflow-hidden"
-                >
-                  {content}
-                </motion.div>
-              ) : (
-                <div key={i} className="min-w-0 overflow-hidden">{content}</div>
+              return (
+                <div key={i} className="min-w-0 overflow-hidden">
+                  {isRecent && !msg.replayed ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                    >
+                      {content}
+                    </motion.div>
+                  ) : content}
+                </div>
               )
             })
           )}

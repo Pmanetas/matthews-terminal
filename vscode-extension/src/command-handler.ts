@@ -49,6 +49,8 @@ export class CommandHandler {
     private hasSeenFirstTool = false;
     // Abort flag — prevents result from being sent after stop
     private aborted = false;
+    // Track whether streaming events were received (to avoid double-processing with assistant summary)
+    private receivedStreamingEvents = false;
 
     constructor() {
         this.disposables.push(
@@ -106,6 +108,7 @@ export class CommandHandler {
         this.toolCallCount = 0;
         this.hasSeenFirstTool = false;
         this.aborted = false;
+        this.receivedStreamingEvents = false;
         // Signal new session on first command (clears phone history)
         if (!this.conversationStarted) {
             client.sendNewSession();
@@ -558,6 +561,11 @@ export class CommandHandler {
 
         // ── Assistant message (each content block comes as a separate event) ──
         if (event.type === 'assistant' && event.message?.content) {
+            // If streaming events already handled this turn, skip to avoid double-processing
+            if (this.receivedStreamingEvents) {
+                return;
+            }
+            let hasToolsInThisEvent = false;
             for (const block of event.message.content) {
                 if (block.type === 'text') {
                     onText(block.text);
@@ -565,9 +573,14 @@ export class CommandHandler {
                     this.writeEmitter.fire(`\x1b[36m${block.text.replace(/\n/g, '\r\n')}\x1b[0m`);
                     this.flushStreamingText(client);
                 } else if (block.type === 'tool_use') {
+                    hasToolsInThisEvent = true;
                     this.emitToolCall(block, client);
                 }
                 // Skip thinking blocks silently
+            }
+            // Speak any narration text that follows the last tool_use
+            if (hasToolsInThisEvent && this.streamingText.trim().length > 5) {
+                this.flushAndSpeak(client);
             }
             return;
         }
@@ -589,6 +602,9 @@ export class CommandHandler {
         }
 
         // ── Streaming text deltas ───────────────────────────────
+        if (event.type === 'content_block_delta' || event.type === 'content_block_start' || event.type === 'content_block_stop') {
+            this.receivedStreamingEvents = true;
+        }
         if (event.type === 'content_block_delta') {
             if (event.delta?.type === 'text_delta' && event.delta.text) {
                 onText(event.delta.text);
