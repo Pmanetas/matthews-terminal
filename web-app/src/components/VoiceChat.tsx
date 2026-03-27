@@ -560,8 +560,8 @@ export function VoiceChat() {
 
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
-                <div className="flex justify-end w-full min-w-0 overflow-hidden">
-                  <div className="max-w-[75%] min-w-0 shrink-0">
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ maxWidth: '75%' }}>
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
