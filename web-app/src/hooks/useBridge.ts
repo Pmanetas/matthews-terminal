@@ -148,6 +148,7 @@ export function useBridge(onAudioDone?: () => void) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isReplayingRef = useRef(false)
+  const replayBufferRef = useRef<Message[]>([])
   const onAudioDoneRef = useRef(onAudioDone)
   onAudioDoneRef.current = onAudioDone
   const audioQueueRef = useRef(_audioQueue)
@@ -178,20 +179,35 @@ export function useBridge(onAudioDone?: () => void) {
           const data = JSON.parse(event.data)
           if (data.type === 'replay_start') {
             isReplayingRef.current = true
+            replayBufferRef.current = []
             return
           } else if (data.type === 'replay_end') {
             isReplayingRef.current = false
+            // Apply all replayed messages in one batch — no animations
+            const buffered = replayBufferRef.current
+            replayBufferRef.current = []
+            if (buffered.length > 0) {
+              setMessages(buffered)
+            }
+            return
+          } else if (data.type === 'clear_history') {
+            setMessages([])
+            setIsWaiting(false)
             return
           } else if (data.type === 'user_command') {
-            setMessages((prev) => [
-              ...prev,
-              { role: 'user' as const, text: data.text, timestamp: Date.now() },
-            ])
+            const msg: Message = { role: 'user' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+            if (isReplayingRef.current) {
+              replayBufferRef.current.push(msg)
+            } else {
+              setMessages((prev) => [...prev, msg])
+            }
           } else if (data.type === 'tool_status') {
-            setMessages((prev) => [
-              ...prev,
-              { role: 'tool' as const, text: data.text, timestamp: Date.now() },
-            ])
+            const msg: Message = { role: 'tool' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+            if (isReplayingRef.current) {
+              replayBufferRef.current.push(msg)
+            } else {
+              setMessages((prev) => [...prev, msg])
+            }
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {
@@ -199,10 +215,12 @@ export function useBridge(onAudioDone?: () => void) {
               audioStartedForResult = false
             }
             setIsWaiting(false)
-            setMessages((prev) => [
-              ...prev,
-              { role: 'assistant' as const, text: data.text, timestamp: Date.now() },
-            ])
+            const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+            if (isReplayingRef.current) {
+              replayBufferRef.current.push(msg)
+            } else {
+              setMessages((prev) => [...prev, msg])
+            }
           } else if (data.type === 'workspace') {
             setWorkspace(data.workspace || data.repo || null)
           } else if (data.type === 'active_file') {

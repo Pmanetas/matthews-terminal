@@ -47,6 +47,10 @@ export class CommandHandler {
     private toolCallCount = 0;
     // Skip speech until first tool call (so Claude's initial "Let me look..." isn't spoken)
     private hasSeenFirstTool = false;
+    // Abort flag — prevents result from being sent after stop
+    private aborted = false;
+    // Track if we've already seen the initial assistant event (to skip duplicates)
+    private seenAssistantEvent = false;
 
     constructor() {
         this.disposables.push(
@@ -59,11 +63,12 @@ export class CommandHandler {
     }
 
     /** Abort the current command — kills the Claude process tree */
-    abortCommand(_client: BridgeClient): void {
+    abortCommand(client: BridgeClient): void {
         if (!this.isProcessing || !this.activeProcess) {
             return;
         }
         console.log('[CommandHandler] Aborting active command');
+        this.aborted = true;
         const pid = this.activeProcess.pid;
         if (pid) {
             if (process.platform === 'win32') {
@@ -78,6 +83,8 @@ export class CommandHandler {
         this.streamingText = '';
         this.lastFlushedLength = 0;
         this.writeEmitter.fire('\r\n\x1b[33m⛔ Stopped\x1b[0m\r\n');
+        // Notify phone immediately so it stops the spinner
+        client.sendResult('Stopped.');
     }
 
     async handleCommand(text: string, client: BridgeClient, images?: ImageData[]): Promise<void> {
@@ -100,6 +107,8 @@ export class CommandHandler {
         this.hasSpokenToolUpdate = false;
         this.toolCallCount = 0;
         this.hasSeenFirstTool = false;
+        this.aborted = false;
+        this.seenAssistantEvent = false;
         this.writeEmitter.fire(`\r\n\x1b[35m🎤 You:\x1b[0m ${text}${images?.length ? ` [+${images.length} image(s)]` : ''}\r\n`);
         this.writeEmitter.fire(`\x1b[2m⏳ Claude is thinking...\x1b[0m\r\n\r\n`);
         client.sendStatus('Thinking...');
@@ -125,14 +134,22 @@ export class CommandHandler {
 
         try {
             await this.runClaude(text, client, imageFiles);
-            this.writeEmitter.fire('\r\n');
-            const finalText = this.streamingText.trim() || 'Done';
-            console.log(`[CommandHandler] Sending RESULT: "${finalText.slice(0, 100)}..."`);
-            client.sendResult(finalText);
+            if (this.aborted) {
+                console.log('[CommandHandler] Command was aborted, skipping result');
+            } else {
+                this.writeEmitter.fire('\r\n');
+                const finalText = this.streamingText.trim() || 'Done';
+                console.log(`[CommandHandler] Sending RESULT: "${finalText.slice(0, 100)}..."`);
+                client.sendResult(finalText);
+            }
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            this.writeEmitter.fire(`\r\n\x1b[31m❌ Error: ${msg}\x1b[0m\r\n`);
-            client.sendResult(`Error: ${msg}`);
+            if (this.aborted) {
+                console.log('[CommandHandler] Command was aborted (error path), skipping result');
+            } else {
+                const msg = err instanceof Error ? err.message : String(err);
+                this.writeEmitter.fire(`\r\n\x1b[31m❌ Error: ${msg}\x1b[0m\r\n`);
+                client.sendResult(`Error: ${msg}`);
+            }
         } finally {
             this.isProcessing = false;
             this.activeProcess = undefined;
@@ -204,6 +221,7 @@ export class CommandHandler {
                     const toolMsg = this.parseStderrToolCall(trimmed);
                     if (toolMsg) {
                         this.flushAndSpeak(client);
+                        this.hasSeenFirstTool = true;
                         this.lastToolDescription = toolMsg.split('\n')[0];
                         client.sendToolStatus(toolMsg);
                         this.toolCallCount++;
@@ -462,8 +480,19 @@ export class CommandHandler {
 
         // For Read tool: read the actual file and send content preview
         if (toolName === 'Read' && input.file_path) {
+            // Skip Claude CLI internal temp files like "tool-results/xxx.txt"
+            if (input.file_path.includes('tool-results/') || input.file_path.includes('tool-results\\')) {
+                return;
+            }
             try {
-                const content = fs.readFileSync(input.file_path, 'utf-8');
+                // Try absolute path first, then resolve relative to workspace
+                let filePath = input.file_path;
+                if (!path.isAbsolute(filePath)) {
+                    const workspaceFolders = vscode.workspace.workspaceFolders;
+                    const cwd = workspaceFolders?.[0]?.uri.fsPath || process.cwd();
+                    filePath = path.join(cwd, filePath);
+                }
+                const content = fs.readFileSync(filePath, 'utf-8');
                 const allLines = content.split('\n');
                 const offset = input.offset ? parseInt(input.offset) - 1 : 0;
                 const limit = input.limit ? parseInt(input.limit) : 40;
@@ -515,12 +544,21 @@ export class CommandHandler {
         client: BridgeClient,
         onText: (text: string) => void,
     ): void {
+        // Don't process events after abort
+        if (this.aborted) return;
+
         // Log every event type to terminal for debugging
         const eventPreview = JSON.stringify(event).slice(0, 300);
         this.writeEmitter.fire(`\x1b[2m[event] ${eventPreview}\x1b[0m\r\n`);
 
-        // ── Text content ────────────────────────────────────────
+        // ── Text content (initial assistant event) ────────────────
+        // Only process the FIRST assistant event — subsequent ones may contain
+        // duplicate text that was already streamed via content_block_delta events
         if (event.type === 'assistant' && event.message?.content) {
+            if (this.seenAssistantEvent) {
+                return; // Skip duplicate assistant events
+            }
+            this.seenAssistantEvent = true;
             for (const block of event.message.content) {
                 if (block.type === 'text') {
                     onText(block.text);
@@ -575,10 +613,8 @@ export class CommandHandler {
                         input = JSON.parse(this.pendingToolInput);
                     }
                 } catch { /* partial JSON */ }
-                const msg = this.describeToolCall({ name: this.pendingToolName, input });
-                this.lastToolDescription = msg.split('\n')[0];
-                this.writeEmitter.fire(`\r\n\x1b[33m${msg}\x1b[0m\r\n`);
-                client.sendToolStatus(msg);
+                // Use emitToolCall for the full detailed output (file content, diffs, etc.)
+                this.emitToolCall({ name: this.pendingToolName, input }, client);
                 this.pendingToolName = null;
                 this.pendingToolInput = '';
             }
@@ -667,8 +703,18 @@ export class CommandHandler {
                 }
                 return msg;
             }
-            case 'Write':
-                return `Creating ${shortPath}`;
+            case 'Write': {
+                let msg = `Creating ${shortPath}`;
+                if (input.content) {
+                    const writeLines = input.content.trim().split('\n');
+                    const showLines = writeLines.slice(0, 12);
+                    for (const line of showLines) {
+                        msg += `\n  ⊕ ${line}`;
+                    }
+                    if (writeLines.length > 12) msg += `\n  ⊕ ... (${writeLines.length - 12} more lines)`;
+                }
+                return msg;
+            }
             case 'Bash': {
                 const cmd = (input.command || '').trim();
                 const short = cmd.length > 80 ? cmd.slice(0, 80) + '...' : cmd;

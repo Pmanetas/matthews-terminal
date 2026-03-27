@@ -336,6 +336,10 @@ wss.on('connection', (ws) => {
             existingWs.close();
           }
         }
+        // Extension (re)connected — clear old session history and notify phones
+        messageHistory.length = 0;
+        broadcastToRole('phone', { type: 'clear_history' });
+        console.log(`[${timestamp()}] Cleared message history (extension reconnected)`);
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);

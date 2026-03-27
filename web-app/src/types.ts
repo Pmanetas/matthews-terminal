@@ -14,4 +14,5 @@ export interface Message {
   timestamp: number
   streaming?: boolean
   images?: ImageAttachment[]
+  replayed?: boolean
 }

@@ -388,7 +388,7 @@ export function VoiceChat() {
               return (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={msg.replayed ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.25, ease: 'easeOut' }}
                 >
@@ -451,7 +451,7 @@ export function VoiceChat() {
                   ) : (
                     /* ── Assistant text (no bubble) ── */
                     <div className="px-1">
-                      {i === lastAssistantIndex ? (
+                      {i === lastAssistantIndex && !msg.replayed ? (
                         <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
                       ) : (
                         <MarkdownMessage text={msg.text} />
