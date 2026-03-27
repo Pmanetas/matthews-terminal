@@ -4,7 +4,7 @@ import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pe
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, getAudioLevel, onAudioPlayingChange, stopAllAudio } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
 import type { ImageAttachment } from '@/types'
@@ -110,29 +110,55 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
   const [chars, setChars] = useState(animate ? 0 : text.length)
   const prevTextRef = useRef(text)
   const rafRef = useRef(0)
-  const startTimeRef = useRef(0)
+  const waitingForAudio = useRef(true)
+  const fallbackStartRef = useRef(0)
 
   useEffect(() => {
     if (!animate) { setChars(text.length); return }
     if (text !== prevTextRef.current) {
       prevTextRef.current = text
       setChars(0)
-      startTimeRef.current = 0
+      waitingForAudio.current = true
+      fallbackStartRef.current = 0
     }
+  }, [text, animate])
+
+  // Listen for audio start
+  useEffect(() => {
+    if (!animate) return
+    const cb = () => { waitingForAudio.current = false }
+    onAudioStarted(cb)
+    return () => onAudioStarted(() => {})
   }, [text, animate])
 
   useEffect(() => {
     if (!animate || chars >= text.length) return
     const tick = (now: number) => {
-      if (startTimeRef.current === 0) startTimeRef.current = now
-      // ~60 chars/sec — visible word-by-word without feeling delayed
-      const elapsed = now - startTimeRef.current
-      const target = Math.floor(elapsed * 0.06)
-      setChars((c) => Math.min(Math.max(c, target), text.length))
-      onUpdate?.()
-      if (target < text.length) {
-        rafRef.current = requestAnimationFrame(tick)
+      // Wait for audio to start, but give up after 4s and reveal at steady pace
+      if (waitingForAudio.current && !audioStartedForResult) {
+        if (fallbackStartRef.current === 0) fallbackStartRef.current = now
+        if (now - fallbackStartRef.current < 4000) {
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
       }
+
+      // Sync to audio playback if available
+      if (sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
+        const progress = sharedAudio.currentTime / sharedAudio.duration
+        // Audio plays in chunks — use progress but also ensure forward movement
+        const audioTarget = Math.floor(progress * text.length)
+        setChars((c) => Math.min(Math.max(c, audioTarget), text.length))
+      } else if (audioStartedForResult || (fallbackStartRef.current > 0 && now - fallbackStartRef.current >= 4000)) {
+        // Audio finished or timed out — reveal remaining at 60 chars/sec
+        if (fallbackStartRef.current === 0) fallbackStartRef.current = now
+        const elapsed = now - fallbackStartRef.current
+        const target = Math.floor(elapsed * 0.06)
+        setChars((c) => Math.min(Math.max(c, target), text.length))
+      }
+
+      onUpdate?.()
+      rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
@@ -506,8 +532,7 @@ export function VoiceChat() {
         className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
-        {/* No max-width constraint — full width so messages go to edges */}
-        <div className="flex flex-col gap-3 px-4 py-4 w-full">
+        <div className="flex flex-col gap-3 px-6 py-4 w-full">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <VoiceWaveform isActive={false} getAudioLevel={() => 0} size={200} />

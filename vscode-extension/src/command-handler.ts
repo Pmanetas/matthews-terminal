@@ -426,19 +426,15 @@ export class CommandHandler {
         }
     }
 
-    /** Flush text to phone, display + speak it (only after first tool call), then reset */
+    /** Flush text to phone, display + speak it, then reset */
     private flushAndSpeak(client: BridgeClient): void {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
         if (text.length > 5) {
-            if (this.hasSeenFirstTool) {
-                console.log(`[CommandHandler] Narration: "${text.slice(0, 80)}..."`);
-                // Send as tool_status with marker — works with existing bridge (no deploy needed)
-                client.sendToolStatus(`💬 ${text}`);
-                client.sendSpeak(text);
-            } else {
-                console.log(`[CommandHandler] SKIPPED speech (before first tool): "${text.slice(0, 80)}..."`);
-            }
+            console.log(`[CommandHandler] Narration: "${text.slice(0, 80)}..."`);
+            // Send as tool_status with marker — works with existing bridge (no deploy needed)
+            client.sendToolStatus(`💬 ${text}`);
+            client.sendSpeak(text);
         }
         this.streamingText = '';
         this.lastFlushedLength = 0;
