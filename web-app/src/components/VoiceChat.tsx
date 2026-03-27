@@ -125,9 +125,9 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     if (!animate || chars >= text.length) return
     const tick = (now: number) => {
       if (startTimeRef.current === 0) startTimeRef.current = now
-      // ~18 chars/sec — clearly visible word-by-word
+      // ~60 chars/sec — visible word-by-word without feeling delayed
       const elapsed = now - startTimeRef.current
-      const target = Math.floor(elapsed * 0.018)
+      const target = Math.floor(elapsed * 0.06)
       setChars((c) => Math.min(Math.max(c, target), text.length))
       onUpdate?.()
       if (target < text.length) {
@@ -543,7 +543,7 @@ export function VoiceChat() {
                         ))}
                       </div>
                     )}
-                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-5 py-3">
+                    <div className="bg-violet-600 rounded-2xl rounded-br-md p-4">
                       <p className="text-[15px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                     </div>
                   </div>
