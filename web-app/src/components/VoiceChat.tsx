@@ -540,7 +540,7 @@ export function VoiceChat() {
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
-        <div className="flex flex-col gap-3 px-6 py-4 w-full">
+        <div className="flex flex-col gap-3 px-6 py-4 w-full overflow-hidden box-border">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <VoiceWaveform isActive={false} getAudioLevel={() => 0} size={200} />
@@ -560,8 +560,8 @@ export function VoiceChat() {
 
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <div style={{ maxWidth: '75%' }}>
+                <div className="w-full overflow-hidden" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ maxWidth: 'min(75%, calc(100vw - 48px))' }}>
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
@@ -580,7 +580,7 @@ export function VoiceChat() {
                       </div>
                     )}
                     <div className="bg-violet-600 rounded-2xl rounded-br-md p-4">
-                      <p className="text-[15px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                      <p className="text-[15px] text-white leading-relaxed" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{msg.text}</p>
                     </div>
                   </div>
                 </div>
@@ -630,11 +630,12 @@ export function VoiceChat() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.25, ease: 'easeOut' }}
+                  className="min-w-0 overflow-hidden"
                 >
                   {content}
                 </motion.div>
               ) : (
-                <div key={i}>{content}</div>
+                <div key={i} className="min-w-0 overflow-hidden">{content}</div>
               )
             })
           )}
