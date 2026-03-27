@@ -134,6 +134,7 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
   }
   sharedAudio.play().then(() => {
     audioStartedForResult = true
+    clearResultFallback() // Audio is playing — no need for fallback
     _onAudioStarted?.()
   }).catch((e) => {
     console.error('[Audio] Playback failed:', e)
@@ -164,6 +165,24 @@ export function stopAllAudio() {
 export let audioStartedForResult = false
 let _onAudioStarted: (() => void) | null = null
 export function onAudioStarted(cb: () => void) { _onAudioStarted = cb }
+
+// Fallback: if result arrives but no audio plays within timeout, fire onAudioDone anyway
+let _resultFallbackTimer: ReturnType<typeof setTimeout> | null = null
+function startResultFallback(onAudioDoneRef: { current: (() => void) | undefined }) {
+  clearResultFallback()
+  _resultFallbackTimer = setTimeout(() => {
+    // No audio arrived/started for this result — trigger auto-listen anyway
+    if (!isPlayingAudio && _audioQueue.length === 0) {
+      onAudioDoneRef.current?.()
+    }
+  }, 6000)
+}
+function clearResultFallback() {
+  if (_resultFallbackTimer) {
+    clearTimeout(_resultFallbackTimer)
+    _resultFallbackTimer = null
+  }
+}
 
 // ── Hook ─────────────────────────────────────────────────────────
 
@@ -257,6 +276,7 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'result') {
             if (!isReplayingRef.current) {
               audioStartedForResult = false
+              startResultFallback(onAudioDoneRef)
             }
             setIsWaiting(false)
             const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }

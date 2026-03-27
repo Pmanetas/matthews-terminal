@@ -4,7 +4,7 @@ import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pe
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted } from '@/hooks/useBridge'
+import { useBridge, getAudioLevel, onAudioPlayingChange, stopAllAudio } from '@/hooks/useBridge'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
 import type { ImageAttachment } from '@/types'
@@ -110,50 +110,32 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
   const [chars, setChars] = useState(animate ? 0 : text.length)
   const prevTextRef = useRef(text)
   const rafRef = useRef(0)
-  const waitingForAudio = useRef(true)
-  const audioTimedOut = useRef(false)
+  const startTimeRef = useRef(0)
 
   useEffect(() => {
     if (!animate) { setChars(text.length); return }
     if (text !== prevTextRef.current) {
       prevTextRef.current = text
       setChars(0)
-      waitingForAudio.current = true
-      audioTimedOut.current = false
+      startTimeRef.current = 0
     }
-  }, [text, animate])
-
-  // Wait up to 3s for audio to start before showing text anyway
-  useEffect(() => {
-    if (!animate) return
-    const timeout = setTimeout(() => { audioTimedOut.current = true }, 3000)
-    return () => clearTimeout(timeout)
-  }, [text, animate])
-
-  useEffect(() => {
-    if (!animate) return
-    const cb = () => { waitingForAudio.current = false }
-    onAudioStarted(cb)
-    return () => onAudioStarted(() => {})
   }, [text, animate])
 
   useEffect(() => {
     if (!animate || chars >= text.length) return
-    const tick = () => {
-      if (waitingForAudio.current && !audioTimedOut.current && !audioStartedForResult) {
-        rafRef.current = requestAnimationFrame(tick)
-        return
-      }
-      if (sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
-        const progress = sharedAudio.currentTime / sharedAudio.duration
-        const target = Math.floor(progress * text.length)
-        setChars((c) => Math.min(Math.max(c, target), text.length))
-      } else if (audioStartedForResult || audioTimedOut.current) {
-        // Slow reveal — ~1 char per frame at 60fps = readable pace
-        setChars((c) => Math.min(c + 1, text.length))
-      }
+    const tick = (now: number) => {
+      if (startTimeRef.current === 0) startTimeRef.current = now
+      // Reveal at ~120 chars/sec (roughly matches speech pace)
+      const elapsed = now - startTimeRef.current
+      const target = Math.floor(elapsed * 0.12)
+      setChars((c) => {
+        const next = Math.min(Math.max(c, target), text.length)
+        return next
+      })
       onUpdate?.()
-      rafRef.current = requestAnimationFrame(tick)
+      if (target < text.length) {
+        rafRef.current = requestAnimationFrame(tick)
+      }
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
@@ -204,7 +186,7 @@ export function VoiceChat() {
     return () => onAudioPlayingChange(() => {})
   }, [])
 
-  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, workspace, isWaiting } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -389,12 +371,7 @@ export function VoiceChat() {
               <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
               <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
             </div>
-            {activeFile && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <FileText className="w-2.5 h-2.5 text-violet-400/50" />
-                <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
-              </div>
-            )}
+            {/* activeFile hidden — was cluttering header */}
           </div>
         </div>
         {/* Gradient fade instead of border */}
@@ -425,9 +402,9 @@ export function VoiceChat() {
               const isRecent = i >= messages.length - 3
 
               const content = msg.role === 'user' ? (
-                /* ── User bubble (purple) ── */
+                /* ── User message (no bubble) ── */
                 <div className="flex justify-end">
-                  <div className="max-w-[80%] sm:max-w-[60%] lg:max-w-[45%]">
+                  <div className="max-w-[85%] sm:max-w-[70%] lg:max-w-[55%]">
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
@@ -445,9 +422,7 @@ export function VoiceChat() {
                         ))}
                       </div>
                     )}
-                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-3">
-                      <p className="text-[15px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
-                    </div>
+                    <p className="text-[15px] text-white/60 break-words whitespace-pre-wrap leading-relaxed text-right">{msg.text}</p>
                   </div>
                 </div>
               ) : msg.role === 'tool' ? (
