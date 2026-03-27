@@ -214,9 +214,12 @@ function pushHistory(msg: HistoryEntry): void {
 }
 
 function replayHistory(ws: WebSocket): void {
+  // Send a replay_start marker so the client knows these are historical
+  sendJSON(ws, { type: 'replay_start' });
   for (const msg of messageHistory) {
     sendJSON(ws, msg);
   }
+  sendJSON(ws, { type: 'replay_end' });
   console.log(`[${timestamp()}] Replayed ${messageHistory.length} messages to reconnecting client`);
 }
 
@@ -407,6 +410,7 @@ wss.on('connection', (ws) => {
 
     // ── Extension sends speak (intermediate TTS) ─────────────
     if (role === 'extension' && msg.type === 'speak') {
+      console.log(`[${timestamp()}] SPEAK received: "${(msg.text || '').slice(0, 100)}"`);
       generateSpeech(msg.text).then((audioBuffer) => {
         if (audioBuffer) {
           const base64 = audioBuffer.toString('base64');

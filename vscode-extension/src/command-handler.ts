@@ -58,13 +58,21 @@ export class CommandHandler {
         );
     }
 
-    /** Abort the current command — kills the Claude process silently */
+    /** Abort the current command — kills the Claude process tree */
     abortCommand(_client: BridgeClient): void {
         if (!this.isProcessing || !this.activeProcess) {
             return;
         }
         console.log('[CommandHandler] Aborting active command');
-        this.activeProcess.kill('SIGTERM');
+        const pid = this.activeProcess.pid;
+        if (pid) {
+            if (process.platform === 'win32') {
+                // Windows: SIGTERM doesn't work, must use taskkill to kill process tree
+                spawn('taskkill', ['/F', '/T', '/PID', pid.toString()], { shell: true });
+            } else {
+                this.activeProcess.kill('SIGTERM');
+            }
+        }
         this.activeProcess = undefined;
         this.isProcessing = false;
         this.streamingText = '';

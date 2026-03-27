@@ -147,6 +147,7 @@ export function useBridge(onAudioDone?: () => void) {
   const [isWaiting, setIsWaiting] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isReplayingRef = useRef(false)
   const onAudioDoneRef = useRef(onAudioDone)
   onAudioDoneRef.current = onAudioDone
   const audioQueueRef = useRef(_audioQueue)
@@ -175,8 +176,13 @@ export function useBridge(onAudioDone?: () => void) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          if (data.type === 'user_command') {
-            // Replayed from bridge history
+          if (data.type === 'replay_start') {
+            isReplayingRef.current = true
+            return
+          } else if (data.type === 'replay_end') {
+            isReplayingRef.current = false
+            return
+          } else if (data.type === 'user_command') {
             setMessages((prev) => [
               ...prev,
               { role: 'user' as const, text: data.text, timestamp: Date.now() },
@@ -189,7 +195,9 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {
-            audioStartedForResult = false
+            if (!isReplayingRef.current) {
+              audioStartedForResult = false
+            }
             setIsWaiting(false)
             setMessages((prev) => [
               ...prev,
