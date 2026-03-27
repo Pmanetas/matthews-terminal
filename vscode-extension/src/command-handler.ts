@@ -434,8 +434,8 @@ export class CommandHandler {
         this.flushStreamingText(client);
         const text = this.streamingText.trim();
         if (text.length > 5) {
-            console.log(`[CommandHandler] Narration: "${text.slice(0, 80)}..."`);
-            // Send as tool_status with marker — works with existing bridge (no deploy needed)
+            this.writeEmitter.fire(`\r\n\x1b[35m🔊 Narrating: "${text.slice(0, 60)}..."\x1b[0m\r\n`);
+            // Send as tool_status with 💬 marker — bridge generates TTS from this
             client.sendToolStatus(`💬 ${text}`);
             client.sendSpeak(text);
         }

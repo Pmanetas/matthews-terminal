@@ -37,7 +37,8 @@
       "Bash(claude --version)",
       "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.2.1.vsix\" --force)",
       "Bash(npx vsce:*)",
-      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.3.0.vsix\" --force)"
+      "Bash(code --install-extension \"c:/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.3.0.vsix\" --force)",
+      "Bash(code --install-extension \"/c/Users/Peter/OneDrive/Desktop/Matthews Terminal/vscode-extension/matthews-terminal-0.5.0.vsix\" --force)"
     ]
   }
 }

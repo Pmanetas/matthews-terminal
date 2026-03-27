@@ -341,7 +341,7 @@ const globalCSS = `
   .user-bubble {
     margin-left: auto !important;
     width: fit-content !important;
-    max-width: 75% !important;
+    max-width: 85% !important;
     background: rgb(124, 58, 237) !important;
     border-radius: 1rem !important;
     border-bottom-right-radius: 0.375rem !important;
