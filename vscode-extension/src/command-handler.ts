@@ -433,7 +433,8 @@ export class CommandHandler {
         if (text.length > 5) {
             if (this.hasSeenFirstTool) {
                 console.log(`[CommandHandler] Narration: "${text.slice(0, 80)}..."`);
-                client.sendNarration(text);
+                client.sendNarration(text);  // display on phone
+                client.sendSpeak(text);      // TTS (separate so it works even if bridge is stale)
             } else {
                 console.log(`[CommandHandler] SKIPPED speech (before first tool): "${text.slice(0, 80)}..."`);
             }

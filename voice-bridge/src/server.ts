@@ -422,21 +422,12 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension sends narration (displayed on phone + TTS) ──
+    // ── Extension sends narration (display only, TTS comes via separate 'speak') ──
     if (role === 'extension' && msg.type === 'narration') {
       console.log(`[${timestamp()}] NARRATION: "${(msg.text || '').slice(0, 100)}"`);
       const narrationEntry = { type: 'narration', text: msg.text };
       pushHistory(narrationEntry);
       broadcastToRole('phone', narrationEntry);
-
-      // Generate TTS in background
-      generateSpeech(msg.text).then((audioBuffer) => {
-        if (audioBuffer) {
-          const base64 = audioBuffer.toString('base64');
-          broadcastToRole('phone', { type: 'audio', data: base64, final: false });
-          console.log(`[${timestamp()}] Sent narration TTS (${Math.round(audioBuffer.length / 1024)}KB)`);
-        }
-      });
       return;
     }
 
