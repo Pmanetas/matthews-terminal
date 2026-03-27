@@ -125,9 +125,9 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     if (!animate || chars >= text.length) return
     const tick = (now: number) => {
       if (startTimeRef.current === 0) startTimeRef.current = now
-      // ~40 chars/sec = readable word-by-word pace
+      // ~18 chars/sec — clearly visible word-by-word
       const elapsed = now - startTimeRef.current
-      const target = Math.floor(elapsed * 0.04)
+      const target = Math.floor(elapsed * 0.018)
       setChars((c) => Math.min(Math.max(c, target), text.length))
       onUpdate?.()
       if (target < text.length) {
@@ -156,6 +156,140 @@ function ThinkingDots() {
   )
 }
 
+// ── Mic orb with voice-reactive pulse ────────────────────────────
+
+function MicOrb({ isListening, onClick, disabled }: {
+  isListening: boolean
+  onClick: () => void
+  disabled: boolean
+}) {
+  const ring1Ref = useRef<HTMLSpanElement>(null)
+  const ring2Ref = useRef<HTMLSpanElement>(null)
+  const ring3Ref = useRef<HTMLSpanElement>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const ctxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const dataRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
+  const rafRef = useRef(0)
+  const smoothLevelRef = useRef(0)
+
+  useEffect(() => {
+    if (!isListening) {
+      cancelAnimationFrame(rafRef.current)
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      micStreamRef.current = null
+      analyserRef.current = null
+      ctxRef.current?.close().catch(() => {})
+      ctxRef.current = null
+      smoothLevelRef.current = 0
+      // Reset ring styles
+      ;[ring1Ref, ring2Ref, ring3Ref].forEach(r => {
+        if (r.current) {
+          r.current.style.transform = 'scale(1)'
+          r.current.style.opacity = '0'
+        }
+      })
+      return
+    }
+
+    let cancelled = false
+
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
+      micStreamRef.current = stream
+      const ctx = new AudioContext()
+      ctxRef.current = ctx
+      const source = ctx.createMediaStreamSource(stream)
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
+      source.connect(analyser)
+      analyserRef.current = analyser
+      dataRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount))
+
+      const tick = () => {
+        if (!analyserRef.current || !dataRef.current) return
+        analyserRef.current.getByteFrequencyData(dataRef.current)
+        let sum = 0
+        for (let i = 0; i < dataRef.current.length; i++) sum += dataRef.current[i]
+        const raw = Math.min(1, sum / dataRef.current.length / 100)
+
+        // Smooth it
+        const prev = smoothLevelRef.current
+        smoothLevelRef.current = raw > prev ? prev + (raw - prev) * 0.4 : prev + (raw - prev) * 0.15
+        const level = smoothLevelRef.current
+
+        // Drive rings from mic level
+        if (ring1Ref.current) {
+          ring1Ref.current.style.transform = `scale(${1 + level * 0.25})`
+          ring1Ref.current.style.opacity = `${0.15 + level * 0.55}`
+        }
+        if (ring2Ref.current) {
+          ring2Ref.current.style.transform = `scale(${1 + level * 0.45})`
+          ring2Ref.current.style.opacity = `${0.1 + level * 0.35}`
+        }
+        if (ring3Ref.current) {
+          ring3Ref.current.style.transform = `scale(${1 + level * 0.7})`
+          ring3Ref.current.style.opacity = `${0.05 + level * 0.2}`
+        }
+
+        rafRef.current = requestAnimationFrame(tick)
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }).catch(() => {})
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(rafRef.current)
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      micStreamRef.current = null
+      ctxRef.current?.close().catch(() => {})
+      ctxRef.current = null
+    }
+  }, [isListening])
+
+  return (
+    <motion.button
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClick}
+      disabled={disabled}
+      whileTap={{ scale: 0.9 }}
+      className={cn(
+        'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-colors',
+        isListening
+          ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
+          : 'bg-white/[0.06] hover:bg-white/[0.1]',
+        disabled && 'opacity-30 cursor-not-allowed',
+      )}
+    >
+      {/* Voice-reactive pulse rings */}
+      <span
+        ref={ring1Ref}
+        className="absolute inset-0 rounded-full bg-violet-500/30 transition-none"
+        style={{ opacity: 0 }}
+      />
+      <span
+        ref={ring2Ref}
+        className="absolute -inset-2 rounded-full border-2 border-violet-400/30 transition-none"
+        style={{ opacity: 0 }}
+      />
+      <span
+        ref={ring3Ref}
+        className="absolute -inset-5 rounded-full border border-violet-400/15 transition-none"
+        style={{ opacity: 0 }}
+      />
+      {isListening ? (
+        <MicOff className="w-6 h-6 text-white relative z-10" />
+      ) : (
+        <Mic className="w-6 h-6 text-white/50 relative z-10" />
+      )}
+    </motion.button>
+  )
+}
+
 // ── Global styles ────────────────────────────────────────────────
 
 const globalCSS = `
@@ -163,19 +297,6 @@ const globalCSS = `
   .no-scrollbar { scrollbar-width: none; }
   * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
-
-  @keyframes heartbeat {
-    0%, 100% { transform: scale(1); opacity: 0.4; }
-    50% { transform: scale(1.15); opacity: 0.7; }
-  }
-  @keyframes heartbeat-ring1 {
-    0%, 100% { transform: scale(1); opacity: 0.3; }
-    50% { transform: scale(1.25); opacity: 0.5; }
-  }
-  @keyframes heartbeat-ring2 {
-    0%, 100% { transform: scale(1); opacity: 0.15; }
-    50% { transform: scale(1.35); opacity: 0.3; }
-  }
 `
 
 // ── Main Component ───────────────────────────────────────────────
@@ -194,7 +315,7 @@ export function VoiceChat() {
     return () => onAudioPlayingChange(() => {})
   }, [])
 
-  const { status, messages, sendCommand, sendStop, workspace, isWaiting } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -228,7 +349,6 @@ export function VoiceChat() {
 
   const isProcessing = isWaiting || (messages.length > 0 && messages[messages.length - 1].role !== 'assistant')
 
-  // Find the last user message index so we only show spinner on tools from the CURRENT command
   const lastUserIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') return i }
     return -1
@@ -241,16 +361,13 @@ export function VoiceChat() {
     return -1
   })()
 
-  // Only show spinner if the last tool is from the current command (after last user message)
   const isCurrentToolLoading = isProcessing && lastToolIndex > lastUserIndex
 
-  // Find the last result (non-narration assistant message) for typing animation
   const lastResultIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'assistant' && !messages[i].narration) return i }
     return -1
   })()
 
-  // Collapse all tools once the result arrives
   const hasResultAfterTools = lastResultIndex > lastToolIndex
 
   const scrollToBottom = useCallback(() => {
@@ -260,7 +377,6 @@ export function VoiceChat() {
   }, [])
 
   useEffect(() => { scrollToBottom() }, [messages, expandedTools, scrollToBottom])
-  // Scroll again after animations finish (tool expand = 250ms, message enter = 250ms)
   useEffect(() => {
     const t = setTimeout(scrollToBottom, 300)
     return () => clearTimeout(t)
@@ -317,7 +433,7 @@ export function VoiceChat() {
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    e.target.value = '' // reset for re-selection
+    e.target.value = ''
 
     if (file.size > MAX_IMAGE_SIZE) {
       console.warn('[Image] Large file, resizing...')
@@ -376,6 +492,12 @@ export function VoiceChat() {
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
           <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
         </div>
+        {activeFile && (
+          <div className="flex items-center gap-1 mt-0.5">
+            <FileText className="w-2.5 h-2.5 text-violet-400/50" />
+            <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Chat messages ── */}
@@ -384,7 +506,8 @@ export function VoiceChat() {
         className="flex-1 min-h-0 overflow-y-auto no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
-        <div className="flex flex-col gap-3 px-4 py-4 max-w-5xl mx-auto w-full">
+        {/* No max-width constraint — full width so messages go to edges */}
+        <div className="flex flex-col gap-3 px-4 py-4 w-full">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <VoiceWaveform isActive={false} getAudioLevel={() => 0} size={200} />
@@ -395,16 +518,14 @@ export function VoiceChat() {
               const isNextTool = messages[i + 1]?.role === 'tool'
               const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
               const isLastTool = i === lastToolIndex
-              // Only the last tool is auto-expanded; collapse when result arrives
               const defaultExpanded = isLastTool && !hasResultAfterTools
               const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
-              // Only animate the last 3 messages — older ones render instantly
               const isRecent = i >= messages.length - 3
 
               const content = msg.role === 'user' ? (
-                /* ── User message — flush right, no bubble ── */
+                /* ── User bubble — flush right ── */
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-[70%] lg:max-w-[55%]">
+                  <div className="max-w-[85%] sm:max-w-[70%]">
                     {msg.images && msg.images.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap justify-end">
                         {msg.images.map((img, j) => (
@@ -422,7 +543,7 @@ export function VoiceChat() {
                         ))}
                       </div>
                     )}
-                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-4 py-3">
+                    <div className="bg-violet-600 rounded-2xl rounded-br-md px-5 py-3">
                       <p className="text-[15px] text-white break-words whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                     </div>
                   </div>
@@ -469,7 +590,6 @@ export function VoiceChat() {
                 </div>
               )
 
-              // Only wrap recent non-replayed messages in motion.div for enter animation
               return isRecent && !msg.replayed ? (
                 <motion.div
                   key={i}
@@ -504,24 +624,14 @@ export function VoiceChat() {
         className="shrink-0 bg-black"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        {/* Transcript while listening */}
-        <AnimatePresence mode="wait">
-          {(isListening && transcript) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="px-5 pb-2"
-            >
-              <p className="text-xs text-violet-300/60 text-center line-clamp-2">&ldquo;{transcript}&rdquo;</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {micError && (
-          <p className="text-xs text-red-400 text-center px-5 pb-2">{micError}</p>
-        )}
+        {/* Transcript while listening — fixed height to prevent glitch */}
+        <div className="h-6 flex items-center justify-center px-5">
+          {isListening && transcript ? (
+            <p className="text-xs text-violet-300/60 text-center line-clamp-1 truncate max-w-full">&ldquo;{transcript}&rdquo;</p>
+          ) : micError ? (
+            <p className="text-xs text-red-400 text-center">{micError}</p>
+          ) : null}
+        </div>
 
         {/* Hidden file input */}
         <input
@@ -598,46 +708,12 @@ export function VoiceChat() {
                 <ArrowUp className="w-6 h-6 text-white" />
               </motion.button>
             ) : (
-              <motion.button
+              <MicOrb
                 key="mic"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
+                isListening={isListening}
                 onClick={handleMicClick}
                 disabled={!supported}
-                whileTap={{ scale: 0.9 }}
-                className={cn(
-                  'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-all',
-                  isListening
-                    ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
-                    : 'bg-white/[0.06] hover:bg-white/[0.1]',
-                  !supported && 'opacity-30 cursor-not-allowed',
-                )}
-              >
-                {/* Heartbeat pulse rings — real animation, not ping */}
-                {isListening && (
-                  <>
-                    <span
-                      className="absolute inset-0 rounded-full bg-violet-500/30"
-                      style={{ animation: 'heartbeat 1.2s ease-in-out infinite' }}
-                    />
-                    <span
-                      className="absolute -inset-2 rounded-full border-2 border-violet-400/30"
-                      style={{ animation: 'heartbeat-ring1 1.2s ease-in-out infinite' }}
-                    />
-                    <span
-                      className="absolute -inset-5 rounded-full border border-violet-400/15"
-                      style={{ animation: 'heartbeat-ring2 1.2s ease-in-out infinite' }}
-                    />
-                  </>
-                )}
-                {isListening ? (
-                  <MicOff className="w-6 h-6 text-white relative z-10" />
-                ) : (
-                  <Mic className="w-6 h-6 text-white/50 relative z-10" />
-                )}
-              </motion.button>
+              />
             )}
           </AnimatePresence>
 
