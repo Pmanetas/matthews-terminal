@@ -12,6 +12,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { AgentSink, ImageData } from './types';
 import { SessionContext } from './session-context';
+import { ConversationLog } from './conversation-log';
+import { ClaudeMdUpdater } from './claude-md-updater';
 
 // ANSI colour helpers for terminal output
 const C = {
@@ -66,12 +68,16 @@ export class AgentRunner {
 
     // Session persistence
     private sessionContext: SessionContext;
+    private conversationLog: ConversationLog;
+    private claudeMdUpdater: ClaudeMdUpdater;
     private lastUserPrompt = '';
 
     constructor(agentId: string, projectDir: string) {
         this.agentId = agentId;
         this.projectDir = projectDir;
         this.sessionContext = new SessionContext(projectDir);
+        this.conversationLog = new ConversationLog(projectDir);
+        this.claudeMdUpdater = new ClaudeMdUpdater(projectDir);
     }
 
     get id(): string { return this.agentId; }
@@ -124,7 +130,11 @@ export class AgentRunner {
 
         if (!this.conversationStarted) {
             sink.sendNewSession();
+            this.conversationLog.logSessionStart();
         }
+
+        // Log the user message to conversation history
+        this.conversationLog.logUser(text, images?.length);
 
         // Terminal output — mirrors what the VS Code extension showed
         const imgLabel = images?.length ? ` [+${images.length} image(s)]` : '';
@@ -160,6 +170,11 @@ export class AgentRunner {
                 sink.sendResult(finalText);
                 // Persist this exchange for session recovery
                 this.sessionContext.saveExchange(this.lastUserPrompt, finalText);
+                // Log full conversation and update CLAUDE.md
+                this.conversationLog.logAssistant(finalText);
+                this.claudeMdUpdater.scheduleUpdate(
+                    this.sessionContext.getExchanges()
+                );
             }
         } catch (err: unknown) {
             if (this.aborted) {
@@ -187,6 +202,9 @@ export class AgentRunner {
         this.activeProcess?.kill();
         if (this.toolSpeechTimer) clearTimeout(this.toolSpeechTimer);
         this.clearIdleTimer();
+        // Flush any pending CLAUDE.md update before shutdown
+        this.claudeMdUpdater.forceUpdate(this.sessionContext.getExchanges());
+        this.claudeMdUpdater.dispose();
     }
 
     // ── Claude CLI ──────────────────────────────────────────

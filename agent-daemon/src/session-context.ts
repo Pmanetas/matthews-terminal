@@ -10,7 +10,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface Exchange {
+export interface Exchange {
     timestamp: string;
     user: string;
     assistant: string;
@@ -72,6 +72,11 @@ export class SessionContext {
     hasContext(): boolean {
         const data = this.load();
         return data.exchanges.length > 0;
+    }
+
+    /** Get all saved exchanges (for CLAUDE.md updater) */
+    getExchanges(): Exchange[] {
+        return this.load().exchanges;
     }
 
     /** Clear saved context (e.g. user wants a fresh start) */

@@ -760,10 +760,10 @@ export function VoiceChat() {
         className="shrink-0 bg-black"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        {/* Transcript while listening — fixed height to prevent glitch */}
-        <div className="h-6 flex items-center justify-center px-5 overflow-hidden w-full min-w-0">
+        {/* Transcript while listening */}
+        <div className="min-h-[1.5rem] max-h-[4.5rem] flex items-center justify-center px-5 overflow-y-auto w-full min-w-0">
           {isListening && transcript ? (
-            <p className="text-xs text-violet-300/60 text-center truncate w-full min-w-0">&ldquo;{transcript}&rdquo;</p>
+            <p className="text-xs text-violet-300/60 text-center w-full min-w-0 leading-relaxed">&ldquo;{transcript}&rdquo;</p>
           ) : micError ? (
             <p className="text-xs text-red-400 text-center">{micError}</p>
           ) : null}
