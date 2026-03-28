@@ -677,9 +677,9 @@ export function VoiceChat() {
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         {/* Transcript while listening — fixed height to prevent glitch */}
-        <div className="h-6 flex items-center justify-center px-5">
+        <div className="h-6 flex items-center justify-center px-5 overflow-hidden w-full min-w-0">
           {isListening && transcript ? (
-            <p className="text-xs text-violet-300/60 text-center line-clamp-1 truncate max-w-full">&ldquo;{transcript}&rdquo;</p>
+            <p className="text-xs text-violet-300/60 text-center truncate w-full min-w-0">&ldquo;{transcript}&rdquo;</p>
           ) : micError ? (
             <p className="text-xs text-red-400 text-center">{micError}</p>
           ) : null}
@@ -769,8 +769,15 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Send button for images-only (no voice text yet) — sits to the right */}
-          {!showStop && !pendingMessage && pendingImages.length > 0 ? (
+          {/* Right button: X cancel when there's pending text, send for images-only, spacer otherwise */}
+          {!showStop && pendingMessage ? (
+            <button
+              onClick={() => { setPendingMessage(''); setPendingImages([]); }}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <X className="w-4 h-4 text-white/40" />
+            </button>
+          ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
             <motion.button
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
