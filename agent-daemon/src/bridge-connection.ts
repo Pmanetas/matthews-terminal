@@ -44,15 +44,17 @@ export class BridgeConnection {
             this.ws = new WebSocket(this.bridgeUrl);
 
             this.ws.on('open', () => {
-                console.log('\x1b[32m[Daemon] Connected to bridge\x1b[0m');
-                // Identify as 'extension' for now — works with current bridge without changes.
-                // When bridge is updated for multi-agent, switch to 'daemon'.
+                // MUST identify first — console.log sends daemon_log messages,
+                // and bridge ignores messages from unidentified clients
                 this.send({ type: 'identify', client: 'extension' });
 
                 // Send workspace info like the VS Code extension does
                 const path = require('path');
                 const workspace = path.basename(this.defaultProjectDir);
                 this.send({ type: 'workspace', data: { workspace, repo: this.defaultProjectDir } });
+
+                // Now safe to log (client is identified, daemon_log will be forwarded)
+                console.log('\x1b[32m[Daemon] Connected to bridge\x1b[0m');
 
                 // Auto-spawn the default agent if not already running
                 if (!this.defaultAgentId) {
