@@ -179,6 +179,7 @@ interface ActiveFileMessage { type: 'active_file'; file: string | null; }
 interface StopMessage { type: 'stop'; }
 interface NewSessionMessage { type: 'new_session'; }
 interface NarrationMessage { type: 'narration'; text: string; }
+interface DaemonLogMessage { type: 'daemon_log'; text: string; }
 
 type BridgeMessage =
   | IdentifyMessage
@@ -188,6 +189,7 @@ type BridgeMessage =
   | ResultMessage
   | SpeakMessage
   | WorkspaceMessage
+  | DaemonLogMessage
   | ActiveFileMessage
   | StopMessage
   | NewSessionMessage
@@ -498,8 +500,8 @@ wss.on('connection', (ws) => {
 
     // ── Extension/daemon sends log lines for phone terminal viewer ─
     if (role === 'extension' && msg.type === 'daemon_log') {
-      pushDaemonLog((msg as any).text);
-      broadcastToRole('phone', { type: 'daemon_log', text: (msg as any).text });
+      pushDaemonLog(msg.text);
+      broadcastToRole('phone', { type: 'daemon_log', text: msg.text });
       return;
     }
 

@@ -560,6 +560,11 @@ export function VoiceChat() {
 
       {/* ── Header ── */}
       <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-2 relative">
+        {/* Usage counter — top left */}
+        <div className="absolute top-3 left-4 flex flex-col items-start">
+          <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
+        </div>
+
         {/* Terminal viewer toggle — top right */}
         <button
           onClick={() => setShowTerminal(prev => !prev)}
