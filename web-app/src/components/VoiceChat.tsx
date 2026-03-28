@@ -599,7 +599,7 @@ export function VoiceChat() {
             <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-violet-400" />
-                <span className="text-sm font-medium text-white/70">Daemon Terminal</span>
+                <span className="text-sm font-medium text-white/70">Terminal</span>
               </div>
               <button
                 onClick={() => setShowTerminal(false)}

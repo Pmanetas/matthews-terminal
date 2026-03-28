@@ -39,14 +39,41 @@ try {
 
 const connection = new BridgeConnection(BRIDGE_URL, DEFAULT_PROJECT);
 
-// Intercept console output and forward to bridge for phone terminal viewer
+// Intercept ALL terminal output and forward to bridge for phone terminal viewer
 const origLog = console.log.bind(console);
 const origError = console.error.bind(console);
 const origWarn = console.warn.bind(console);
+const origStdoutWrite = process.stdout.write.bind(process.stdout);
 
 function stripAnsi(str: string): string {
     return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
+
+// Buffer for stdout.write chunks (Claude streams character by character)
+let stdoutBuffer = '';
+let stdoutFlushTimer: ReturnType<typeof setTimeout> | undefined;
+
+function flushStdoutBuffer() {
+    if (stdoutBuffer.trim()) {
+        connection.sendLog(stripAnsi(stdoutBuffer));
+    }
+    stdoutBuffer = '';
+    stdoutFlushTimer = undefined;
+}
+
+// Capture process.stdout.write — this is where Claude's streaming text goes
+process.stdout.write = (chunk: any, ...rest: any[]): boolean => {
+    const text = typeof chunk === 'string' ? chunk : chunk.toString();
+    stdoutBuffer += text;
+    // Flush after 200ms of no new writes, or if buffer has a newline
+    if (stdoutFlushTimer) clearTimeout(stdoutFlushTimer);
+    if (text.includes('\n')) {
+        flushStdoutBuffer();
+    } else {
+        stdoutFlushTimer = setTimeout(flushStdoutBuffer, 200);
+    }
+    return origStdoutWrite(chunk, ...rest as any);
+};
 
 console.log = (...args: any[]) => {
     origLog(...args);
