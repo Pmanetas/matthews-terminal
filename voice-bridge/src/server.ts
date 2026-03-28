@@ -227,6 +227,21 @@ function replayHistory(ws: WebSocket): void {
   console.log(`[${timestamp()}] Replayed ${messageHistory.length} messages to reconnecting client`);
 }
 
+// ── Daemon log history (replayed to phone terminal viewer) ─────────
+const daemonLogHistory: string[] = [];
+const MAX_DAEMON_LOGS = 500;
+
+function pushDaemonLog(text: string): void {
+  daemonLogHistory.push(text);
+  if (daemonLogHistory.length > MAX_DAEMON_LOGS) daemonLogHistory.shift();
+}
+
+function replayDaemonLogs(ws: WebSocket): void {
+  for (const text of daemonLogHistory) {
+    sendJSON(ws, { type: 'daemon_log', text });
+  }
+}
+
 // ── Client tracking ────────────────────────────────────────────────
 
 const clients: Map<WebSocket, ClientRole> = new Map();
@@ -362,6 +377,7 @@ wss.on('connection', (ws) => {
           sendJSON(ws, { type: 'active_file', file: state.activeFile });
         }
         replayHistory(ws);
+        replayDaemonLogs(ws);
       }
       return;
     }
@@ -482,6 +498,7 @@ wss.on('connection', (ws) => {
 
     // ── Extension/daemon sends log lines for phone terminal viewer ─
     if (role === 'extension' && msg.type === 'daemon_log') {
+      pushDaemonLog((msg as any).text);
       broadcastToRole('phone', { type: 'daemon_log', text: (msg as any).text });
       return;
     }
