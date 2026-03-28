@@ -345,7 +345,7 @@ const globalCSS = `
     background: rgb(124, 58, 237) !important;
     border-radius: 1rem !important;
     border-bottom-right-radius: 0.375rem !important;
-    padding: 0.6rem 0.85rem !important;
+    padding: 0.45rem 0.75rem !important;
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
@@ -559,7 +559,7 @@ export function VoiceChat() {
       <style>{globalCSS}</style>
 
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-4 relative">
+      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-6 relative">
         {/* Usage counter — top left */}
         <div className="absolute top-3 left-4 flex flex-col items-start">
           <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
