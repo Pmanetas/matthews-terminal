@@ -747,7 +747,7 @@ export function VoiceChat() {
               >
                 <Square className="w-5 h-5 text-white fill-white" />
               </motion.button>
-            ) : (pendingMessage || pendingImages.length > 0) ? (
+            ) : pendingMessage ? (
               <motion.button
                 key="send"
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -769,10 +769,21 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Spacer to balance camera button */}
-          {!showStop && (
+          {/* Send button for images-only (no voice text yet) — sits to the right */}
+          {!showStop && !pendingMessage && pendingImages.length > 0 ? (
+            <motion.button
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={handleSend}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+            >
+              <ArrowUp className="w-4 h-4 text-white" />
+            </motion.button>
+          ) : !showStop ? (
             <div className="w-10 h-10 shrink-0" />
-          )}
+          ) : null}
         </div>
       </div>
     </div>

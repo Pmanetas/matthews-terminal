@@ -8,3 +8,5 @@ out/
 # Piper TTS binary + voice models (downloaded at build time)
 voice-bridge/piper/
 voice-bridge/voices/
+# Session context (persisted per-project, not committed)
+.matthews/
