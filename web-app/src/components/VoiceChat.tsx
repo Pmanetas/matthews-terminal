@@ -758,7 +758,7 @@ export function VoiceChat() {
       {/* ── Bottom controls ── */}
       <div
         className="shrink-0 bg-black"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
         {(isListening && transcript) || micError ? (
