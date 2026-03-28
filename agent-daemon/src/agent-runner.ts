@@ -497,13 +497,10 @@ export class AgentRunner {
 
         const msg = this.describeToolCall(block);
         this.lastToolDescription = msg.split('\n')[0];
-        if (!this.stderrToolsSent.delete(this.lastToolDescription)) {
-            console.log(`${C.yellow}${this.lastToolDescription}${C.reset}`);
-            sink.sendToolStatus(msg);
-        }
+        const isFromStderr = this.stderrToolsSent.delete(this.lastToolDescription);
         this.toolCallCount++;
 
-        // For Read tool: send file content preview
+        // For Read tool: send file content preview instead of plain header
         if (toolName === 'Read' && input.file_path) {
             try {
                 let resolvedPath = input.file_path;
@@ -523,8 +520,16 @@ export class AgentRunner {
                 if (allLines.length > offset + limit) {
                     preview += `\n  ... (${allLines.length - offset - limit} more lines)`;
                 }
+                console.log(`${C.yellow}${this.lastToolDescription}${C.reset}`);
                 sink.sendToolStatus(preview);
-            } catch { /* file not accessible */ }
+                return;
+            } catch { /* file not accessible — fall through to plain message */ }
+        }
+
+        // Send plain tool status (non-Read tools, or Read that failed to preview)
+        if (!isFromStderr) {
+            console.log(`${C.yellow}${this.lastToolDescription}${C.reset}`);
+            sink.sendToolStatus(msg);
         }
     }
 
