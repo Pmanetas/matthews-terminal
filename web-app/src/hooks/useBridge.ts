@@ -199,6 +199,7 @@ export function useBridge(onAudioDone?: () => void) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [messages, setMessages] = useState<Message[]>([])
   const [workspace, setWorkspace] = useState<string | null>(null)
+  const [workspacePath, setWorkspacePath] = useState<string | null>(null)
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [isWaiting, setIsWaiting] = useState(false)
   const [daemonConnected, setDaemonConnected] = useState(false)
@@ -292,6 +293,7 @@ export function useBridge(onAudioDone?: () => void) {
             }
           } else if (data.type === 'workspace') {
             setWorkspace(data.workspace || data.repo || null)
+            setWorkspacePath(data.repo || null)
           } else if (data.type === 'active_file') {
             setActiveFile(data.file || null)
           } else if (data.type === 'extension_status') {
@@ -378,5 +380,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting, daemonConnected, daemonLogs }
+  return { status, messages, sendCommand, sendStop, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs }
 }

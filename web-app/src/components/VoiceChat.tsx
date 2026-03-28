@@ -380,7 +380,7 @@ export function VoiceChat() {
   const [showTerminal, setShowTerminal] = useState(false)
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
-  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -577,6 +577,24 @@ export function VoiceChat() {
         </button>
 
         <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={240} />
+
+        {/* Live directory tracker */}
+        {workspace && daemonConnected && (
+          <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
+            <Terminal className="w-3 h-3 text-violet-400/60 shrink-0" />
+            <span className="text-[11px] text-white/50 font-medium truncate max-w-[260px]">
+              {(() => {
+                const p = workspacePath || workspace
+                // Split on / or \ and take meaningful parts (skip user/system folders)
+                const parts = p.replace(/\\/g, '/').split('/')
+                const desktopIdx = parts.findIndex(s => s.toLowerCase() === 'desktop')
+                const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                return meaningful.join(' → ')
+              })()}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center gap-1.5 mt-1">
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
           <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
