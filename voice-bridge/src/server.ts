@@ -345,8 +345,16 @@ wss.on('connection', (ws) => {
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
-      // Send workspace info, active file, and message history to phone on connect
+
+      // Tell phones when daemon/extension connects
+      if (role === 'extension') {
+        broadcastToRole('phone', { type: 'extension_status', connected: true });
+      }
+
+      // Send workspace info, active file, daemon status, and message history to phone on connect
       if (role === 'phone') {
+        const extConnected = !!getClient('extension');
+        sendJSON(ws, { type: 'extension_status', connected: extConnected });
         if (state.activeWorkspace) {
           sendJSON(ws, { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
         }
@@ -496,6 +504,10 @@ wss.on('connection', (ws) => {
     const role = clients.get(ws) ?? 'unidentified';
     clients.delete(ws);
     console.log(`[${timestamp()}] Client disconnected: ${role}`);
+    // Tell phones when daemon/extension disconnects
+    if (role === 'extension') {
+      broadcastToRole('phone', { type: 'extension_status', connected: false });
+    }
   });
 
   ws.on('error', (err) => {

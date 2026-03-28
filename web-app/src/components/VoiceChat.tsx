@@ -377,7 +377,7 @@ export function VoiceChat() {
     }
   }, [])
 
-  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting, daemonConnected } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -534,9 +534,11 @@ export function VoiceChat() {
     })
   }
 
-  const statusDot = status === 'connected' ? 'bg-emerald-400' : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
+  const statusDot = status === 'connected'
+    ? (daemonConnected ? 'bg-emerald-400' : 'bg-yellow-400')
+    : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
   const statusLabel = status === 'connected'
-    ? (workspace || 'Connected')
+    ? (daemonConnected ? (workspace || 'Connected') : 'Bridge connected — waiting for daemon')
     : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
   const showStop = isProcessing || isAudioPlaying

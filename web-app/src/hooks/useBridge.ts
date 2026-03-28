@@ -201,6 +201,7 @@ export function useBridge(onAudioDone?: () => void) {
   const [workspace, setWorkspace] = useState<string | null>(null)
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [isWaiting, setIsWaiting] = useState(false)
+  const [daemonConnected, setDaemonConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isReplayingRef = useRef(false)
@@ -292,6 +293,8 @@ export function useBridge(onAudioDone?: () => void) {
             setWorkspace(data.workspace || data.repo || null)
           } else if (data.type === 'active_file') {
             setActiveFile(data.file || null)
+          } else if (data.type === 'extension_status') {
+            setDaemonConnected(!!data.connected)
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
@@ -369,5 +372,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting }
+  return { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting, daemonConnected }
 }
