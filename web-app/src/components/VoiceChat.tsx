@@ -808,7 +808,7 @@ export function VoiceChat() {
         </AnimatePresence>
 
         {/* Action row — centered orb with flanking buttons */}
-        <div className="flex items-center justify-center gap-5 px-4 pb-2">
+        <div className="flex items-center justify-center gap-5 px-4">
           {/* Camera button (left) */}
           {!showStop && (
             <button
