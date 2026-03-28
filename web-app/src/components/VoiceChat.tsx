@@ -345,7 +345,7 @@ const globalCSS = `
     background: rgb(124, 58, 237) !important;
     border-radius: 1rem !important;
     border-bottom-right-radius: 0.375rem !important;
-    padding: 1rem !important;
+    padding: 0.6rem 0.85rem !important;
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
@@ -546,7 +546,7 @@ export function VoiceChat() {
     ? (daemonConnected ? 'bg-emerald-400' : 'bg-yellow-400')
     : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
   const statusLabel = status === 'connected'
-    ? (daemonConnected ? (workspace || 'Connected') : 'Bridge connected — waiting for daemon')
+    ? (daemonConnected ? 'Connected' : 'Bridge connected — waiting for daemon')
     : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
   const showStop = isProcessing || isAudioPlaying
@@ -559,7 +559,7 @@ export function VoiceChat() {
       <style>{globalCSS}</style>
 
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-2 relative">
+      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-4 relative">
         {/* Usage counter — top left */}
         <div className="absolute top-3 left-4 flex flex-col items-start">
           <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
