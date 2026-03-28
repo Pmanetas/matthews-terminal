@@ -166,7 +166,7 @@ interface BridgeState {
   lastOutputSummary: string | null;
 }
 
-type ClientRole = 'phone' | 'extension';
+type ClientRole = 'phone' | 'extension' | 'daemon';
 
 interface IdentifyMessage { type: 'identify'; client: ClientRole; }
 interface CommandMessage { type: 'command'; text: string; images?: Array<{ data: string; mimeType: string; name?: string }>; }
@@ -252,6 +252,12 @@ function getClient(role: ClientRole): WebSocket | undefined {
   let latest: WebSocket | undefined;
   for (const [ws, r] of clients) {
     if (r === role && ws.readyState === WebSocket.OPEN) latest = ws;
+  }
+  // When looking for 'extension', also check for 'daemon' (daemon replaces extension)
+  if (!latest && role === 'extension') {
+    for (const [ws, r] of clients) {
+      if (r === 'daemon' && ws.readyState === WebSocket.OPEN) latest = ws;
+    }
   }
   return latest;
 }
@@ -347,30 +353,30 @@ wss.on('connection', (ws) => {
     // ── Identify ───────────────────────────────────────────────
     if (msg.type === 'identify') {
       const role = msg.client;
-      // Close stale extension connections (only one extension allowed)
+      // Close stale connections for same role (only one extension/daemon allowed)
       // But allow multiple phone/browser sessions for cross-device sync
-      if (role === 'extension') {
+      if (role === 'extension' || role === 'daemon') {
         for (const [existingWs, existingRole] of clients) {
-          if (existingRole === 'extension' && existingWs !== ws) {
-            console.log(`[${timestamp()}] Closing stale extension connection`);
+          if (existingRole === role && existingWs !== ws) {
+            console.log(`[${timestamp()}] Closing stale ${role} connection`);
             clients.delete(existingWs);
             existingWs.close();
           }
         }
-        // Don't clear history on reconnect — extension may just be recovering from a blip
-        // History is cleared only when extension sends explicit 'new_session' message
+        // Don't clear history on reconnect — may just be recovering from a blip
+        // History is cleared only when extension/daemon sends explicit 'new_session' message
       }
       clients.set(ws, role);
       console.log(`[${timestamp()}] Client identified as: ${role} (total: ${clients.size})`);
 
       // Tell phones when daemon/extension connects
-      if (role === 'extension') {
+      if (role === 'extension' || role === 'daemon') {
         broadcastToRole('phone', { type: 'extension_status', connected: true });
       }
 
       // Send workspace info, active file, daemon status, and message history to phone on connect
       if (role === 'phone') {
-        const extConnected = !!getClient('extension');
+        const extConnected = !!getClient('extension'); // getClient('extension') also checks for 'daemon'
         sendJSON(ws, { type: 'extension_status', connected: extConnected });
         if (state.activeWorkspace) {
           sendJSON(ws, { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
@@ -426,22 +432,24 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension signals new session (clear old history) ──────
-    if (role === 'extension' && msg.type === 'new_session') {
+    const isExtOrDaemon = role === 'extension' || role === 'daemon';
+
+    // ── Extension/daemon signals new session (clear old history) ──
+    if (isExtOrDaemon && msg.type === 'new_session') {
       messageHistory.length = 0;
       broadcastToRole('phone', { type: 'clear_history' });
       console.log(`[${timestamp()}] New session — cleared message history`);
       return;
     }
 
-    // ── Extension sends status ─────────────────────────────────
-    if (role === 'extension' && msg.type === 'status') {
+    // ── Extension/daemon sends status ──────────────────────────
+    if (isExtOrDaemon && msg.type === 'status') {
       broadcastToRole('phone', { type: 'status', text: msg.text });
       return;
     }
 
-    // ── Extension sends tool status (separate step on phone) ──
-    if (role === 'extension' && msg.type === 'tool_status') {
+    // ── Extension/daemon sends tool status (separate step on phone) ──
+    if (isExtOrDaemon && msg.type === 'tool_status') {
       const entry = { type: 'tool_status', text: msg.text };
       pushHistory(entry);
       broadcastToRole('phone', entry);
@@ -449,8 +457,8 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension sends narration (display only, TTS comes via separate 'speak') ──
-    if (role === 'extension' && msg.type === 'narration') {
+    // ── Extension/daemon sends narration (display only, TTS comes via separate 'speak') ──
+    if (isExtOrDaemon && msg.type === 'narration') {
       console.log(`[${timestamp()}] NARRATION: "${(msg.text || '').slice(0, 100)}"`);
       const narrationEntry = { type: 'narration', text: msg.text };
       pushHistory(narrationEntry);
@@ -458,8 +466,8 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension sends speak (TTS only, no display) ─────────
-    if (role === 'extension' && msg.type === 'speak') {
+    // ── Extension/daemon sends speak (TTS only, no display) ───
+    if (isExtOrDaemon && msg.type === 'speak') {
       const phoneCount = [...clients].filter(([w, r]) => r === 'phone' && w.readyState === WebSocket.OPEN).length;
       console.log(`[${timestamp()}] SPEAK received (${phoneCount} phone(s) online): "${(msg.text || '').slice(0, 100)}"`);
       generateSpeech(msg.text).then((audioBuffer) => {
@@ -477,8 +485,8 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension sends result ─────────────────────────────────
-    if (role === 'extension' && msg.type === 'result') {
+    // ── Extension/daemon sends result ──────────────────────────
+    if (isExtOrDaemon && msg.type === 'result') {
       state.currentTaskStatus = 'complete';
       state.lastOutputSummary = msg.text;
 
@@ -499,14 +507,14 @@ wss.on('connection', (ws) => {
     }
 
     // ── Extension/daemon sends log lines for phone terminal viewer ─
-    if (role === 'extension' && msg.type === 'daemon_log') {
+    if (isExtOrDaemon && msg.type === 'daemon_log') {
       pushDaemonLog(msg.text);
       broadcastToRole('phone', { type: 'daemon_log', text: msg.text });
       return;
     }
 
-    // ── Extension sends workspace info ─────────────────────────
-    if (role === 'extension' && msg.type === 'workspace') {
+    // ── Extension/daemon sends workspace info ─────────────────
+    if (isExtOrDaemon && msg.type === 'workspace') {
       state.activeWorkspace = msg.data.workspace;
       state.activeRepo = msg.data.repo;
       console.log(`[${timestamp()}] Workspace updated: ${msg.data.workspace} (${msg.data.repo})`);
@@ -514,8 +522,8 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension sends active file ──────────────────────────
-    if (role === 'extension' && msg.type === 'active_file') {
+    // ── Extension/daemon sends active file ────────────────────
+    if (isExtOrDaemon && msg.type === 'active_file') {
       state.activeFile = msg.file || null;
       console.log(`[${timestamp()}] Active file: ${state.activeFile}`);
       broadcastToRole('phone', { type: 'active_file', file: state.activeFile });
@@ -530,7 +538,7 @@ wss.on('connection', (ws) => {
     clients.delete(ws);
     console.log(`[${timestamp()}] Client disconnected: ${role}`);
     // Tell phones when daemon/extension disconnects
-    if (role === 'extension') {
+    if (role === 'extension' || role === 'daemon') {
       broadcastToRole('phone', { type: 'extension_status', connected: false });
     }
   });

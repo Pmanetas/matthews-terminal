@@ -46,7 +46,7 @@ export class BridgeConnection {
             this.ws.on('open', () => {
                 // MUST identify first — console.log sends daemon_log messages,
                 // and bridge ignores messages from unidentified clients
-                this.send({ type: 'identify', client: 'extension' });
+                this.send({ type: 'identify', client: 'daemon' });
 
                 // Send workspace info like the VS Code extension does
                 const path = require('path');
