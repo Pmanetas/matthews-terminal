@@ -27,6 +27,11 @@ export class BridgeConnection {
         this.manager = new AgentManager((agentId) => this.createSink(agentId));
     }
 
+    /** Forward a log line to the bridge for phone terminal viewer */
+    sendLog(text: string): void {
+        this.send({ type: 'daemon_log', text });
+    }
+
     connect(): void {
         if (this.ws) this.disconnect();
         this.shouldReconnect = true;

@@ -377,7 +377,10 @@ export function VoiceChat() {
     }
   }, [])
 
-  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting, daemonConnected } = useBridge(() => {
+  const [showTerminal, setShowTerminal] = useState(false)
+  const terminalEndRef = useRef<HTMLDivElement>(null)
+
+  const { status, messages, sendCommand, sendStop, workspace, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -400,6 +403,11 @@ export function VoiceChat() {
     el.addEventListener('scroll', handleScroll, { passive: true })
     return () => el.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // Auto-scroll terminal logs
+  useEffect(() => {
+    if (showTerminal) terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [daemonLogs, showTerminal])
 
   // Clear stale expanded tools when messages get replaced (replay/clear)
   const prevMsgLenRef = useRef(messages.length)
@@ -551,7 +559,18 @@ export function VoiceChat() {
       <style>{globalCSS}</style>
 
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-2">
+      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-2 relative">
+        {/* Terminal viewer toggle — top right */}
+        <button
+          onClick={() => setShowTerminal(prev => !prev)}
+          className={cn(
+            'absolute top-3 right-4 flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+            showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+          )}
+        >
+          <Terminal className={cn('w-3.5 h-3.5', showTerminal ? 'text-violet-400' : 'text-white/40')} />
+        </button>
+
         <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={240} />
         <div className="flex items-center gap-1.5 mt-1">
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
@@ -564,6 +583,64 @@ export function VoiceChat() {
           </div>
         )}
       </div>
+
+      {/* ── Terminal overlay ── */}
+      <AnimatePresence>
+        {showTerminal && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-[#0A0A0B]/95 backdrop-blur-sm"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          >
+            {/* Terminal header */}
+            <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-violet-400" />
+                <span className="text-sm font-medium text-white/70">Daemon Terminal</span>
+              </div>
+              <button
+                onClick={() => setShowTerminal(false)}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:scale-90 transition-transform"
+              >
+                <X className="w-4 h-4 text-white/40" />
+              </button>
+            </div>
+
+            {/* Log output */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-3 py-2 font-mono text-[11px] leading-relaxed">
+              {daemonLogs.length === 0 ? (
+                <p className="text-white/20 text-center mt-8">No logs yet — waiting for daemon output</p>
+              ) : (
+                daemonLogs.map((log, i) => (
+                  <p key={i} className={cn(
+                    'whitespace-pre-wrap break-all',
+                    log.startsWith('ERROR') ? 'text-red-400/70' :
+                    log.startsWith('WARN') ? 'text-yellow-400/70' :
+                    log.includes('[Daemon]') ? 'text-emerald-400/60' :
+                    log.includes('You:') ? 'text-violet-400/70' :
+                    log.includes('Result:') ? 'text-emerald-300/70' :
+                    'text-white/40'
+                  )}>{log}</p>
+                ))
+              )}
+              <div ref={terminalEndRef} />
+            </div>
+
+            {/* Daemon status bar */}
+            <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t border-white/[0.06]"
+              style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+            >
+              <span className={cn('h-2 w-2 rounded-full', daemonConnected ? 'bg-emerald-400' : 'bg-red-400')} />
+              <span className="text-xs text-white/40">
+                {daemonConnected ? 'Daemon connected to bridge' : 'Daemon not connected'}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Chat messages ── */}
       <div

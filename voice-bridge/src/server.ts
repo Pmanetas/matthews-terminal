@@ -480,6 +480,12 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // ── Extension/daemon sends log lines for phone terminal viewer ─
+    if (role === 'extension' && msg.type === 'daemon_log') {
+      broadcastToRole('phone', { type: 'daemon_log', text: (msg as any).text });
+      return;
+    }
+
     // ── Extension sends workspace info ─────────────────────────
     if (role === 'extension' && msg.type === 'workspace') {
       state.activeWorkspace = msg.data.workspace;

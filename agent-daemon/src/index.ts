@@ -39,6 +39,33 @@ try {
 
 const connection = new BridgeConnection(BRIDGE_URL, DEFAULT_PROJECT);
 
+// Intercept console output and forward to bridge for phone terminal viewer
+const origLog = console.log.bind(console);
+const origError = console.error.bind(console);
+const origWarn = console.warn.bind(console);
+
+function stripAnsi(str: string): string {
+    return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+console.log = (...args: any[]) => {
+    origLog(...args);
+    const text = args.map(a => typeof a === 'string' ? a : String(a)).join(' ');
+    connection.sendLog(stripAnsi(text));
+};
+
+console.error = (...args: any[]) => {
+    origError(...args);
+    const text = args.map(a => typeof a === 'string' ? a : String(a)).join(' ');
+    connection.sendLog(`ERROR: ${stripAnsi(text)}`);
+};
+
+console.warn = (...args: any[]) => {
+    origWarn(...args);
+    const text = args.map(a => typeof a === 'string' ? a : String(a)).join(' ');
+    connection.sendLog(`WARN: ${stripAnsi(text)}`);
+};
+
 console.log('');
 console.log('  \x1b[36mMatthews Terminal — Agent Daemon\x1b[0m');
 console.log('  ────────────────────────────────');
