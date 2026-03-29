@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw } from 'lucide-react'
+import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -381,9 +381,12 @@ export function VoiceChat() {
   const [showTerminal, setShowTerminal] = useState(false)
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
-  const { status, messages, sendCommand, sendStop, sendNewChat, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, fileList, filePath, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
     autoListenRef.current?.()
   })
+
+  const [showFiles, setShowFiles] = useState(false)
+  const [fileNavPath, setFileNavPath] = useState<string | null>(null)
 
   const { isListening, transcript, startListening, stopListening, supported, micError } = useVoice()
 
@@ -687,6 +690,107 @@ export function VoiceChat() {
         )}
       </AnimatePresence>
 
+      {/* ── File browser overlay ── */}
+      <AnimatePresence>
+        {showFiles && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-[#0A0A0B]/95 backdrop-blur-sm"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          >
+            {/* Header */}
+            <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2 min-w-0">
+                {filePath && fileNavPath && (
+                  <button
+                    onClick={() => {
+                      const parent = filePath.replace(/[\\/][^\\/]+$/, '')
+                      if (parent && parent !== filePath) {
+                        setFileNavPath(parent)
+                        requestFiles(parent)
+                      } else {
+                        setFileNavPath(null)
+                        requestFiles()
+                      }
+                    }}
+                    className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06] active:scale-90 transition-transform shrink-0"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-white/50" />
+                  </button>
+                )}
+                <FolderOpen className="w-4 h-4 text-violet-400 shrink-0" />
+                <span className="text-sm font-medium text-white/70 truncate">
+                  {filePath ? filePath.replace(/\\/g, '/').split('/').pop() : workspace || 'Files'}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowFiles(false)}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:scale-90 transition-transform"
+              >
+                <X className="w-4 h-4 text-white/40" />
+              </button>
+            </div>
+
+            {/* Breadcrumb */}
+            {filePath && (
+              <div className="shrink-0 px-4 py-1.5 border-b border-white/[0.04]">
+                <span className="text-[10px] text-white/20 truncate block">
+                  {(() => {
+                    const p = filePath.replace(/\\/g, '/')
+                    const parts = p.split('/').filter(Boolean)
+                    const desktopIdx = parts.findIndex(s => s.toLowerCase() === 'desktop')
+                    return (desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-4)).join(' / ')
+                  })()}
+                </span>
+              </div>
+            )}
+
+            {/* File list */}
+            <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+              {fileList.length === 0 ? (
+                <p className="text-white/20 text-center text-sm mt-8">No files found</p>
+              ) : (
+                fileList.map((f, i) => (
+                  <button
+                    key={i}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/[0.04] transition-colors text-left"
+                    onClick={() => {
+                      if (f.type === 'dir' && filePath) {
+                        const newPath = filePath + (filePath.endsWith('/') || filePath.endsWith('\\') ? '' : '/') + f.name
+                        setFileNavPath(newPath)
+                        requestFiles(newPath)
+                      }
+                    }}
+                  >
+                    {f.type === 'dir' ? (
+                      <Folder className="w-4 h-4 text-violet-400/60 shrink-0" />
+                    ) : (
+                      <File className="w-4 h-4 text-white/25 shrink-0" />
+                    )}
+                    <span className={cn(
+                      'text-sm truncate',
+                      f.type === 'dir' ? 'text-white/60' : 'text-white/40'
+                    )}>{f.name}</span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {/* Status bar */}
+            <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t border-white/[0.06]"
+              style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+            >
+              <span className="text-[11px] text-white/25">
+                {fileList.filter(f => f.type === 'dir').length} folders, {fileList.filter(f => f.type === 'file').length} files
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Chat messages ── */}
       <div
         ref={scrollContainerRef}
@@ -848,15 +952,30 @@ export function VoiceChat() {
         </AnimatePresence>
 
         {/* Action row — centered orb with flanking buttons */}
-        <div className="flex items-center justify-center gap-5 px-4">
-          {/* Camera button (left) */}
+        <div className="flex items-center justify-center gap-3 px-4">
+          {/* File browser + Camera buttons (left) */}
           {!showStop && (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-            >
-              <Camera className="w-4 h-4 text-white/40" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setShowFiles(true)
+                  setFileNavPath(null)
+                  requestFiles()
+                }}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                  showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+                )}
+              >
+                <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+              >
+                <Camera className="w-4 h-4 text-white/40" />
+              </button>
+            </div>
           )}
 
           {/* Central mic orb / stop / send */}

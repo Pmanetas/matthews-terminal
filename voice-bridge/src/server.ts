@@ -437,6 +437,15 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // ── Phone requests file list ────────────────────────────────
+    if (role === 'phone' && (msg as any).type === 'list_files') {
+      const ext = getClient('extension');
+      if (ext) {
+        sendJSON(ext, { type: 'list_files', path: (msg as any).path || null });
+      }
+      return;
+    }
+
     // ── Phone sends stop ───────────────────────────────────────
     if (role === 'phone' && msg.type === 'stop') {
       const ext = getClient('extension');
@@ -579,6 +588,12 @@ wss.on('connection', (ws) => {
       state.activeFile = msg.file || null;
       console.log(`[${timestamp()}] Active file: ${state.activeFile}`);
       broadcastToRole('phone', { type: 'active_file', file: state.activeFile });
+      return;
+    }
+
+    // ── Extension/daemon sends file list ────────────────────────
+    if (isExtOrDaemon && (msg as any).type === 'file_list') {
+      broadcastToRole('phone', msg as any);
       return;
     }
 

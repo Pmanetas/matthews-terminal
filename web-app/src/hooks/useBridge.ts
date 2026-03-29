@@ -207,6 +207,8 @@ export function useBridge(onAudioDone?: () => void) {
   const [isWaiting, setIsWaiting] = useState(false)
   const [daemonConnected, setDaemonConnected] = useState(false)
   const [daemonLogs, setDaemonLogs] = useState<string[]>([])
+  const [fileList, setFileList] = useState<{ name: string; type: string }[]>([])
+  const [filePath, setFilePath] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isReplayingRef = useRef(false)
@@ -307,6 +309,9 @@ export function useBridge(onAudioDone?: () => void) {
               const next = [...prev, data.text]
               return next.length > 200 ? next.slice(-200) : next
             })
+          } else if (data.type === 'file_list') {
+            setFileList(data.files || [])
+            setFilePath(data.path || null)
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
@@ -386,6 +391,12 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [])
 
+  const requestFiles = useCallback((path?: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'list_files', path: path || null }))
+    }
+  }, [])
+
   useEffect(() => {
     connect()
     return () => {
@@ -394,5 +405,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, sendStop, sendNewChat, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs }
+  return { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, fileList, filePath, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs }
 }

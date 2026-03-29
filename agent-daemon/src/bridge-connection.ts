@@ -199,6 +199,11 @@ export class BridgeConnection {
                 break;
             }
 
+            case 'list_files': {
+                this.handleListFiles(msg.path || this.defaultProjectDir);
+                break;
+            }
+
             default:
                 // Silently ignore unknown types (bridge sends pings, etc.)
                 break;
@@ -253,6 +258,28 @@ export class BridgeConnection {
         if (t.length < 15) return 'Yep.';
 
         return 'One sec.';
+    }
+
+    private handleListFiles(dirPath: string): void {
+        const fs = require('fs');
+        const path = require('path');
+        try {
+            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            const files = entries
+                .filter((e: any) => !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
+                .map((e: any) => ({
+                    name: e.name,
+                    type: e.isDirectory() ? 'dir' : 'file',
+                }))
+                .sort((a: any, b: any) => {
+                    if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+                    return a.name.localeCompare(b.name);
+                });
+            this.send({ type: 'file_list', path: dirPath, files });
+        } catch (err: any) {
+            console.error('[Daemon] Failed to list files:', err.message);
+            this.send({ type: 'file_list', path: dirPath, files: [], error: err.message });
+        }
     }
 
     private scheduleReconnect(): void {
