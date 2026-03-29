@@ -665,7 +665,7 @@ export function VoiceChat() {
             <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* ── Terminal overlay ── */}
       <AnimatePresence>
