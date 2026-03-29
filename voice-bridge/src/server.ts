@@ -446,6 +446,15 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // ── Phone requests file content ────────────────────────────
+    if (role === 'phone' && (msg as any).type === 'read_file') {
+      const ext = getClient('extension');
+      if (ext) {
+        sendJSON(ext, { type: 'read_file', path: (msg as any).path });
+      }
+      return;
+    }
+
     // ── Phone sends stop ───────────────────────────────────────
     if (role === 'phone' && msg.type === 'stop') {
       const ext = getClient('extension');
@@ -591,8 +600,8 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // ── Extension/daemon sends file list ────────────────────────
-    if (isExtOrDaemon && (msg as any).type === 'file_list') {
+    // ── Extension/daemon sends file list or file content ────────
+    if (isExtOrDaemon && ((msg as any).type === 'file_list' || (msg as any).type === 'file_content')) {
       broadcastToRole('phone', msg as any);
       return;
     }

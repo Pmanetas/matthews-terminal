@@ -204,6 +204,11 @@ export class BridgeConnection {
                 break;
             }
 
+            case 'read_file': {
+                this.handleReadFile(msg.path);
+                break;
+            }
+
             default:
                 // Silently ignore unknown types (bridge sends pings, etc.)
                 break;
@@ -258,6 +263,23 @@ export class BridgeConnection {
         if (t.length < 15) return 'Yep.';
 
         return 'One sec.';
+    }
+
+    private handleReadFile(filePath: string): void {
+        const fs = require('fs');
+        try {
+            const stat = fs.statSync(filePath);
+            // Limit to 100KB to avoid sending huge files over WebSocket
+            if (stat.size > 100 * 1024) {
+                this.send({ type: 'file_content', path: filePath, content: null, error: 'File too large (>100KB)' });
+                return;
+            }
+            const content = fs.readFileSync(filePath, 'utf-8');
+            this.send({ type: 'file_content', path: filePath, content });
+        } catch (err: any) {
+            console.error('[Daemon] Failed to read file:', err.message);
+            this.send({ type: 'file_content', path: filePath, content: null, error: err.message });
+        }
     }
 
     private handleListFiles(dirPath: string): void {
