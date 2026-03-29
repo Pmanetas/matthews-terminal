@@ -144,10 +144,10 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
   useEffect(() => {
     if (!animate || chars >= text.length) return
     const tick = (now: number) => {
-      // Wait for audio to start, but give up after 4s and reveal at steady pace
+      // Wait for audio to start, but give up after 8s and reveal at steady pace
       if (waitingForAudio.current && !audioStartedForResult) {
         if (fallbackStartRef.current === 0) fallbackStartRef.current = now
-        if (now - fallbackStartRef.current < 4000) {
+        if (now - fallbackStartRef.current < 8000) {
           rafRef.current = requestAnimationFrame(tick)
           return
         }
@@ -159,7 +159,7 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         // Audio plays in chunks — use progress but also ensure forward movement
         const audioTarget = Math.floor(progress * text.length)
         setChars((c) => Math.min(Math.max(c, audioTarget), text.length))
-      } else if (audioStartedForResult || (fallbackStartRef.current > 0 && now - fallbackStartRef.current >= 4000)) {
+      } else if (audioStartedForResult || (fallbackStartRef.current > 0 && now - fallbackStartRef.current >= 8000)) {
         // Audio finished or timed out — reveal remaining at 60 chars/sec
         if (fallbackStartRef.current === 0) fallbackStartRef.current = now
         const elapsed = now - fallbackStartRef.current
@@ -392,12 +392,15 @@ export function VoiceChat() {
   const chatEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const userScrolledRef = useRef(false)
+  const isAutoScrollingRef = useRef(false)
 
   // Detect when user scrolls up — pause auto-scroll
+  // Skip events caused by our own programmatic scrollIntoView
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
     const handleScroll = () => {
+      if (isAutoScrollingRef.current) return
       const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
       userScrolledRef.current = !isAtBottom
     }
@@ -451,7 +454,10 @@ export function VoiceChat() {
 
   const scrollToBottom = useCallback(() => {
     if (!userScrolledRef.current) {
+      isAutoScrollingRef.current = true
       chatEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      // Clear flag after browser processes the scroll
+      requestAnimationFrame(() => { isAutoScrollingRef.current = false })
     }
   }, [])
 

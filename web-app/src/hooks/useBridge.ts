@@ -142,10 +142,13 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
     }
   }
   sharedAudio.play().then(() => {
-    console.log('[Audio] ✓ play() succeeded')
-    audioStartedForResult = true
+    console.log(`[Audio] ✓ play() succeeded (isFinal=${item.isFinal})`)
     clearResultFallback()
-    _onAudioStarted?.()
+    // Only signal "result audio started" for final/result audio, not ack audio
+    if (item.isFinal) {
+      audioStartedForResult = true
+      _onAudioStarted?.()
+    }
   }).catch((e) => {
     console.error('[Audio] ✗ Playback failed:', e)
     URL.revokeObjectURL(item.url)
