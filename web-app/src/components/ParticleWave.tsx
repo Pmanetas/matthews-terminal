@@ -23,9 +23,9 @@ export function ParticleWave() {
     resize()
     window.addEventListener('resize', resize)
 
-    // Dense grid like the 21st.dev particle wave
-    const cols = 80
-    const rows = 50
+    // Dense grid — lots of tiny dots like 21st.dev
+    const cols = 120
+    const rows = 80
 
     const draw = () => {
       const w = canvas.offsetWidth
@@ -35,7 +35,7 @@ export function ParticleWave() {
 
       // Vanishing point at center-top
       const vpX = w * 0.5
-      const vpY = h * 0.08
+      const vpY = h * 0.05
 
       // Gentle time progression
       time += 0.008
@@ -43,16 +43,20 @@ export function ParticleWave() {
       for (let row = 0; row < rows; row++) {
         const rowT = row / (rows - 1)
         // Perspective depth — exponential for realistic foreshortening
-        const depth = Math.pow(rowT, 2.2)
+        const depth = Math.pow(rowT, 2.0)
         const y = vpY + depth * (h - vpY)
 
-        // How wide the row spreads — wider at bottom
-        const spread = 0.05 + depth * 1.0
+        // Spread goes beyond screen edges so dots reach all corners
+        const spread = 0.02 + depth * 1.2
 
         for (let col = 0; col < cols; col++) {
           const colT = (col / (cols - 1)) * 2 - 1 // -1 to 1
 
-          const x = vpX + colT * (w * 0.6) * spread
+          // Use full width — w * 0.55 means edges go past screen at bottom rows
+          const x = vpX + colT * (w * 0.55) * spread
+
+          // Skip dots that are way off screen
+          if (x < -10 || x > w + 10) continue
 
           // Wave displacement — gentle rolling waves
           const wave = Math.sin(colT * 4 + time + row * 0.15) *
@@ -61,11 +65,11 @@ export function ParticleWave() {
 
           const finalY = y + wave
 
-          // Dot size: tiny near vanishing point, bigger at bottom
-          const size = 0.3 + depth * 1.8
+          // Tiny dots — max 1px radius
+          const size = 0.2 + depth * 0.8
 
           // Opacity: very faint near top, stronger at bottom
-          const opacity = 0.05 + depth * 0.35
+          const opacity = 0.06 + depth * 0.4
 
           // Dark purple dots
           ctx.beginPath()
