@@ -35,12 +35,13 @@ export function ParticleWave() {
 
       // Vanishing point — below the header area so dots don't bunch up there
       const vpX = w * 0.5
-      const vpY = h * 0.18
+      const vpY = h * 0.25
 
       // Gentle time progression
       time += 0.008
 
-      for (let row = 0; row < rows; row++) {
+      // Skip first 8 rows — they compress into a visible line near the vanishing point
+      for (let row = 8; row < rows; row++) {
         const rowT = row / (rows - 1)
         // Perspective depth — exponential for realistic foreshortening
         const depth = Math.pow(rowT, 1.8)

@@ -75,8 +75,9 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
                       key={i}
                       className={cn(
                         'flex items-start font-mono text-[11px] leading-5',
-                        isRemove && 'bg-red-500/[0.08]',
-                        isAdd && 'bg-emerald-500/[0.08]',
+                        isRemove && 'bg-red-500/[0.08] border-l-2 border-l-red-500/40',
+                        isAdd && 'bg-emerald-500/[0.08] border-l-2 border-l-emerald-500/40',
+                        !isRemove && !isAdd && 'border-l-2 border-l-transparent',
                       )}
                     >
                       <span className={cn(
@@ -581,33 +582,25 @@ export function VoiceChat() {
       <style>{globalCSS}</style>
 
       {/* ── Splash Screen ── */}
-      <AnimatePresence>
-        {showSplash && (
-          <SplashScreen onDone={() => {
-            setShowSplash(false)
-            // Stagger the intro — particle wave fades in first, then UI elements
-            setTimeout(() => setIntroReady(true), 200)
-          }} />
-        )}
-      </AnimatePresence>
+      {showSplash && (
+        <SplashScreen onDone={() => {
+          setShowSplash(false)
+          setTimeout(() => setIntroReady(true), 100)
+        }} />
+      )}
 
       {/* Particle wave — fades in after splash */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: introReady || !showSplash ? 1 : 0 }}
-        transition={{ duration: 1.2, ease: 'easeOut' }}
-        className="fixed inset-0 pointer-events-none"
-        style={{ zIndex: 0 }}
+      <div
+        className="fixed inset-0 pointer-events-none transition-opacity duration-1000"
+        style={{ zIndex: 0, opacity: introReady ? 1 : 0 }}
       >
         <ParticleWave />
-      </motion.div>
+      </div>
 
       {/* ── Header ── */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: introReady ? 1 : 0, y: introReady ? 0 : -20 }}
-        transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' }}
-        className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative"
+      <div
+        className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative transition-all duration-500"
+        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-20px)', transitionDelay: '0.3s' }}
       >
         {/* Top row: restart + waveform + terminal all in line */}
         <div className="flex items-center w-full gap-2">
@@ -665,7 +658,7 @@ export function VoiceChat() {
             <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
           </div>
         )}
-      </motion.div>
+      </div>
 
       {/* ── Terminal overlay ── */}
       <AnimatePresence>
@@ -976,11 +969,9 @@ export function VoiceChat() {
       </div>
 
       {/* ── Bottom controls ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: introReady ? 1 : 0, y: introReady ? 0 : 30 }}
-        transition={{ duration: 0.5, delay: 0.5, ease: 'easeOut' }}
-        className="shrink-0 bg-black"
+      <div
+        className="shrink-0 bg-black transition-all duration-500"
+        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(30px)', transitionDelay: '0.5s' }}
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
@@ -1114,7 +1105,7 @@ export function VoiceChat() {
             </button>
           ) : null}
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }
