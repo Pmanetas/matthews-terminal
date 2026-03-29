@@ -6,6 +6,7 @@ import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
 import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted, onAudioWillPlay } from '@/hooks/useBridge'
 import { ParticleWave } from '@/components/ParticleWave'
+import { SplashScreen } from '@/components/SplashScreen'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
 import type { ImageAttachment } from '@/types'
@@ -359,6 +360,8 @@ const animatedTexts = new Set<string>()
 // ── Main Component ───────────────────────────────────────────────
 
 export function VoiceChat() {
+  const [showSplash, setShowSplash] = useState(true)
+  const [introReady, setIntroReady] = useState(false)
   const [pendingMessage, setPendingMessage] = useState('')
   const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
@@ -576,10 +579,36 @@ export function VoiceChat() {
       style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none' }}
     >
       <style>{globalCSS}</style>
-      <ParticleWave />
+
+      {/* ── Splash Screen ── */}
+      <AnimatePresence>
+        {showSplash && (
+          <SplashScreen onDone={() => {
+            setShowSplash(false)
+            // Stagger the intro — particle wave fades in first, then UI elements
+            setTimeout(() => setIntroReady(true), 200)
+          }} />
+        )}
+      </AnimatePresence>
+
+      {/* Particle wave — fades in after splash */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: introReady || !showSplash ? 1 : 0 }}
+        transition={{ duration: 1.2, ease: 'easeOut' }}
+        className="fixed inset-0 pointer-events-none"
+        style={{ zIndex: 0 }}
+      >
+        <ParticleWave />
+      </motion.div>
 
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: introReady ? 1 : 0, y: introReady ? 0 : -20 }}
+        transition={{ duration: 0.5, delay: 0.3, ease: 'easeOut' }}
+        className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative"
+      >
         {/* Top row: restart + waveform + terminal all in line */}
         <div className="flex items-center w-full gap-2">
           <div className="flex items-center gap-2">
@@ -947,7 +976,10 @@ export function VoiceChat() {
       </div>
 
       {/* ── Bottom controls ── */}
-      <div
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: introReady ? 1 : 0, y: introReady ? 0 : 30 }}
+        transition={{ duration: 0.5, delay: 0.5, ease: 'easeOut' }}
         className="shrink-0 bg-black"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
@@ -1082,7 +1114,7 @@ export function VoiceChat() {
             </button>
           ) : null}
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
