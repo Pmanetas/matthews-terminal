@@ -869,7 +869,6 @@ export function VoiceChat() {
         <div className="flex flex-col gap-3 px-6 py-4 w-full overflow-hidden box-border">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
-              <VoiceWaveform isActive={false} getAudioLevel={() => 0} size={200} />
               <p className="text-white/20 text-sm">Tap the mic to start talking</p>
             </div>
           ) : (
@@ -970,8 +969,8 @@ export function VoiceChat() {
 
       {/* ── Bottom controls ── */}
       <div
-        className="shrink-0 bg-black transition-all duration-500"
-        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(30px)', transitionDelay: '0.5s', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        className="shrink-0 bg-black transition-opacity duration-500"
+        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.5s', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
         {(isListening && transcript) || micError ? (
