@@ -453,7 +453,29 @@ wss.on('connection', (ws) => {
       const entry = { type: 'tool_status', text: msg.text };
       pushHistory(entry);
       broadcastToRole('phone', entry);
-      // TTS for 💬 narrations is handled by the separate 'speak' message handler below
+
+      // Auto-detect workspace changes from tool_status file paths
+      // e.g. "Reading bets-and-regrets/CLAUDE.md" or "Editing some-repo/src/file.ts"
+      const text = msg.text || '';
+      const fileMatch = text.match(/^(?:Reading|Editing|Creating)\s+(.+)/);
+      if (fileMatch) {
+        const filePath = fileMatch[1].trim();
+        // Extract the top-level directory from the path
+        const firstSegment = filePath.split(/[/\\]/)[0];
+        if (firstSegment && state.activeRepo) {
+          const currentRepoName = path.basename(state.activeRepo);
+          // If the file's top-level dir doesn't match current repo, it's a workspace switch
+          if (firstSegment !== currentRepoName && !firstSegment.includes('.') && firstSegment.length > 1) {
+            // Build the new repo path by replacing the last segment of the current repo path
+            const parentDir = path.dirname(state.activeRepo);
+            const newRepo = path.join(parentDir, firstSegment);
+            state.activeWorkspace = firstSegment;
+            state.activeRepo = newRepo;
+            console.log(`[${timestamp()}] Workspace auto-detected from tool_status: ${firstSegment}`);
+            broadcastToRole('phone', { type: 'workspace', workspace: firstSegment, repo: newRepo });
+          }
+        }
+      }
       return;
     }
 
