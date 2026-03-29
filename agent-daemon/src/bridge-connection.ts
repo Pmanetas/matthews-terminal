@@ -147,6 +147,12 @@ export class BridgeConnection {
                     return;
                 }
                 console.log(`\x1b[35m[Daemon] Command → ${agentId}: "${text.slice(0, 60)}"\x1b[0m`);
+
+                // Immediate contextual acknowledgment — user hears something right away
+                const ackSink = this.createSink(agentId);
+                const ack = this.getContextualAck(text);
+                ackSink.sendSpeak(ack);
+
                 this.manager.sendCommand(agentId, text, msg.images).catch(err => {
                     console.error(`[Daemon] Error running command on ${agentId}:`, err);
                 });
@@ -218,6 +224,35 @@ export class BridgeConnection {
                 this.send({ type: 'workspace', data: { workspace, repo: dir } });
             },
         };
+    }
+
+    /** Pick a short, natural acknowledgment based on what the user said */
+    private getContextualAck(text: string): string {
+        const t = text.toLowerCase().trim();
+
+        // Questions — user is asking something
+        const questionWords = /^(what|where|how|why|when|can|do|is|are|did|does|will|would|should|could|have|has|who)\b/;
+        if (t.includes('?') || questionWords.test(t)) return 'Let me check.';
+
+        // Navigation — going somewhere
+        if (/\b(go to|navigate|switch to|open|head to|check out)\b/.test(t)) return 'On it.';
+
+        // Fixing / debugging
+        if (/\b(fix|debug|solve|repair|broken|bug|issue|error|wrong|problem)\b/.test(t)) return "I'll take a look.";
+
+        // Reading / checking
+        if (/\b(read|look at|check|show me|what's in|have a look|see what)\b/.test(t)) return 'Let me see.';
+
+        // Creating / building
+        if (/\b(create|build|make|add|write|set up|install|generate)\b/.test(t)) return 'On it.';
+
+        // Explaining / telling
+        if (/\b(explain|tell me|describe|walk me through|what does|what is)\b/.test(t)) return 'Sure thing.';
+
+        // Short acknowledgments / confirmations from user
+        if (t.length < 15) return 'Yep.';
+
+        return 'One sec.';
     }
 
     private scheduleReconnect(): void {

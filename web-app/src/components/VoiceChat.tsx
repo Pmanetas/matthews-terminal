@@ -425,7 +425,14 @@ export function VoiceChat() {
     return -1
   })()
 
-  const isThinking = isProcessing && messages.length > 0 && messages[messages.length - 1].role === 'user'
+  // Show thinking dots when waiting — narration messages shouldn't hide the dots
+  const lastNonNarrationMsg = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (!(messages[i] as any).narration) return messages[i]
+    }
+    return null
+  })()
+  const isThinking = isProcessing && messages.length > 0 && lastNonNarrationMsg?.role === 'user'
 
   const lastToolIndex = (() => {
     for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'tool') return i }
@@ -592,11 +599,12 @@ export function VoiceChat() {
             <span className="text-[11px] text-white/50 font-medium truncate max-w-[260px]">
               {(() => {
                 const p = workspacePath || workspace
-                // Split on / or \ and take meaningful parts (skip user/system folders)
-                const parts = p.replace(/\\/g, '/').split('/')
+                // Split on / or \ and filter out empty/drive-letter parts
+                const parts = p.replace(/\\/g, '/').split('/').filter(s => s && !/^[A-Z]:$/i.test(s))
                 const desktopIdx = parts.findIndex(s => s.toLowerCase() === 'desktop')
                 const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
-                return meaningful.join(' → ')
+                // If nothing meaningful, just show the workspace name
+                return meaningful.length > 0 ? meaningful.join(' → ') : workspace
               })()}
             </span>
           </div>
