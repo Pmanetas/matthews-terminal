@@ -971,8 +971,7 @@ export function VoiceChat() {
       {/* ── Bottom controls ── */}
       <div
         className="shrink-0 bg-black transition-all duration-500"
-        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(30px)', transitionDelay: '0.5s' }}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(30px)', transitionDelay: '0.5s', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
         {(isListening && transcript) || micError ? (
