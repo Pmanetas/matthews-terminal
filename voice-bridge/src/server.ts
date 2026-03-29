@@ -471,24 +471,38 @@ wss.on('connection', (ws) => {
       broadcastToRole('phone', entry);
 
       // Auto-detect workspace changes from tool_status file paths
-      // e.g. "Reading bets-and-regrets/CLAUDE.md" or "Editing some-repo/src/file.ts"
+      // Only detect from ABSOLUTE paths — relative paths (like "src/file.ts") are within the current repo
+      // e.g. "Reading C:\Users\Peter\Desktop\bets-and-regrets\CLAUDE.md"
       const text = msg.text || '';
       const fileMatch = text.match(/^(?:Reading|Editing|Creating)\s+(.+)/);
       if (fileMatch) {
-        const filePath = fileMatch[1].trim();
-        // Extract the top-level directory from the path
-        const firstSegment = filePath.split(/[/\\]/)[0];
-        if (firstSegment && state.activeRepo) {
-          const currentRepoName = path.basename(state.activeRepo);
-          // If the file's top-level dir doesn't match current repo, it's a workspace switch
-          if (firstSegment !== currentRepoName && !firstSegment.includes('.') && firstSegment.length > 1) {
-            // Build the new repo path by replacing the last segment of the current repo path
-            const parentDir = path.dirname(state.activeRepo);
-            const newRepo = path.join(parentDir, firstSegment);
-            state.activeWorkspace = firstSegment;
-            state.activeRepo = newRepo;
-            console.log(`[${timestamp()}] Workspace auto-detected from tool_status: ${firstSegment}`);
-            broadcastToRole('phone', { type: 'workspace', workspace: firstSegment, repo: newRepo });
+        const filePath = fileMatch[1].trim().split('\n')[0]; // Take only first line (before diff content)
+        // Only process absolute paths — relative paths are always within current project
+        const isAbsolute = /^[A-Z]:[/\\]/i.test(filePath) || filePath.startsWith('/');
+        if (isAbsolute && state.activeRepo) {
+          const normalizedFile = filePath.replace(/\\/g, '/').toLowerCase();
+          const normalizedRepo = state.activeRepo.replace(/\\/g, '/').toLowerCase();
+          // If the file is NOT under the current repo, detect the new workspace
+          if (!normalizedFile.startsWith(normalizedRepo + '/') && normalizedFile !== normalizedRepo) {
+            // Walk up from the file path to find a project root
+            let dir = path.dirname(filePath);
+            for (let i = 0; i < 10; i++) {
+              const hasMarker = ['package.json', 'CLAUDE.md', '.git'].some(
+                f => { try { return require('fs').existsSync(path.join(dir, f)); } catch { return false; } }
+              );
+              if (hasMarker) break;
+              const parent = path.dirname(dir);
+              if (parent === dir) break;
+              dir = parent;
+            }
+            const newWorkspace = path.basename(dir);
+            const normalizedDir = dir.replace(/\\/g, '/').toLowerCase();
+            if (normalizedDir !== normalizedRepo) {
+              state.activeWorkspace = newWorkspace;
+              state.activeRepo = dir;
+              console.log(`[${timestamp()}] Workspace auto-detected from tool_status: ${newWorkspace} (${dir})`);
+              broadcastToRole('phone', { type: 'workspace', workspace: newWorkspace, repo: dir });
+            }
           }
         }
       }
