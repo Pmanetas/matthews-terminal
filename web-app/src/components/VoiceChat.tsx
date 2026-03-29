@@ -179,12 +179,13 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
 
 function ThinkingDots() {
   return (
-    <div className="flex items-center gap-1.5 px-5 py-4">
+    <div className="flex items-center gap-1.5 px-1 py-1">
+      <span className="text-[11px] text-white/25 italic">thinking</span>
       {[0, 1, 2].map((i) => (
         <motion.div
           key={i}
-          className="w-2.5 h-2.5 bg-violet-400/50 rounded-full"
-          animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1.1, 0.8] }}
+          className="w-1 h-1 bg-white/30 rounded-full"
+          animate={{ opacity: [0.2, 0.8, 0.2] }}
           transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
         />
       ))}
