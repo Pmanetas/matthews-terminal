@@ -373,6 +373,16 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [])
 
+  const sendNewChat = useCallback(() => {
+    stopAllAudio()
+    setMessages([])
+    setDaemonLogs([])
+    setIsWaiting(false)
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'new_chat' }))
+    }
+  }, [])
+
   useEffect(() => {
     connect()
     return () => {
@@ -381,5 +391,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, sendStop, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs }
+  return { status, messages, sendCommand, sendStop, sendNewChat, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs }
 }

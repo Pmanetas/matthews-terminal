@@ -421,6 +421,22 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    // ── Phone requests new chat ─────────────────────────────────
+    if (role === 'phone' && msg.type === 'new_chat') {
+      console.log(`[${timestamp()}] New chat requested by phone`);
+      // Clear bridge history
+      messageHistory.length = 0;
+      daemonLogHistory.length = 0;
+      // Tell all phones to clear
+      broadcastToRole('phone', { type: 'clear_history' });
+      // Forward to daemon as a command so it restarts the Claude agent
+      const ext = getClient('extension');
+      if (ext) {
+        sendJSON(ext, { type: 'command', text: 'new chat' });
+      }
+      return;
+    }
+
     // ── Phone sends stop ───────────────────────────────────────
     if (role === 'phone' && msg.type === 'stop') {
       const ext = getClient('extension');

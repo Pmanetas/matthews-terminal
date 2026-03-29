@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle } from 'lucide-react'
+import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -380,7 +380,7 @@ export function VoiceChat() {
   const [showTerminal, setShowTerminal] = useState(false)
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
-  const { status, messages, sendCommand, sendStop, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, sendNewChat, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -560,8 +560,15 @@ export function VoiceChat() {
 
       {/* ── Header ── */}
       <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-6 relative">
-        {/* Usage counter — top left */}
-        <div className="absolute top-3 left-4 flex flex-col items-start">
+        {/* New Chat button + Usage counter — top left */}
+        <div className="absolute top-3 left-4 flex items-center gap-2">
+          <button
+            onClick={sendNewChat}
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:bg-violet-500/30 transition-colors"
+            title="New Chat"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-white/40" />
+          </button>
           <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
         </div>
 
