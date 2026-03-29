@@ -53,6 +53,9 @@ export class BridgeConnection {
                 const workspace = path.basename(this.defaultProjectDir);
                 this.send({ type: 'workspace', data: { workspace, repo: this.defaultProjectDir } });
 
+                // Clear old chat history from previous session
+                this.send({ type: 'new_session' });
+
                 // Now safe to log (client is identified, daemon_log will be forwarded)
                 console.log('\x1b[32m[Daemon] Connected to bridge\x1b[0m');
 
@@ -118,13 +121,33 @@ export class BridgeConnection {
         switch (msg.type) {
             // ── Existing bridge format (single-agent compat) ──
             case 'command': {
+                const text = (msg.text || '').trim();
+                // Check for "new chat" / "new session" / "start fresh" commands
+                if (/^(new\s*(chat|session)|start\s*(fresh|over|new)|reset\s*(chat|session))\s*[.!]?\s*$/i.test(text)) {
+                    console.log('\x1b[33m[Daemon] Starting new chat session...\x1b[0m');
+                    const agentId = this.defaultAgentId;
+                    if (agentId) {
+                        this.manager.killAgent(agentId);
+                    }
+                    // Spawn fresh agent
+                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', 'claude');
+                    this.defaultAgentId = info.agentId;
+                    // Tell bridge to clear phone history
+                    this.send({ type: 'new_session' });
+                    // Tell user
+                    const sink = this.createSink(info.agentId);
+                    sink.sendResult('Fresh session started. What do you need?');
+                    sink.sendSpeak('Fresh session started. What do you need?');
+                    console.log(`\x1b[32m[Daemon] New session ready: ${info.agentId}\x1b[0m`);
+                    break;
+                }
                 const agentId = msg.agentId || this.defaultAgentId;
                 if (!agentId) {
                     console.error('[Daemon] No agent available for command');
                     return;
                 }
-                console.log(`\x1b[35m[Daemon] Command → ${agentId}: "${(msg.text || '').slice(0, 60)}"\x1b[0m`);
-                this.manager.sendCommand(agentId, msg.text, msg.images).catch(err => {
+                console.log(`\x1b[35m[Daemon] Command → ${agentId}: "${text.slice(0, 60)}"\x1b[0m`);
+                this.manager.sendCommand(agentId, text, msg.images).catch(err => {
                     console.error(`[Daemon] Error running command on ${agentId}:`, err);
                 });
                 break;
@@ -189,6 +212,11 @@ export class BridgeConnection {
             sendSpeak: (text) => this.send({ type: 'speak', text }),
             sendNarration: (text) => this.send({ type: 'narration', text }),
             sendNewSession: () => this.send({ type: 'new_session' }),
+            sendWorkspace: (dir) => {
+                const path = require('path');
+                const workspace = path.basename(dir);
+                this.send({ type: 'workspace', data: { workspace, repo: dir } });
+            },
         };
     }
 

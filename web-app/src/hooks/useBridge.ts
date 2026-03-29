@@ -250,7 +250,8 @@ export function useBridge(onAudioDone?: () => void) {
             }
             return
           } else if (data.type === 'clear_history') {
-            setMessages((prev) => prev.filter(m => !m.replayed))
+            setMessages([])
+            setDaemonLogs([])
             setIsWaiting(false)
             return
           } else if (data.type === 'user_command') {
