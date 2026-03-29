@@ -344,7 +344,7 @@ const globalCSS = `
     margin-left: auto !important;
     width: fit-content !important;
     max-width: 85% !important;
-    background: rgb(124, 58, 237) !important;
+    background: rgb(76, 29, 149) !important;
     border-radius: 1rem !important;
     border-bottom-right-radius: 0.375rem !important;
     padding: 0.45rem 0.75rem !important;
@@ -579,31 +579,34 @@ export function VoiceChat() {
       <ParticleWave />
 
       {/* ── Header ── */}
-      <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-6 relative">
-        {/* New Chat button + Usage counter — top left */}
-        <div className="absolute top-3 left-4 flex items-center gap-2">
+      <div className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative">
+        {/* Top row: restart + waveform + terminal all in line */}
+        <div className="flex items-center w-full gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={sendNewChat}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:bg-violet-500/30 transition-colors"
+              title="New Chat"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-white/40" />
+            </button>
+            <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
+          </div>
+
+          <div className="flex-1 flex justify-center">
+            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={200} />
+          </div>
+
           <button
-            onClick={sendNewChat}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:bg-violet-500/30 transition-colors"
-            title="New Chat"
+            onClick={() => setShowTerminal(prev => !prev)}
+            className={cn(
+              'flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+              showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+            )}
           >
-            <RotateCcw className="w-3.5 h-3.5 text-white/40" />
+            <Terminal className={cn('w-3.5 h-3.5', showTerminal ? 'text-violet-400' : 'text-white/40')} />
           </button>
-          <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
         </div>
-
-        {/* Terminal viewer toggle — top right */}
-        <button
-          onClick={() => setShowTerminal(prev => !prev)}
-          className={cn(
-            'absolute top-3 right-4 flex items-center justify-center w-8 h-8 rounded-full transition-colors',
-            showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-          )}
-        >
-          <Terminal className={cn('w-3.5 h-3.5', showTerminal ? 'text-violet-400' : 'text-white/40')} />
-        </button>
-
-        <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={240} />
 
         {/* Live directory tracker */}
         {workspace && daemonConnected && (
