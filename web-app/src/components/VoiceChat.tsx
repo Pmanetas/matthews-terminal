@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
 import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted, onAudioWillPlay } from '@/hooks/useBridge'
+import { ParticleWave } from '@/components/ParticleWave'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
 import type { ImageAttachment } from '@/types'
@@ -575,6 +576,7 @@ export function VoiceChat() {
       style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none' }}
     >
       <style>{globalCSS}</style>
+      <ParticleWave />
 
       {/* ── Header ── */}
       <div className="shrink-0 flex flex-col items-center px-5 pt-3 pb-6 relative">
