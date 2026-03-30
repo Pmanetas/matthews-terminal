@@ -371,8 +371,8 @@ const globalCSS = `
   .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
   .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.12) !important; }
   .light-mode .border-white\\/\\[0\\.12\\] { border-color: rgba(0, 0, 0, 0.15) !important; }
-  .light-mode .text-violet-200\\/70 { color: rgba(0, 0, 0, 0.8) !important; }
-  .light-mode .text-white\\/90 { color: rgba(0, 0, 0, 0.9) !important; }
+  .light-mode .text-violet-200\\/70 { color: rgb(76, 29, 149) !important; }
+  .light-mode .text-white\\/90 { color: rgb(55, 20, 110) !important; }
   .light-mode .text-violet-300 { color: rgb(76, 29, 149) !important; }
   .light-mode .text-violet-400 { color: rgb(91, 33, 182) !important; }
   .light-mode .text-emerald-300\\/90 { color: rgb(5, 150, 105) !important; }
@@ -646,8 +646,8 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('h-[100dvh] flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
-      style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none' }}
+      className={cn('min-h-[100dvh] flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
+      style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none', position: 'fixed', inset: 0 }}
     >
       <style>{globalCSS}</style>
 
@@ -807,11 +807,16 @@ export function VoiceChat() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-5 top-16 z-[60] w-52 rounded-2xl border border-white/[0.08] bg-[#1A1A1E]/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+            className={cn(
+              'absolute right-5 top-16 z-[60] w-52 rounded-2xl border backdrop-blur-xl shadow-2xl overflow-hidden',
+              lightMode
+                ? 'bg-white/95 border-black/[0.1]'
+                : 'bg-[#1A1A1E]/95 border-white/[0.08]'
+            )}
             style={{ marginTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="px-5 py-3 border-b border-white/[0.06]">
-              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Settings</span>
+            <div className={cn('px-5 py-3 border-b', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
+              <span className={cn('text-xs font-semibold uppercase tracking-wider', lightMode ? 'text-black/40' : 'text-white/50')}>Settings</span>
             </div>
             <button
               onClick={() => {
@@ -819,10 +824,10 @@ export function VoiceChat() {
                 setLightMode(next)
                 localStorage.setItem('matthews-light-mode', String(next))
               }}
-              className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-white/[0.06] transition-colors"
+              className={cn('w-full flex items-center gap-3 px-5 py-3.5 transition-colors', lightMode ? 'active:bg-black/[0.04]' : 'active:bg-white/[0.06]')}
             >
-              {lightMode ? <Moon className="w-4 h-4 text-violet-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
-              <span className="text-sm text-white/70">{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
+              {lightMode ? <Moon className="w-4 h-4 text-violet-500" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
           </motion.div>
         )}
