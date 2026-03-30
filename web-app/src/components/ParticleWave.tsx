@@ -94,8 +94,8 @@ export function ParticleWave() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full pointer-events-none"
-      style={{ zIndex: 0 }}
+      className="fixed w-full pointer-events-none"
+      style={{ zIndex: 0, top: 0, left: 0, right: 0, bottom: '-50px', height: 'calc(100% + 50px)' }}
     />
   )
 }

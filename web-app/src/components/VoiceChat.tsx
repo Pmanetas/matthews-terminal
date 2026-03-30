@@ -677,7 +677,7 @@ export function VoiceChat() {
   return (
     <div
       className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'text-black light-mode' : 'text-white')}
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', height: '100dvh', overflow: 'hidden', background: lightMode ? '#ffffff' : '#000000' }}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', paddingBottom: 'max(env(safe-area-inset-bottom), 34px)', overscrollBehavior: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: '-50px', overflow: 'hidden', background: lightMode ? '#ffffff' : '#000000' }}
     >
       <style>{globalCSS}</style>
 
@@ -691,8 +691,8 @@ export function VoiceChat() {
 
       {/* Particle wave — fades in after splash, hidden in light mode */}
       <div
-        className="fixed inset-0 pointer-events-none transition-opacity duration-1000"
-        style={{ zIndex: 0, opacity: introReady && !lightMode ? 1 : 0 }}
+        className="fixed pointer-events-none transition-opacity duration-1000"
+        style={{ zIndex: 0, top: 0, left: 0, right: 0, bottom: '-50px', opacity: introReady && !lightMode ? 1 : 0 }}
       >
         <ParticleWave />
       </div>
@@ -863,7 +863,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.5</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.6</span>
             </div>
           </motion.div>
         )}
