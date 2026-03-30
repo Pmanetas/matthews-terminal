@@ -48,13 +48,13 @@ export function ParticleWave() {
         const y = vpY + depth * (h - vpY)
 
         // Spread wide enough that bottom rows go well past screen edges
-        const spread = 0.03 + depth * 1.6
+        const spread = 0.03 + depth * 2.4
 
         for (let col = 0; col < cols; col++) {
           const colT = (col / (cols - 1)) * 2 - 1 // -1 to 1
 
           // Full width spread — edges overflow past screen
-          const x = vpX + colT * (w * 0.52) * spread
+          const x = vpX + colT * (w * 0.7) * spread
 
           // Skip dots that are way off screen
           if (x < -10 || x > w + 10) continue

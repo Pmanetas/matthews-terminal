@@ -372,6 +372,10 @@ wss.on('connection', (ws) => {
       // Tell phones when daemon/extension connects
       if (role === 'extension' || role === 'daemon') {
         broadcastToRole('phone', { type: 'extension_status', connected: true });
+        // Resend workspace info if we have it — phones that connected before the daemon won't have it
+        if (state.activeWorkspace) {
+          broadcastToRole('phone', { type: 'workspace', workspace: state.activeWorkspace, repo: state.activeRepo });
+        }
       }
 
       // Send workspace info, active file, daemon status, and message history to phone on connect

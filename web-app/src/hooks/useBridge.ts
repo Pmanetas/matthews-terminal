@@ -260,7 +260,9 @@ export function useBridge(onAudioDone?: () => void) {
             }
             return
           } else if (data.type === 'clear_history') {
-            setMessages([])
+            // Keep any messages the user sent locally (non-replayed) —
+            // clear_history from daemon can arrive after the user already typed a new message
+            setMessages(prev => prev.filter(m => !m.replayed))
             setDaemonLogs([])
             setIsWaiting(false)
             return
