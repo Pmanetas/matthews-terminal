@@ -36,7 +36,7 @@ function parseDiffStats(lines: string[]): { added: number; removed: number } {
   return { added, removed }
 }
 
-function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
+function ToolContent({ text, expanded, lightMode }: { text: string; expanded: boolean; lightMode?: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
   const diffLines = lines.slice(1)
@@ -63,7 +63,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-lg overflow-hidden border-2 border-violet-400/40 bg-black/70">
+            <div className="mt-2 rounded-lg overflow-hidden" style={{ border: lightMode ? '2px solid rgba(109, 40, 217, 0.3)' : '2px solid rgba(167, 139, 250, 0.45)', background: lightMode ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.7)' }}>
               <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
@@ -371,13 +371,10 @@ const globalCSS = `
   .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
   .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.12) !important; }
   .light-mode .border-white\\/\\[0\\.12\\] { border-color: rgba(0, 0, 0, 0.15) !important; }
-  .light-mode .text-violet-200\\/70 { color: rgb(124, 58, 237) !important; }
   .light-mode .assistant-text,
-  .light-mode .assistant-text p,
-  .light-mode .assistant-text span,
-  .light-mode .assistant-text div { color: rgb(124, 58, 237) !important; }
+  .light-mode .assistant-text *:not(code):not(strong) { color: rgb(124, 58, 237) !important; }
   .light-mode .assistant-text strong { color: rgb(109, 40, 217) !important; font-weight: 700 !important; }
-  .light-mode .assistant-text code { color: rgb(139, 92, 246) !important; }
+  .light-mode .assistant-text code { color: rgb(139, 92, 246) !important; background: rgba(124, 58, 237, 0.08) !important; }
   .light-mode .text-white\\/90 { color: rgb(109, 40, 217) !important; }
   .light-mode .text-violet-300 { color: rgb(76, 29, 149) !important; }
   .light-mode .text-violet-400 { color: rgb(91, 33, 182) !important; }
@@ -756,27 +753,30 @@ export function VoiceChat() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-[#0A0A0B]/95 backdrop-blur-sm"
+            className={cn(
+              'absolute inset-x-0 top-0 bottom-0 z-50 flex flex-col backdrop-blur-sm',
+              lightMode ? 'bg-white/95' : 'bg-[#0A0A0B]/95'
+            )}
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             {/* Terminal header */}
-            <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06]">
+            <div className={cn('shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-violet-400" />
-                <span className="text-sm font-medium text-white/70">Terminal</span>
+                <span className={cn('text-sm font-medium', lightMode ? 'text-black/70' : 'text-white/70')}>Terminal</span>
               </div>
               <button
                 onClick={() => setShowTerminal(false)}
-                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:scale-90 transition-transform"
+                className={cn('flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
               >
-                <X className="w-4 h-4 text-white/40" />
+                <X className={cn('w-4 h-4', lightMode ? 'text-black/40' : 'text-white/40')} />
               </button>
             </div>
 
             {/* Log output */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-3 py-2 font-mono text-[11px] leading-relaxed">
               {daemonLogs.length === 0 ? (
-                <p className="text-white/20 text-center mt-8">No logs yet — waiting for daemon output</p>
+                <p className={cn('text-center mt-8', lightMode ? 'text-black/20' : 'text-white/20')}>No logs yet — waiting for daemon output</p>
               ) : (
                 daemonLogs.map((log, i) => (
                   <p key={i} className={cn(
@@ -786,7 +786,7 @@ export function VoiceChat() {
                     log.includes('[Daemon]') ? 'text-emerald-400/60' :
                     log.includes('You:') ? 'text-violet-400/70' :
                     log.includes('Result:') ? 'text-emerald-300/70' :
-                    'text-white/40'
+                    lightMode ? 'text-black/50' : 'text-white/40'
                   )}>{log}</p>
                 ))
               )}
@@ -794,11 +794,11 @@ export function VoiceChat() {
             </div>
 
             {/* Daemon status bar */}
-            <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t border-white/[0.06]"
+            <div className={cn('shrink-0 flex items-center gap-2 px-4 py-2 border-t', lightMode ? 'border-black/[0.06]' : 'border-white/[0.06]')}
               style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
             >
               <span className={cn('h-2 w-2 rounded-full', daemonConnected ? 'bg-emerald-400' : 'bg-red-400')} />
-              <span className="text-xs text-white/40">
+              <span className={cn('text-xs', lightMode ? 'text-black/40' : 'text-white/40')}>
                 {daemonConnected ? 'Daemon connected to bridge' : 'Daemon not connected'}
               </span>
             </div>
@@ -815,7 +815,7 @@ export function VoiceChat() {
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              'absolute right-5 top-16 z-[60] w-52 rounded-2xl border backdrop-blur-xl shadow-2xl overflow-hidden',
+              'absolute right-8 top-16 z-[60] w-56 rounded-2xl border backdrop-blur-xl shadow-2xl overflow-hidden',
               lightMode
                 ? 'bg-white/95 border-black/[0.1]'
                 : 'bg-[#1A1A1E]/95 border-white/[0.08]'
@@ -1054,26 +1054,26 @@ export function VoiceChat() {
                     <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
                   </div>
                   <div
-                    className={cn(
-                      'flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden border transition-all duration-200',
+                    className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200"
+                    style={
                       toolType === 'read'
-                        ? 'border-amber-600/50 bg-amber-900/30'
+                        ? { border: lightMode ? '1px solid rgba(217, 119, 6, 0.4)' : '1px solid rgba(217, 119, 6, 0.5)', background: lightMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.12)' }
                         : toolType === 'edit'
-                        ? 'border-violet-500/40 bg-violet-900/25'
+                        ? { border: lightMode ? '1px solid rgba(109, 40, 217, 0.3)' : '1px solid rgba(139, 92, 246, 0.4)', background: lightMode ? 'rgba(109, 40, 217, 0.06)' : 'rgba(139, 92, 246, 0.08)' }
                         : isExpanded
-                        ? 'border-violet-500/20 bg-violet-500/[0.04]'
-                        : 'border-white/[0.06] bg-white/[0.02]'
-                    )}
+                        ? { border: '1px solid rgba(139, 92, 246, 0.2)', background: 'rgba(139, 92, 246, 0.04)' }
+                        : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.06)', background: lightMode ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)' }
+                    }
                   >
                     <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
                       <ToolIcon text={msg.text} />
                     </div>
-                    <ToolContent text={msg.text} expanded={isExpanded} />
+                    <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
                   </div>
                 </div>
               ) : (
                 /* ── Assistant text ── */
-                <div className="px-1 assistant-text">
+                <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
                   {i === lastResultIndex && !msg.replayed ? (
                     <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
                   ) : (
