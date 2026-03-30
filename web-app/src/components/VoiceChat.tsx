@@ -456,7 +456,9 @@ export function VoiceChat() {
     const bg = isLight ? '#ffffff' : '#000000'
     document.body.style.setProperty('background', bg, 'important')
     document.documentElement.style.setProperty('background', bg, 'important')
-    // Toggle class on html for CSS ::after pseudo-element
+    const root = document.getElementById('root')
+    if (root) root.style.setProperty('background', bg, 'important')
+    // Toggle class on html for CSS rules
     if (isLight) {
       document.documentElement.classList.add('light-bg')
     } else {
@@ -667,8 +669,8 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', position: 'absolute', inset: 0, background: lightMode ? '#ffffff' : '#000000' }}
+      className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'text-black light-mode' : 'text-white')}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', width: '100%', height: '100%', background: lightMode ? '#ffffff' : '#000000' }}
     >
       <style>{globalCSS}</style>
 
@@ -854,7 +856,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.2</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.3</span>
             </div>
           </motion.div>
         )}
