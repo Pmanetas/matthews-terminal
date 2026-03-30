@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File, Settings, Sun, Moon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -693,7 +694,7 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'text-black light-mode' : 'text-white')}
+      className={cn('flex flex-col relative', lightMode ? 'text-black light-mode' : 'text-white')}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', position: 'fixed', inset: 0, overflow: 'hidden', background: lightMode ? '#ffffff' : '#000000' }}
     >
       <style>{globalCSS}</style>
@@ -706,13 +707,17 @@ export function VoiceChat() {
         }} />
       )}
 
-      {/* Particle wave — fades in after splash, hidden in light mode */}
-      <div
-        className="fixed inset-0 pointer-events-none transition-opacity duration-1000"
-        style={{ zIndex: 0, opacity: introReady && !lightMode ? 1 : 0 }}
-      >
-        <ParticleWave />
-      </div>
+      {/* Particle wave — rendered via portal on document.body to avoid
+          Safari containing-block issues that clip fixed children */}
+      {createPortal(
+        <div
+          className="fixed inset-0 pointer-events-none"
+          style={{ zIndex: 0, opacity: introReady && !lightMode ? 1 : 0, transition: 'opacity 1s' }}
+        >
+          <ParticleWave />
+        </div>,
+        document.body
+      )}
 
       {/* ── Header ── */}
       <div
@@ -880,7 +885,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.7</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.8</span>
             </div>
           </motion.div>
         )}
