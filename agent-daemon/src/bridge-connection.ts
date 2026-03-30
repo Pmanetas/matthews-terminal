@@ -236,33 +236,33 @@ export class BridgeConnection {
         };
     }
 
-    /** Pick a short, natural acknowledgment based on what the user said */
+    /** Pick a natural acknowledgment based on what the user said */
     private getContextualAck(text: string): string {
         const t = text.toLowerCase().trim();
 
         // Questions — user is asking something
         const questionWords = /^(what|where|how|why|when|can|do|is|are|did|does|will|would|should|could|have|has|who)\b/;
-        if (t.includes('?') || questionWords.test(t)) return 'Let me check.';
+        if (t.includes('?') || questionWords.test(t)) return 'Good question, let me have a look.';
 
         // Navigation — going somewhere
-        if (/\b(go to|navigate|switch to|open|head to|check out)\b/.test(t)) return 'On it.';
+        if (/\b(go to|navigate|switch to|open|head to|check out)\b/.test(t)) return 'Sure thing, heading there now.';
 
         // Fixing / debugging
-        if (/\b(fix|debug|solve|repair|broken|bug|issue|error|wrong|problem)\b/.test(t)) return "I'll take a look.";
+        if (/\b(fix|debug|solve|repair|broken|bug|issue|error|wrong|problem)\b/.test(t)) return "Alright, let me dig into that.";
 
         // Reading / checking
-        if (/\b(read|look at|check|show me|what's in|have a look|see what)\b/.test(t)) return 'Let me see.';
+        if (/\b(read|look at|check|show me|what's in|have a look|see what)\b/.test(t)) return 'Let me pull that up for you.';
 
         // Creating / building
-        if (/\b(create|build|make|add|write|set up|install|generate)\b/.test(t)) return 'On it.';
+        if (/\b(create|build|make|add|write|set up|install|generate)\b/.test(t)) return "Alright, I'll get that sorted.";
 
         // Explaining / telling
-        if (/\b(explain|tell me|describe|walk me through|what does|what is)\b/.test(t)) return 'Sure thing.';
+        if (/\b(explain|tell me|describe|walk me through|what does|what is)\b/.test(t)) return 'Sure, let me walk you through it.';
 
         // Short acknowledgments / confirmations from user
-        if (t.length < 15) return 'Yep.';
+        if (t.length < 15) return 'Got it, one sec.';
 
-        return 'One sec.';
+        return 'Alright, give me a moment.';
     }
 
     private handleReadFile(filePath: string): void {
