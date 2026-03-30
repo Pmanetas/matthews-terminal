@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File, Settings, Sun, Moon } from 'lucide-react'
+import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File, Settings, Sun, Moon, Keyboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -498,6 +498,8 @@ export function VoiceChat() {
   })
 
   const [showFiles, setShowFiles] = useState(false)
+  const [showTyping, setShowTyping] = useState(false)
+  const typingInputRef = useRef<HTMLInputElement>(null)
   const [, setFileNavPath] = useState<string | null>(null)
   const [viewingFile, setViewingFile] = useState<string | null>(null)
 
@@ -1196,6 +1198,43 @@ export function VoiceChat() {
           )}
         </AnimatePresence>
 
+        {/* Typing input — shown when keyboard button is tapped */}
+        {showTyping && (
+          <div className="flex items-center gap-2 px-4 pb-2">
+            <input
+              ref={typingInputRef}
+              type="text"
+              placeholder="Type a message..."
+              value={pendingMessage}
+              onChange={(e) => setPendingMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && pendingMessage.trim()) {
+                  handleSend()
+                  setShowTyping(false)
+                }
+              }}
+              className={cn(
+                'flex-1 rounded-full px-4 py-2.5 text-sm outline-none',
+                lightMode
+                  ? 'bg-black/[0.06] text-black placeholder:text-black/30'
+                  : 'bg-white/[0.08] text-white placeholder:text-white/30'
+              )}
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                if (pendingMessage.trim()) {
+                  handleSend()
+                }
+                setShowTyping(false)
+              }}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+            >
+              <ArrowUp className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        )}
+
         {/* Action row — centered orb with flanking buttons */}
         <div className="flex items-center justify-center gap-5 px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
           {/* File browser button (left) */}
@@ -1252,33 +1291,47 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Right button: X cancel when pending text, send for images-only, camera otherwise */}
-          {!showStop && pendingMessage ? (
-            <button
-              onClick={() => { setPendingMessage(''); setPendingImages([]); }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-            >
-              <X className="w-4 h-4 text-white/40" />
-            </button>
-          ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
-            <motion.button
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={handleSend}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
-            >
-              <ArrowUp className="w-4 h-4 text-white" />
-            </motion.button>
-          ) : !showStop ? (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-            >
-              <Camera className="w-4 h-4 text-white/40" />
-            </button>
-          ) : null}
+          {/* Right buttons */}
+          {!showStop && (
+            <div className="flex items-center gap-2">
+              {pendingMessage ? (
+                <button
+                  onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+                >
+                  <X className="w-4 h-4 text-white/40" />
+                </button>
+              ) : pendingImages.length > 0 ? (
+                <button
+                  onClick={handleSend}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+                >
+                  <ArrowUp className="w-4 h-4 text-white" />
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowTyping(prev => !prev)
+                      setTimeout(() => typingInputRef.current?.focus(), 100)
+                    }}
+                    className={cn(
+                      'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                      showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+                    )}
+                  >
+                    <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+                  >
+                    <Camera className="w-4 h-4 text-white/40" />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
