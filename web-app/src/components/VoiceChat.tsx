@@ -8,7 +8,7 @@ import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAud
 import { ParticleWave } from '@/components/ParticleWave'
 import { SplashScreen } from '@/components/SplashScreen'
 import { useVoice } from '@/hooks/useVoice'
-import { resizeImage, MAX_IMAGE_SIZE } from '@/lib/image-utils'
+import { resizeImage } from '@/lib/image-utils'
 import type { ImageAttachment } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────────────
