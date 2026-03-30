@@ -63,7 +63,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-lg overflow-hidden border-2 border-white/[0.12] bg-black/50">
+            <div className="mt-2 rounded-lg overflow-hidden border-2 border-white/20 bg-black/60">
               <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
@@ -399,11 +399,14 @@ const globalCSS = `
   .light-mode .border-red-500\\/25 { border-color: rgba(220, 38, 38, 0.2) !important; }
   .light-mode .border-emerald-500\\/25 { border-color: rgba(5, 150, 105, 0.2) !important; }
   /* Tool card amber tints for light mode */
-  .light-mode .bg-amber-500\\/\\[0\\.06\\] { background: rgba(245, 158, 11, 0.1) !important; }
-  .light-mode .bg-amber-500\\/\\[0\\.03\\] { background: rgba(245, 158, 11, 0.06) !important; }
-  .light-mode .border-amber-500\\/25 { border-color: rgba(217, 119, 6, 0.25) !important; }
-  .light-mode .border-amber-500\\/10 { border-color: rgba(217, 119, 6, 0.15) !important; }
+  .light-mode .bg-amber-500\\/15 { background: rgba(245, 158, 11, 0.18) !important; }
+  .light-mode .bg-amber-500\\/10 { background: rgba(245, 158, 11, 0.12) !important; }
+  .light-mode .border-amber-500\\/40 { border-color: rgba(217, 119, 6, 0.4) !important; }
+  .light-mode .border-amber-500\\/20 { border-color: rgba(217, 119, 6, 0.25) !important; }
   .light-mode .text-amber-400 { color: rgb(180, 83, 9) !important; }
+  /* Diff box border in light mode */
+  .light-mode .border-white\\/20 { border-color: rgba(0, 0, 0, 0.2) !important; }
+  .light-mode .bg-black\\/60 { background: rgba(0, 0, 0, 0.06) !important; }
   .light-mode p, .light-mode span { transition: color 0.5s; }
 `
 
@@ -1056,11 +1059,11 @@ export function VoiceChat() {
                     className={cn(
                       'flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden border transition-all duration-200',
                       toolType === 'read' && isExpanded
-                        ? 'border-amber-500/25 bg-amber-500/[0.06]'
+                        ? 'border-amber-500/40 bg-amber-500/15'
                         : toolType === 'read'
-                        ? 'border-amber-500/10 bg-amber-500/[0.03]'
+                        ? 'border-amber-500/20 bg-amber-500/10'
                         : toolType === 'edit' && isExpanded
-                        ? 'border-violet-500/25 bg-violet-500/[0.06]'
+                        ? 'border-violet-500/30 bg-violet-500/10'
                         : isExpanded
                         ? 'border-violet-500/20 bg-violet-500/[0.04]'
                         : 'border-white/[0.06] bg-white/[0.02]'
