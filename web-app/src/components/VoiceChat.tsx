@@ -4,7 +4,7 @@ import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pe
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioStarted, onAudioWillPlay } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioWillPlay } from '@/hooks/useBridge'
 import { ParticleWave } from '@/components/ParticleWave'
 import { SplashScreen } from '@/components/SplashScreen'
 import { useVoice } from '@/hooks/useVoice'
@@ -120,24 +120,20 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
 }
 
 function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: boolean; onUpdate?: () => void }) {
-  // Skip animation entirely if this text was already shown
   const alreadyDone = animatedTexts.has(text)
   const [chars, setChars] = useState(animate && !alreadyDone ? 0 : text.length)
-  const prevTextRef = useRef(text)
-  const rafRef = useRef(0)
-  const waitingForAudio = useRef(true)
-  const fallbackStartRef = useRef(0)
+  const textRef = useRef(text)
+  const onUpdateRef = useRef(onUpdate)
+  onUpdateRef.current = onUpdate
 
+  // Reset when text changes
   useEffect(() => {
-    if (!animate || alreadyDone) { setChars(text.length); return }
-    if (text !== prevTextRef.current) {
-      prevTextRef.current = text
+    if (text !== textRef.current) {
+      textRef.current = text
       if (animatedTexts.has(text)) { setChars(text.length); return }
       setChars(0)
-      waitingForAudio.current = true
-      fallbackStartRef.current = 0
     }
-  }, [text, animate, alreadyDone])
+  }, [text])
 
   // Mark text as animated once complete
   useEffect(() => {
@@ -146,46 +142,57 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     }
   }, [chars, text])
 
-  // Listen for audio start
+  // Single animation loop — runs once per mount, never restarts from deps
   useEffect(() => {
-    if (!animate) return
-    const cb = () => { waitingForAudio.current = false }
-    onAudioStarted(cb)
-    return () => onAudioStarted(() => {})
-  }, [text, animate])
+    if (!animate || alreadyDone) { setChars(text.length); return }
 
-  useEffect(() => {
-    if (!animate || chars >= text.length) return
+    let waitStart = 0
+    let revealStart = 0
+    const WAIT_TIMEOUT = 4000
+
     const tick = (now: number) => {
-      // Wait for audio to start, but give up after 8s and reveal at steady pace
-      if (waitingForAudio.current && !audioStartedForResult) {
-        if (fallbackStartRef.current === 0) fallbackStartRef.current = now
-        if (now - fallbackStartRef.current < 8000) {
+      const currentText = textRef.current
+
+      // Phase 1: wait for result audio to start (max 4s)
+      if (!audioStartedForResult) {
+        if (waitStart === 0) waitStart = now
+        if (now - waitStart < WAIT_TIMEOUT) {
           rafRef.current = requestAnimationFrame(tick)
           return
         }
       }
 
-      // Sync to audio playback if available
-      if (sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
+      // Phase 2: sync to result audio if playing
+      if (audioStartedForResult && sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
         const progress = sharedAudio.currentTime / sharedAudio.duration
-        // Audio plays in chunks — use progress but also ensure forward movement
-        const audioTarget = Math.floor(progress * text.length)
-        setChars((c) => Math.min(Math.max(c, audioTarget), text.length))
-      } else if (audioStartedForResult || (fallbackStartRef.current > 0 && now - fallbackStartRef.current >= 8000)) {
-        // Audio finished or timed out — reveal remaining at 60 chars/sec
-        if (fallbackStartRef.current === 0) fallbackStartRef.current = now
-        const elapsed = now - fallbackStartRef.current
-        const target = Math.floor(elapsed * 0.06)
-        setChars((c) => Math.min(Math.max(c, target), text.length))
+        const target = Math.floor(progress * currentText.length)
+        setChars((c) => Math.min(Math.max(c, target), currentText.length))
+      } else if (audioStartedForResult || now - waitStart >= WAIT_TIMEOUT) {
+        // Phase 3: audio done or timed out — reveal at 80 chars/sec
+        if (revealStart === 0) revealStart = now
+        const elapsed = now - revealStart
+        const target = Math.floor(elapsed * 0.08)
+        setChars((c) => {
+          const next = Math.min(Math.max(c, target), currentText.length)
+          if (next >= currentText.length) return currentText.length
+          return next
+        })
       }
 
-      onUpdate?.()
-      rafRef.current = requestAnimationFrame(tick)
+      onUpdateRef.current?.()
+
+      // Stop loop when done
+      setChars((c) => {
+        if (c >= currentText.length) return c
+        rafRef.current = requestAnimationFrame(tick)
+        return c
+      })
     }
-    rafRef.current = requestAnimationFrame(tick)
+
+    const rafRef = { current: requestAnimationFrame(tick) }
     return () => cancelAnimationFrame(rafRef.current)
-  }, [text, animate, chars, onUpdate])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — runs once, uses refs for current values
 
   return <MarkdownMessage text={text.slice(0, chars)} />
 }
@@ -856,7 +863,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.4</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.5</span>
             </div>
           </motion.div>
         )}
