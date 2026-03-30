@@ -47,8 +47,8 @@ export function ParticleWave() {
         const depth = Math.pow(rowT, 1.8)
         const y = vpY + depth * (h - vpY)
 
-        // Spread wide enough that bottom rows go well past screen edges
-        const spread = 0.03 + depth * 2.4
+        // Spread wide — even back rows should cover most of the screen width
+        const spread = 0.4 + depth * 2.0
 
         for (let col = 0; col < cols; col++) {
           const colT = (col / (cols - 1)) * 2 - 1 // -1 to 1

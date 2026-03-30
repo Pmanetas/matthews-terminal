@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File } from 'lucide-react'
+import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File, Settings, Sun, Moon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
@@ -353,6 +353,29 @@ const globalCSS = `
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
+  /* Light mode overrides */
+  .light-mode .user-bubble {
+    background: rgb(109, 40, 217) !important;
+  }
+  .light-mode .user-bubble p { color: #fff !important; }
+  .light-mode .text-white\\/50,
+  .light-mode .text-white\\/40,
+  .light-mode .text-white\\/30,
+  .light-mode .text-white\\/25,
+  .light-mode .text-white\\/20 { color: rgba(0, 0, 0, 0.5) !important; }
+  .light-mode .text-white\\/70 { color: rgba(0, 0, 0, 0.7) !important; }
+  .light-mode .bg-white\\/\\[0\\.06\\] { background: rgba(0, 0, 0, 0.06) !important; }
+  .light-mode .bg-white\\/\\[0\\.04\\] { background: rgba(0, 0, 0, 0.04) !important; }
+  .light-mode .bg-white\\/\\[0\\.02\\] { background: rgba(0, 0, 0, 0.02) !important; }
+  .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.08) !important; }
+  .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
+  .light-mode .text-violet-200\\/70 { color: rgba(0, 0, 0, 0.75) !important; }
+  .light-mode .text-white\\/90 { color: rgba(0, 0, 0, 0.9) !important; }
+  .light-mode .text-violet-300 { color: rgb(109, 40, 217) !important; }
+  .light-mode .text-emerald-300\\/90 { color: rgb(5, 150, 105) !important; }
+  .light-mode .bg-black\\/40 { background: rgba(0, 0, 0, 0.04) !important; }
+  .light-mode .text-violet-400\\/60 { color: rgba(109, 40, 217, 0.6) !important; }
+  .light-mode p, .light-mode span { transition: color 0.5s; }
 `
 
 // Track which result texts have already been animated (survives re-renders and remounts)
@@ -384,6 +407,8 @@ export function VoiceChat() {
   }, [])
 
   const [showTerminal, setShowTerminal] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
   const { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
@@ -576,7 +601,7 @@ export function VoiceChat() {
 
   return (
     <div
-      className="h-[100dvh] flex flex-col bg-black text-white relative"
+      className={cn('h-[100dvh] flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
       style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none' }}
     >
       <style>{globalCSS}</style>
@@ -589,18 +614,18 @@ export function VoiceChat() {
         }} />
       )}
 
-      {/* Particle wave — fades in after splash */}
+      {/* Particle wave — fades in after splash, hidden in light mode */}
       <div
         className="fixed inset-0 pointer-events-none transition-opacity duration-1000"
-        style={{ zIndex: 0, opacity: introReady ? 1 : 0 }}
+        style={{ zIndex: 0, opacity: introReady && !lightMode ? 1 : 0 }}
       >
         <ParticleWave />
       </div>
 
       {/* ── Header ── */}
       <div
-        className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative transition-all duration-500"
-        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-20px)', transitionDelay: '0.3s' }}
+        className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative transition-all duration-400"
+        style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-10px)', transitionDelay: '0.1s' }}
       >
         {/* Top row: restart + waveform + terminal all in line */}
         <div className="flex items-center w-full gap-2">
@@ -612,29 +637,40 @@ export function VoiceChat() {
             >
               <RotateCcw className="w-3.5 h-3.5 text-white/40" />
             </button>
-            <span className="text-[10px] text-white/25">{messages.filter(m => m.role === 'user').length} msgs</span>
+            <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{messages.filter(m => m.role === 'user').length} msgs</span>
           </div>
 
           <div className="flex-1 flex justify-center">
             <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={200} />
           </div>
 
-          <button
-            onClick={() => setShowTerminal(prev => !prev)}
-            className={cn(
-              'flex items-center justify-center w-8 h-8 rounded-full transition-colors',
-              showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-            )}
-          >
-            <Terminal className={cn('w-3.5 h-3.5', showTerminal ? 'text-violet-400' : 'text-white/40')} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTerminal(prev => !prev)}
+              className={cn(
+                'flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+                showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              <Terminal className={cn('w-3.5 h-3.5', showTerminal ? 'text-violet-400' : 'text-white/40')} />
+            </button>
+            <button
+              onClick={() => setShowSettings(prev => !prev)}
+              className={cn(
+                'flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+                showSettings ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              <Settings className={cn('w-3.5 h-3.5', showSettings ? 'text-violet-400' : 'text-white/40')} />
+            </button>
+          </div>
         </div>
 
         {/* Live directory tracker */}
         {workspace && daemonConnected && (
           <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.06]">
             <Terminal className="w-3 h-3 text-violet-400/60 shrink-0" />
-            <span className="text-[11px] text-white/50 font-medium truncate max-w-[260px]">
+            <span className={cn('text-[11px] font-medium truncate max-w-[260px]', lightMode ? 'text-black/50' : 'text-white/50')}>
               {(() => {
                 const p = workspacePath || workspace
                 // Split on / or \ and filter out empty/drive-letter parts
@@ -650,7 +686,7 @@ export function VoiceChat() {
 
         <div className="flex items-center gap-1.5 mt-1">
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
-          <span className="text-[10px] text-white/30 truncate max-w-[200px]">{statusLabel}</span>
+          <span className={cn('text-[10px] truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/30')}>{statusLabel}</span>
         </div>
         {activeFile && (
           <div className="flex items-center gap-1 mt-0.5">
@@ -717,6 +753,39 @@ export function VoiceChat() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Settings popup ── */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-3 top-16 z-[60] w-48 rounded-2xl border border-white/[0.08] bg-[#1A1A1E]/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+            style={{ marginTop: 'env(safe-area-inset-top)' }}
+          >
+            <div className="px-4 py-3 border-b border-white/[0.06]">
+              <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Settings</span>
+            </div>
+            <button
+              onClick={() => {
+                const next = !lightMode
+                setLightMode(next)
+                localStorage.setItem('matthews-light-mode', String(next))
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/[0.06] transition-colors"
+            >
+              {lightMode ? <Moon className="w-4 h-4 text-violet-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
+              <span className="text-sm text-white/70">{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Backdrop to close settings */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[55]" onClick={() => setShowSettings(false)} />
+      )}
 
       {/* ── File browser overlay ── */}
       <AnimatePresence>
@@ -869,7 +938,7 @@ export function VoiceChat() {
         <div className="flex flex-col gap-3 px-6 py-4 w-full overflow-hidden box-border">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
-              <p className="text-white/20 text-sm">Tap the mic to start talking</p>
+              <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
             </div>
           ) : (
             messages.map((msg, i) => {
@@ -969,8 +1038,8 @@ export function VoiceChat() {
 
       {/* ── Bottom controls ── */}
       <div
-        className="shrink-0 bg-black transition-opacity duration-500"
-        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.5s', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        className={cn('shrink-0 transition-all duration-300', lightMode ? 'bg-white' : 'bg-black')}
+        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
         {(isListening && transcript) || micError ? (
