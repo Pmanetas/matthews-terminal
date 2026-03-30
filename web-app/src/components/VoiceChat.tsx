@@ -1192,12 +1192,6 @@ export function VoiceChat() {
         {/* Typing input — shown when keyboard button is tapped */}
         {showTyping && (
           <div className="flex items-center gap-2 px-4 pb-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-            >
-              <Camera className="w-3.5 h-3.5 text-white/40" />
-            </button>
             <input
               ref={typingInputRef}
               type="text"
@@ -1288,7 +1282,7 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Right button — keyboard toggle (default), X (pending text), send (pending images) */}
+          {/* Right buttons — camera + keyboard (default), X (pending text), send (pending images) */}
           {!showStop && pendingMessage ? (
             <button
               onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
@@ -1296,26 +1290,38 @@ export function VoiceChat() {
             >
               <X className="w-4 h-4 text-white/40" />
             </button>
-          ) : !showStop && pendingImages.length > 0 ? (
-            <button
+          ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
+            <motion.button
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ duration: 0.15 }}
               onClick={handleSend}
               className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
             >
               <ArrowUp className="w-4 h-4 text-white" />
-            </button>
+            </motion.button>
           ) : !showStop ? (
-            <button
-              onClick={() => {
-                setShowTyping(prev => !prev)
-                setTimeout(() => typingInputRef.current?.focus(), 100)
-              }}
-              className={cn(
-                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-              )}
-            >
-              <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
-            </button>
+            <>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+              >
+                <Camera className="w-4 h-4 text-white/40" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowTyping(prev => !prev)
+                  setTimeout(() => typingInputRef.current?.focus(), 100)
+                }}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                  showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+                )}
+              >
+                <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
+              </button>
+            </>
           ) : null}
         </div>
       </div>
