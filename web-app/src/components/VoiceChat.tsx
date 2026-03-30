@@ -707,17 +707,7 @@ export function VoiceChat() {
         }} />
       )}
 
-      {/* Particle wave — rendered via portal on document.body to avoid
-          Safari containing-block issues that clip fixed children */}
-      {createPortal(
-        <div
-          className="fixed inset-0 pointer-events-none"
-          style={{ zIndex: 0, opacity: introReady && !lightMode ? 1 : 0, transition: 'opacity 1s' }}
-        >
-          <ParticleWave />
-        </div>,
-        document.body
-      )}
+      {/* Particle wave removed — caused persistent bottom gap on iOS */}
 
       {/* ── Header ── */}
       <div
@@ -885,7 +875,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.0</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.1</span>
             </div>
           </motion.div>
         )}
