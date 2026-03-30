@@ -156,9 +156,7 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
       return
     }
 
-    let waitStart = 0
     let revealStart = 0
-    const WAIT_TIMEOUT = 4000
     let stopped = false
 
     const tick = (now: number) => {
@@ -169,27 +167,20 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
       // Already done — stop
       if (currentChars >= currentText.length) return
 
-      // Phase 1: wait for result audio to start (max 4s)
-      if (!audioStartedForResult) {
-        if (waitStart === 0) waitStart = now
-        if (now - waitStart < WAIT_TIMEOUT) {
-          rafRef.current = requestAnimationFrame(tick)
-          return
-        }
-      }
-
       let newChars = currentChars
 
-      // Phase 2: sync to result audio if playing
+      // If result audio is playing, sync text to audio progress
       if (audioStartedForResult && sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
         const progress = sharedAudio.currentTime / sharedAudio.duration
         newChars = Math.min(Math.max(currentChars, Math.floor(progress * currentText.length)), currentText.length)
-      } else if (audioStartedForResult || now - waitStart >= WAIT_TIMEOUT) {
-        // Phase 3: audio done or timed out — reveal at 80 chars/sec
+        revealStart = 0 // reset so phase 2 starts fresh after audio ends
+      } else if (audioStartedForResult) {
+        // Audio finished — reveal remaining text at 80 chars/sec
         if (revealStart === 0) revealStart = now
         const elapsed = now - revealStart
         newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
       }
+      // else: still waiting for audio — don't reveal anything, just keep looping
 
       // Update state if changed
       if (newChars !== currentChars) {
@@ -1201,6 +1192,12 @@ export function VoiceChat() {
         {/* Typing input — shown when keyboard button is tapped */}
         {showTyping && (
           <div className="flex items-center gap-2 px-4 pb-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <Camera className="w-3.5 h-3.5 text-white/40" />
+            </button>
             <input
               ref={typingInputRef}
               type="text"
@@ -1228,9 +1225,9 @@ export function VoiceChat() {
                 }
                 setShowTyping(false)
               }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
             >
-              <ArrowUp className="w-4 h-4 text-white" />
+              <ArrowUp className="w-3.5 h-3.5 text-white" />
             </button>
           </div>
         )}
@@ -1291,47 +1288,35 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Right buttons */}
-          {!showStop && (
-            <div className="flex items-center gap-2">
-              {pendingMessage ? (
-                <button
-                  onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-                >
-                  <X className="w-4 h-4 text-white/40" />
-                </button>
-              ) : pendingImages.length > 0 ? (
-                <button
-                  onClick={handleSend}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
-                >
-                  <ArrowUp className="w-4 h-4 text-white" />
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      setShowTyping(prev => !prev)
-                      setTimeout(() => typingInputRef.current?.focus(), 100)
-                    }}
-                    className={cn(
-                      'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                      showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-                    )}
-                  >
-                    <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
-                  </button>
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-                  >
-                    <Camera className="w-4 h-4 text-white/40" />
-                  </button>
-                </>
+          {/* Right button — keyboard toggle (default), X (pending text), send (pending images) */}
+          {!showStop && pendingMessage ? (
+            <button
+              onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <X className="w-4 h-4 text-white/40" />
+            </button>
+          ) : !showStop && pendingImages.length > 0 ? (
+            <button
+              onClick={handleSend}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+            >
+              <ArrowUp className="w-4 h-4 text-white" />
+            </button>
+          ) : !showStop ? (
+            <button
+              onClick={() => {
+                setShowTyping(prev => !prev)
+                setTimeout(() => typingInputRef.current?.focus(), 100)
+              }}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
               )}
-            </div>
-          )}
+            >
+              <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
+            </button>
+          ) : null}
         </div>
       </div>
 
