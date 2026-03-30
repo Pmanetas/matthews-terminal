@@ -347,19 +347,6 @@ const globalCSS = `
   .no-scrollbar { scrollbar-width: none; }
   * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
-  /* Cover iPhone home indicator area */
-  .app-root::after {
-    content: '';
-    position: fixed;
-    bottom: -200px;
-    left: -50px;
-    right: -50px;
-    height: 250px;
-    z-index: 9999;
-    pointer-events: none;
-  }
-  .app-root.bg-black::after { background: #000; }
-  .app-root.bg-white::after { background: #fff; }
   @keyframes msgFadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -673,7 +660,7 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('app-root flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
+      className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', paddingBottom: 'env(safe-area-inset-bottom)', overscrollBehavior: 'none', position: 'fixed', inset: 0 }}
     >
       <style>{globalCSS}</style>
@@ -1265,6 +1252,9 @@ export function VoiceChat() {
           ) : null}
         </div>
       </div>
+
+      {/* Cover iPhone home indicator area — real div, not pseudo-element */}
+      <div style={{ position: 'fixed', bottom: '-100px', left: '-10px', right: '-10px', height: '150px', background: lightMode ? '#fff' : '#000', zIndex: 9999, pointerEvents: 'none' as const }} />
     </div>
   )
 }
