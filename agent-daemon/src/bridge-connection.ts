@@ -288,7 +288,7 @@ export class BridgeConnection {
         try {
             const entries = fs.readdirSync(dirPath, { withFileTypes: true });
             const files = entries
-                .filter((e: any) => !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
+                .filter((e: any) => (e.name === '.matthews' || !e.name.startsWith('.')) && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '__pycache__')
                 .map((e: any) => ({
                     name: e.name,
                     type: e.isDirectory() ? 'dir' : 'file',

@@ -23,7 +23,7 @@ body {
   min-height: 100dvh;
 }
 
-/* iPhone bottom gap cover — extends background past viewport */
+/* iPhone bottom gap cover — extends background below viewport only */
 #root::after {
   content: '';
   display: block;
@@ -31,7 +31,7 @@ body {
   left: 0;
   right: 0;
   bottom: -200px;
-  height: 300px;
+  height: 200px;
   background: inherit;
   z-index: 99999;
   pointer-events: none;
