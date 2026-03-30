@@ -15,7 +15,7 @@ import type { ImageAttachment } from '@/types'
 
 function ToolIcon({ text }: { text: string }) {
   const t = text.toLowerCase()
-  if (t.startsWith('reading')) return <FileText className="w-3.5 h-3.5 text-violet-400" />
+  if (t.startsWith('reading')) return <FileText className="w-3.5 h-3.5 text-amber-400" />
   if (t.startsWith('running')) return <Terminal className="w-3.5 h-3.5 text-violet-400" />
   if (t.startsWith('searching')) return <Search className="w-3.5 h-3.5 text-violet-400" />
   if (t.startsWith('editing')) return <Pencil className="w-3.5 h-3.5 text-violet-400" />
@@ -63,7 +63,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.06] bg-black/40">
+            <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.08] bg-black/40">
               <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
@@ -75,8 +75,8 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
                       key={i}
                       className={cn(
                         'flex items-start font-mono text-[11px] leading-5',
-                        isRemove && 'bg-red-500/[0.08] border-l-2 border-l-red-500/40',
-                        isAdd && 'bg-emerald-500/[0.08] border-l-2 border-l-emerald-500/40',
+                        isRemove && 'bg-red-500/[0.12] border-l-2 border-l-red-500/50',
+                        isAdd && 'bg-emerald-500/[0.12] border-l-2 border-l-emerald-500/50',
                         !isRemove && !isAdd && 'border-l-2 border-l-transparent',
                       )}
                     >
@@ -442,7 +442,7 @@ export function VoiceChat() {
     if (!el) return
     const handleScroll = () => {
       if (isAutoScrollingRef.current) return
-      const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+      const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200
       userScrolledRef.current = !isAtBottom
     }
     el.addEventListener('scroll', handleScroll, { passive: true })
@@ -502,6 +502,15 @@ export function VoiceChat() {
     }
   }, [])
 
+  // Reset user-scrolled flag when new messages arrive so auto-scroll resumes
+  const prevMsgCountRef = useRef(messages.length)
+  useEffect(() => {
+    if (messages.length > prevMsgCountRef.current) {
+      userScrolledRef.current = false
+    }
+    prevMsgCountRef.current = messages.length
+  }, [messages.length])
+
   useEffect(() => { scrollToBottom() }, [messages, expandedTools, scrollToBottom])
   useEffect(() => {
     const t = setTimeout(scrollToBottom, 300)
@@ -559,9 +568,11 @@ export function VoiceChat() {
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
+    // Copy to array BEFORE clearing input — mobile browsers invalidate the FileList on reset
+    const fileArray = Array.from(files)
     e.target.value = ''
 
-    for (const file of Array.from(files)) {
+    for (const file of fileArray) {
       try {
         const { data, mimeType } = await resizeImage(file)
         setPendingImages(prev => [...prev, { data, mimeType, name: file.name }])
@@ -629,7 +640,7 @@ export function VoiceChat() {
 
       {/* ── Header ── */}
       <div
-        className="shrink-0 flex flex-col items-center px-4 pt-3 pb-4 relative transition-all duration-400"
+        className="shrink-0 flex flex-col items-center px-5 pt-3 pb-4 relative transition-all duration-400"
         style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-10px)', transitionDelay: '0.1s' }}
       >
         {/* Top row: restart + waveform + terminal all in line */}
@@ -800,11 +811,14 @@ export function VoiceChat() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="absolute inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-[#0A0A0B]/95 backdrop-blur-sm"
+            className={cn(
+              'absolute inset-x-0 top-0 bottom-0 z-50 flex flex-col backdrop-blur-sm',
+              lightMode ? 'bg-white/95' : 'bg-[#0A0A0B]/95'
+            )}
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             {/* Header */}
-            <div className="shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b border-white/[0.06]">
+            <div className={cn('shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
               <div className="flex items-center gap-2 min-w-0">
                 {/* Back button — always visible when not viewing file, navigates up */}
                 {!viewingFile && (
@@ -957,6 +971,8 @@ export function VoiceChat() {
               // Narrations are spoken via TTS but not displayed
               if (msg.narration) return null
 
+              const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+
               const content = msg.role === 'user' ? (
                 /* ── User bubble — flush right ── */
                 <div className="user-bubble">
@@ -997,7 +1013,13 @@ export function VoiceChat() {
                   <div
                     className={cn(
                       'flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden border transition-all duration-200',
-                      isExpanded
+                      toolType === 'read' && isExpanded
+                        ? 'border-amber-500/25 bg-amber-500/[0.06]'
+                        : toolType === 'read'
+                        ? 'border-amber-500/10 bg-amber-500/[0.03]'
+                        : toolType === 'edit' && isExpanded
+                        ? 'border-violet-500/25 bg-violet-500/[0.06]'
+                        : isExpanded
                         ? 'border-violet-500/20 bg-violet-500/[0.04]'
                         : 'border-white/[0.06] bg-white/[0.02]'
                     )}
