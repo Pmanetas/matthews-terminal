@@ -1226,27 +1226,29 @@ export function VoiceChat() {
           </div>
         )}
 
-        {/* Action row — centered orb with flanking buttons */}
-        <div className="flex items-center justify-center gap-5 px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-          {/* File browser button (left) */}
-          {!showStop && (
-            <button
-              onClick={() => {
-                setShowFiles(true)
-                setFileNavPath(null)
-                setViewingFile(null)
-                requestFiles()
-              }}
-              className={cn(
-                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-              )}
-            >
-              <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
-            </button>
-          )}
+        {/* Action row — mic stays dead centre, equal-width sides */}
+        <div className="flex items-center px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          {/* Left side — fixed width to balance right side */}
+          <div className="flex items-center justify-start gap-2 flex-1">
+            {!showStop && (
+              <button
+                onClick={() => {
+                  setShowFiles(true)
+                  setFileNavPath(null)
+                  setViewingFile(null)
+                  requestFiles()
+                }}
+                className={cn(
+                  'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                  showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+                )}
+              >
+                <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
+              </button>
+            )}
+          </div>
 
-          {/* Central mic orb / stop / send */}
+          {/* Centre — mic orb / stop / send */}
           <AnimatePresence mode="wait">
             {showStop ? (
               <motion.button
@@ -1282,47 +1284,49 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Right buttons — camera + keyboard (default), X (pending text), send (pending images) */}
-          {!showStop && pendingMessage ? (
-            <button
-              onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-            >
-              <X className="w-4 h-4 text-white/40" />
-            </button>
-          ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
-            <motion.button
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={handleSend}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
-            >
-              <ArrowUp className="w-4 h-4 text-white" />
-            </motion.button>
-          ) : !showStop ? (
-            <>
+          {/* Right side — camera + keyboard, same flex-1 as left to keep mic centred */}
+          <div className="flex items-center justify-end gap-2 flex-1">
+            {!showStop && pendingMessage ? (
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
               >
-                <Camera className="w-4 h-4 text-white/40" />
+                <X className="w-4 h-4 text-white/40" />
               </button>
-              <button
-                onClick={() => {
-                  setShowTyping(prev => !prev)
-                  setTimeout(() => typingInputRef.current?.focus(), 100)
-                }}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                  showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-                )}
+            ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
+              <motion.button
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={handleSend}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
               >
-                <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
-              </button>
-            </>
-          ) : null}
+                <ArrowUp className="w-4 h-4 text-white" />
+              </motion.button>
+            ) : !showStop ? (
+              <>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+                >
+                  <Camera className="w-4 h-4 text-white/40" />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTyping(prev => !prev)
+                    setTimeout(() => typingInputRef.current?.focus(), 100)
+                  }}
+                  className={cn(
+                    'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                    showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+                  )}
+                >
+                  <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
 
