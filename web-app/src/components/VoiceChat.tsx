@@ -371,14 +371,14 @@ const globalCSS = `
   .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
   .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.12) !important; }
   .light-mode .border-white\\/\\[0\\.12\\] { border-color: rgba(0, 0, 0, 0.15) !important; }
-  .light-mode .text-violet-200\\/70 { color: rgb(76, 29, 149) !important; }
+  .light-mode .text-violet-200\\/70 { color: rgb(109, 40, 217) !important; }
   .light-mode .assistant-text,
   .light-mode .assistant-text p,
   .light-mode .assistant-text span,
-  .light-mode .assistant-text div { color: rgb(76, 29, 149) !important; }
-  .light-mode .assistant-text strong { color: rgb(55, 20, 110) !important; }
-  .light-mode .assistant-text code { color: rgb(91, 33, 182) !important; }
-  .light-mode .text-white\\/90 { color: rgb(55, 20, 110) !important; }
+  .light-mode .assistant-text div { color: rgb(109, 40, 217) !important; }
+  .light-mode .assistant-text strong { color: rgb(91, 33, 182) !important; }
+  .light-mode .assistant-text code { color: rgb(124, 58, 237) !important; }
+  .light-mode .text-white\\/90 { color: rgb(91, 33, 182) !important; }
   .light-mode .text-violet-300 { color: rgb(76, 29, 149) !important; }
   .light-mode .text-violet-400 { color: rgb(91, 33, 182) !important; }
   .light-mode .text-emerald-300\\/90 { color: rgb(5, 150, 105) !important; }
@@ -655,8 +655,8 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('min-h-[100dvh] flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
-      style={{ paddingTop: 'env(safe-area-inset-top)', overscrollBehavior: 'none', position: 'fixed', inset: 0 }}
+      className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', paddingBottom: 'env(safe-area-inset-bottom)', overscrollBehavior: 'none', position: 'fixed', inset: 0 }}
     >
       <style>{globalCSS}</style>
 
@@ -1111,7 +1111,7 @@ export function VoiceChat() {
       {/* ── Bottom controls ── */}
       <div
         className={cn('shrink-0 transition-all duration-300', lightMode ? 'bg-white' : 'bg-black')}
-        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
         {(isListening && transcript) || micError ? (
@@ -1162,7 +1162,7 @@ export function VoiceChat() {
         </AnimatePresence>
 
         {/* Action row — centered orb with flanking buttons */}
-        <div className="flex items-center justify-center gap-5 px-4">
+        <div className="flex items-center justify-center gap-5 px-4 pb-2">
           {/* File browser button (left) */}
           {!showStop && (
             <button
