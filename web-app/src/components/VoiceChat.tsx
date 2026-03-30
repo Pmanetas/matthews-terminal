@@ -63,7 +63,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-lg overflow-hidden border-2 border-white/20 bg-black/60">
+            <div className="mt-2 rounded-lg overflow-hidden border-2 border-violet-400/40 bg-black/70">
               <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
@@ -371,14 +371,14 @@ const globalCSS = `
   .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
   .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.12) !important; }
   .light-mode .border-white\\/\\[0\\.12\\] { border-color: rgba(0, 0, 0, 0.15) !important; }
-  .light-mode .text-violet-200\\/70 { color: rgb(109, 40, 217) !important; }
+  .light-mode .text-violet-200\\/70 { color: rgb(124, 58, 237) !important; }
   .light-mode .assistant-text,
   .light-mode .assistant-text p,
   .light-mode .assistant-text span,
-  .light-mode .assistant-text div { color: rgb(109, 40, 217) !important; }
-  .light-mode .assistant-text strong { color: rgb(91, 33, 182) !important; }
-  .light-mode .assistant-text code { color: rgb(124, 58, 237) !important; }
-  .light-mode .text-white\\/90 { color: rgb(91, 33, 182) !important; }
+  .light-mode .assistant-text div { color: rgb(124, 58, 237) !important; }
+  .light-mode .assistant-text strong { color: rgb(109, 40, 217) !important; font-weight: 700 !important; }
+  .light-mode .assistant-text code { color: rgb(139, 92, 246) !important; }
+  .light-mode .text-white\\/90 { color: rgb(109, 40, 217) !important; }
   .light-mode .text-violet-300 { color: rgb(76, 29, 149) !important; }
   .light-mode .text-violet-400 { color: rgb(91, 33, 182) !important; }
   .light-mode .text-emerald-300\\/90 { color: rgb(5, 150, 105) !important; }
@@ -399,14 +399,15 @@ const globalCSS = `
   .light-mode .border-red-500\\/25 { border-color: rgba(220, 38, 38, 0.2) !important; }
   .light-mode .border-emerald-500\\/25 { border-color: rgba(5, 150, 105, 0.2) !important; }
   /* Tool card amber tints for light mode */
-  .light-mode .bg-amber-500\\/15 { background: rgba(245, 158, 11, 0.18) !important; }
-  .light-mode .bg-amber-500\\/10 { background: rgba(245, 158, 11, 0.12) !important; }
-  .light-mode .border-amber-500\\/40 { border-color: rgba(217, 119, 6, 0.4) !important; }
-  .light-mode .border-amber-500\\/20 { border-color: rgba(217, 119, 6, 0.25) !important; }
+  .light-mode .bg-amber-900\\/30 { background: rgba(245, 158, 11, 0.15) !important; }
+  .light-mode .border-amber-600\\/50 { border-color: rgba(217, 119, 6, 0.4) !important; }
   .light-mode .text-amber-400 { color: rgb(180, 83, 9) !important; }
+  /* Editing card in light mode */
+  .light-mode .bg-violet-900\\/25 { background: rgba(109, 40, 217, 0.08) !important; }
+  .light-mode .border-violet-500\\/40 { border-color: rgba(109, 40, 217, 0.3) !important; }
   /* Diff box border in light mode */
-  .light-mode .border-white\\/20 { border-color: rgba(0, 0, 0, 0.2) !important; }
-  .light-mode .bg-black\\/60 { background: rgba(0, 0, 0, 0.06) !important; }
+  .light-mode .border-violet-400\\/40 { border-color: rgba(109, 40, 217, 0.35) !important; }
+  .light-mode .bg-black\\/70 { background: rgba(0, 0, 0, 0.06) !important; }
   .light-mode p, .light-mode span { transition: color 0.5s; }
 `
 
@@ -442,17 +443,14 @@ export function VoiceChat() {
   const [showSettings, setShowSettings] = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
 
-  // Sync body/html background with light mode so safe-area doesn't bleed through
-  // During splash, keep it black so no white bar shows
+  // Sync body/html/theme-color with light mode so safe-area + home bar match
   useEffect(() => {
-    if (showSplash) {
-      document.body.style.background = '#000000'
-      document.documentElement.style.background = '#000000'
-      return
-    }
-    const bg = lightMode ? '#ffffff' : '#000000'
-    document.body.style.background = bg
-    document.documentElement.style.background = bg
+    const bg = (showSplash || !lightMode) ? '#000000' : '#ffffff'
+    document.body.style.setProperty('background', bg, 'important')
+    document.documentElement.style.setProperty('background', bg, 'important')
+    // Update meta theme-color for iOS status bar / home indicator area
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', bg)
   }, [lightMode, showSplash])
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
@@ -1043,7 +1041,7 @@ export function VoiceChat() {
               ) : msg.role === 'tool' ? (
                 /* ── Tool call ── */
                 <div
-                  className="flex items-stretch gap-2.5 ml-1 cursor-pointer"
+                  className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer"
                   onClick={() => toggleToolExpand(i)}
                 >
                   <div className="flex flex-col items-center w-5 shrink-0">
@@ -1058,12 +1056,10 @@ export function VoiceChat() {
                   <div
                     className={cn(
                       'flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden border transition-all duration-200',
-                      toolType === 'read' && isExpanded
-                        ? 'border-amber-500/40 bg-amber-500/15'
-                        : toolType === 'read'
-                        ? 'border-amber-500/20 bg-amber-500/10'
-                        : toolType === 'edit' && isExpanded
-                        ? 'border-violet-500/30 bg-violet-500/10'
+                      toolType === 'read'
+                        ? 'border-amber-600/50 bg-amber-900/30'
+                        : toolType === 'edit'
+                        ? 'border-violet-500/40 bg-violet-900/25'
                         : isExpanded
                         ? 'border-violet-500/20 bg-violet-500/[0.04]'
                         : 'border-white/[0.06] bg-white/[0.02]'
