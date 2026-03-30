@@ -63,7 +63,7 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-lg overflow-hidden border border-white/[0.08] bg-black/40">
+            <div className="mt-2 rounded-lg overflow-hidden border-2 border-white/[0.12] bg-black/50">
               <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
@@ -75,26 +75,26 @@ function ToolContent({ text, expanded }: { text: string; expanded: boolean }) {
                       key={i}
                       className={cn(
                         'flex items-start font-mono text-[11px] leading-5',
-                        isRemove && 'bg-red-500/[0.12] border-l-2 border-l-red-500/50',
-                        isAdd && 'bg-emerald-500/[0.12] border-l-2 border-l-emerald-500/50',
+                        isRemove && 'bg-red-500/[0.15] border-l-2 border-l-red-500/60',
+                        isAdd && 'bg-emerald-500/[0.15] border-l-2 border-l-emerald-500/60',
                         !isRemove && !isAdd && 'border-l-2 border-l-transparent',
                       )}
                     >
                       <span className={cn(
                         'w-8 shrink-0 text-right pr-2 select-none border-r',
-                        isRemove ? 'text-red-400/40 border-red-500/20' :
-                        isAdd ? 'text-emerald-400/40 border-emerald-500/20' :
+                        isRemove ? 'text-red-400/50 border-red-500/25' :
+                        isAdd ? 'text-emerald-400/50 border-emerald-500/25' :
                         'text-white/15 border-white/[0.06]'
                       )}>{i + 1}</span>
                       <span className="w-5 shrink-0 text-center select-none">
-                        {isRemove ? <span className="text-red-400/60">−</span> :
-                         isAdd ? <span className="text-emerald-400/60">+</span> :
+                        {isRemove ? <span className="text-red-400/70">−</span> :
+                         isAdd ? <span className="text-emerald-400/70">+</span> :
                          null}
                       </span>
                       <code className={cn(
                         'whitespace-pre pr-3',
-                        isRemove ? 'text-red-300/70' :
-                        isAdd ? 'text-emerald-300/70' :
+                        isRemove ? 'text-red-300/80' :
+                        isAdd ? 'text-emerald-300/80' :
                         'text-white/30'
                       )}>{code}</code>
                     </div>
@@ -344,8 +344,9 @@ const globalCSS = `
   .msg-fade-in { animation: msgFadeIn 0.25s ease-out; }
   .user-bubble {
     margin-left: auto !important;
+    margin-right: 0.25rem !important;
     width: fit-content !important;
-    max-width: 85% !important;
+    max-width: 82% !important;
     background: rgb(76, 29, 149) !important;
     border-radius: 1rem !important;
     border-bottom-right-radius: 0.375rem !important;
@@ -355,26 +356,48 @@ const globalCSS = `
   }
   /* Light mode overrides */
   .light-mode .user-bubble {
-    background: rgb(109, 40, 217) !important;
+    background: rgb(91, 33, 182) !important;
   }
   .light-mode .user-bubble p { color: #fff !important; }
   .light-mode .text-white\\/50,
   .light-mode .text-white\\/40,
   .light-mode .text-white\\/30,
   .light-mode .text-white\\/25,
-  .light-mode .text-white\\/20 { color: rgba(0, 0, 0, 0.5) !important; }
-  .light-mode .text-white\\/70 { color: rgba(0, 0, 0, 0.7) !important; }
+  .light-mode .text-white\\/20 { color: rgba(0, 0, 0, 0.55) !important; }
+  .light-mode .text-white\\/70 { color: rgba(0, 0, 0, 0.75) !important; }
   .light-mode .bg-white\\/\\[0\\.06\\] { background: rgba(0, 0, 0, 0.06) !important; }
   .light-mode .bg-white\\/\\[0\\.04\\] { background: rgba(0, 0, 0, 0.04) !important; }
   .light-mode .bg-white\\/\\[0\\.02\\] { background: rgba(0, 0, 0, 0.02) !important; }
-  .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.08) !important; }
-  .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
-  .light-mode .text-violet-200\\/70 { color: rgba(0, 0, 0, 0.75) !important; }
+  .light-mode .border-white\\/\\[0\\.06\\] { border-color: rgba(0, 0, 0, 0.1) !important; }
+  .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.12) !important; }
+  .light-mode .border-white\\/\\[0\\.12\\] { border-color: rgba(0, 0, 0, 0.15) !important; }
+  .light-mode .text-violet-200\\/70 { color: rgba(0, 0, 0, 0.8) !important; }
   .light-mode .text-white\\/90 { color: rgba(0, 0, 0, 0.9) !important; }
-  .light-mode .text-violet-300 { color: rgb(109, 40, 217) !important; }
+  .light-mode .text-violet-300 { color: rgb(76, 29, 149) !important; }
+  .light-mode .text-violet-400 { color: rgb(91, 33, 182) !important; }
   .light-mode .text-emerald-300\\/90 { color: rgb(5, 150, 105) !important; }
-  .light-mode .bg-black\\/40 { background: rgba(0, 0, 0, 0.04) !important; }
-  .light-mode .text-violet-400\\/60 { color: rgba(109, 40, 217, 0.6) !important; }
+  .light-mode .bg-black\\/40,
+  .light-mode .bg-black\\/50 { background: rgba(0, 0, 0, 0.06) !important; }
+  .light-mode .text-violet-400\\/60 { color: rgba(76, 29, 149, 0.7) !important; }
+  /* Diff colors stronger in light mode */
+  .light-mode .text-red-300\\/80 { color: rgb(185, 28, 28) !important; }
+  .light-mode .text-emerald-300\\/80 { color: rgb(5, 120, 85) !important; }
+  .light-mode .text-red-400\\/70 { color: rgba(185, 28, 28, 0.8) !important; }
+  .light-mode .text-emerald-400\\/70 { color: rgba(5, 120, 85, 0.8) !important; }
+  .light-mode .text-red-400\\/50 { color: rgba(185, 28, 28, 0.5) !important; }
+  .light-mode .text-emerald-400\\/50 { color: rgba(5, 120, 85, 0.5) !important; }
+  .light-mode .bg-red-500\\/\\[0\\.15\\] { background: rgba(220, 38, 38, 0.12) !important; }
+  .light-mode .bg-emerald-500\\/\\[0\\.15\\] { background: rgba(5, 150, 105, 0.12) !important; }
+  .light-mode .border-l-red-500\\/60 { border-left-color: rgba(220, 38, 38, 0.5) !important; }
+  .light-mode .border-l-emerald-500\\/60 { border-left-color: rgba(5, 150, 105, 0.5) !important; }
+  .light-mode .border-red-500\\/25 { border-color: rgba(220, 38, 38, 0.2) !important; }
+  .light-mode .border-emerald-500\\/25 { border-color: rgba(5, 150, 105, 0.2) !important; }
+  /* Tool card amber tints for light mode */
+  .light-mode .bg-amber-500\\/\\[0\\.06\\] { background: rgba(245, 158, 11, 0.1) !important; }
+  .light-mode .bg-amber-500\\/\\[0\\.03\\] { background: rgba(245, 158, 11, 0.06) !important; }
+  .light-mode .border-amber-500\\/25 { border-color: rgba(217, 119, 6, 0.25) !important; }
+  .light-mode .border-amber-500\\/10 { border-color: rgba(217, 119, 6, 0.15) !important; }
+  .light-mode .text-amber-400 { color: rgb(180, 83, 9) !important; }
   .light-mode p, .light-mode span { transition: color 0.5s; }
 `
 
@@ -410,12 +433,18 @@ export function VoiceChat() {
   const [showSettings, setShowSettings] = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
 
-  // Sync body/html background with light mode so safe-area doesn't show black
+  // Sync body/html background with light mode so safe-area doesn't bleed through
+  // During splash, keep it black so no white bar shows
   useEffect(() => {
+    if (showSplash) {
+      document.body.style.background = '#000000'
+      document.documentElement.style.background = '#000000'
+      return
+    }
     const bg = lightMode ? '#ffffff' : '#000000'
     document.body.style.background = bg
     document.documentElement.style.background = bg
-  }, [lightMode])
+  }, [lightMode, showSplash])
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
   const { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
@@ -640,7 +669,7 @@ export function VoiceChat() {
 
       {/* ── Header ── */}
       <div
-        className="shrink-0 flex flex-col items-center px-5 pt-3 pb-4 relative transition-all duration-400"
+        className="shrink-0 flex flex-col items-center px-6 pt-3 pb-4 relative transition-all duration-400"
         style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-10px)', transitionDelay: '0.1s' }}
       >
         {/* Top row: restart + waveform + terminal all in line */}
@@ -778,10 +807,10 @@ export function VoiceChat() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-3 top-16 z-[60] w-48 rounded-2xl border border-white/[0.08] bg-[#1A1A1E]/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+            className="absolute right-5 top-16 z-[60] w-52 rounded-2xl border border-white/[0.08] bg-[#1A1A1E]/95 backdrop-blur-xl shadow-2xl overflow-hidden"
             style={{ marginTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="px-4 py-3 border-b border-white/[0.06]">
+            <div className="px-5 py-3 border-b border-white/[0.06]">
               <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Settings</span>
             </div>
             <button
@@ -790,7 +819,7 @@ export function VoiceChat() {
                 setLightMode(next)
                 localStorage.setItem('matthews-light-mode', String(next))
               }}
-              className="w-full flex items-center gap-3 px-4 py-3 active:bg-white/[0.06] transition-colors"
+              className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-white/[0.06] transition-colors"
             >
               {lightMode ? <Moon className="w-4 h-4 text-violet-400" /> : <Sun className="w-4 h-4 text-amber-400" />}
               <span className="text-sm text-white/70">{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
@@ -832,26 +861,26 @@ export function VoiceChat() {
                         }
                       }
                     }}
-                    className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06] active:scale-90 transition-transform shrink-0"
+                    className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform shrink-0', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
                   >
-                    <ChevronLeft className="w-4 h-4 text-white/50" />
+                    <ChevronLeft className={cn('w-4 h-4', lightMode ? 'text-black/50' : 'text-white/50')} />
                   </button>
                 )}
                 {/* Back from file viewer to file list */}
                 {viewingFile && (
                   <button
                     onClick={() => setViewingFile(null)}
-                    className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.06] active:scale-90 transition-transform shrink-0"
+                    className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform shrink-0', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
                   >
-                    <ChevronLeft className="w-4 h-4 text-white/50" />
+                    <ChevronLeft className={cn('w-4 h-4', lightMode ? 'text-black/50' : 'text-white/50')} />
                   </button>
                 )}
                 {viewingFile ? (
-                  <File className="w-4 h-4 text-white/30 shrink-0" />
+                  <File className={cn('w-4 h-4 shrink-0', lightMode ? 'text-black/30' : 'text-white/30')} />
                 ) : (
                   <FolderOpen className="w-4 h-4 text-violet-400 shrink-0" />
                 )}
-                <span className="text-sm font-medium text-white/70 truncate">
+                <span className={cn('text-sm font-medium truncate', lightMode ? 'text-black/70' : 'text-white/70')}>
                   {viewingFile
                     ? viewingFile.replace(/\\/g, '/').split('/').pop()
                     : filePath ? filePath.replace(/\\/g, '/').split('/').pop() : workspace || 'Files'}
@@ -859,16 +888,16 @@ export function VoiceChat() {
               </div>
               <button
                 onClick={() => { setShowFiles(false); setViewingFile(null) }}
-                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.06] active:scale-90 transition-transform"
+                className={cn('flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
               >
-                <X className="w-4 h-4 text-white/40" />
+                <X className={cn('w-4 h-4', lightMode ? 'text-black/40' : 'text-white/40')} />
               </button>
             </div>
 
             {/* Breadcrumb */}
             {filePath && !viewingFile && (
-              <div className="shrink-0 px-4 py-1.5 border-b border-white/[0.04]">
-                <span className="text-[10px] text-white/20 truncate block">
+              <div className={cn('shrink-0 px-4 py-1.5 border-b', lightMode ? 'border-black/[0.04]' : 'border-white/[0.04]')}>
+                <span className={cn('text-[10px] truncate block', lightMode ? 'text-black/30' : 'text-white/20')}>
                   {(() => {
                     const p = filePath.replace(/\\/g, '/')
                     const parts = p.split('/').filter(Boolean)
@@ -887,10 +916,10 @@ export function VoiceChat() {
                 ) : fileContent.error ? (
                   <p className="text-red-400/60 text-center text-sm mt-8">{fileContent.error}</p>
                 ) : (
-                  <pre className="font-mono text-[11px] leading-relaxed text-white/50 whitespace-pre">
+                  <pre className={cn('font-mono text-[11px] leading-relaxed whitespace-pre', lightMode ? 'text-black/60' : 'text-white/50')}>
                     {(fileContent.content || '').split('\n').map((line, i) => (
                       <div key={i} className="flex">
-                        <span className="w-10 shrink-0 text-right pr-3 text-white/15 select-none">{i + 1}</span>
+                        <span className={cn('w-10 shrink-0 text-right pr-3 select-none', lightMode ? 'text-black/20' : 'text-white/15')}>{i + 1}</span>
                         <span className="whitespace-pre">{line}</span>
                       </div>
                     ))}
@@ -906,7 +935,7 @@ export function VoiceChat() {
                   fileList.map((f, i) => (
                     <button
                       key={i}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/[0.04] transition-colors text-left"
+                      className={cn('w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left', lightMode ? 'active:bg-black/[0.04]' : 'active:bg-white/[0.04]')}
                       onClick={() => {
                         if (f.type === 'dir' && filePath) {
                           const newPath = filePath + (filePath.endsWith('/') || filePath.endsWith('\\') ? '' : '/') + f.name
@@ -922,11 +951,13 @@ export function VoiceChat() {
                       {f.type === 'dir' ? (
                         <Folder className="w-4 h-4 text-violet-400/60 shrink-0" />
                       ) : (
-                        <File className="w-4 h-4 text-white/25 shrink-0" />
+                        <File className={cn('w-4 h-4 shrink-0', lightMode ? 'text-black/25' : 'text-white/25')} />
                       )}
                       <span className={cn(
                         'text-sm truncate',
-                        f.type === 'dir' ? 'text-white/60' : 'text-white/40'
+                        f.type === 'dir'
+                          ? (lightMode ? 'text-black/70' : 'text-white/60')
+                          : (lightMode ? 'text-black/50' : 'text-white/40')
                       )}>{f.name}</span>
                     </button>
                   ))
@@ -935,10 +966,10 @@ export function VoiceChat() {
             )}
 
             {/* Status bar */}
-            <div className="shrink-0 flex items-center gap-2 px-4 py-2 border-t border-white/[0.06]"
+            <div className={cn('shrink-0 flex items-center gap-2 px-4 py-2 border-t', lightMode ? 'border-black/[0.06]' : 'border-white/[0.06]')}
               style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
             >
-              <span className="text-[11px] text-white/25">
+              <span className={cn('text-[11px]', lightMode ? 'text-black/30' : 'text-white/25')}>
                 {viewingFile
                   ? `${(fileContent?.content || '').split('\n').length} lines`
                   : `${fileList.filter(f => f.type === 'dir').length} folders, ${fileList.filter(f => f.type === 'file').length} files`}
