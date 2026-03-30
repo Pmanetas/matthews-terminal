@@ -15,17 +15,11 @@ export function ParticleWave() {
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1
-      const w = window.innerWidth
-      // Use the physical screen height to guarantee dots cover EVERYTHING
-      // including the iOS home indicator area that CSS viewport units miss
-      const h = Math.max(window.innerHeight, window.screen.height)
-
-      // Set CSS dimensions explicitly — this is what determines the VISIBLE area
-      canvas.style.width = w + 'px'
+      // Use screen.height for the CSS height so the canvas covers the
+      // full physical screen including iOS home indicator area
+      const h = Math.max(screen.height, window.innerHeight)
       canvas.style.height = h + 'px'
-
-      // Set pixel buffer
-      canvas.width = w * dpr
+      canvas.width = canvas.offsetWidth * dpr
       canvas.height = h * dpr
       ctx.scale(dpr, dpr)
     }
@@ -38,8 +32,8 @@ export function ParticleWave() {
     const rows = 80
 
     const draw = () => {
-      const w = window.innerWidth
-      const h = Math.max(window.innerHeight, window.screen.height)
+      const w = canvas.offsetWidth
+      const h = Math.max(screen.height, window.innerHeight)
 
       ctx.clearRect(0, 0, w, h)
 
@@ -104,8 +98,8 @@ export function ParticleWave() {
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none"
-      style={{ position: 'fixed', top: 0, left: 0, zIndex: 0 }}
+      className="fixed top-0 left-0 w-full pointer-events-none"
+      style={{ zIndex: 0 }}
     />
   )
 }
