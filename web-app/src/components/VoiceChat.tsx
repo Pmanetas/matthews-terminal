@@ -372,6 +372,12 @@ const globalCSS = `
   .light-mode .border-white\\/\\[0\\.08\\] { border-color: rgba(0, 0, 0, 0.12) !important; }
   .light-mode .border-white\\/\\[0\\.12\\] { border-color: rgba(0, 0, 0, 0.15) !important; }
   .light-mode .text-violet-200\\/70 { color: rgb(76, 29, 149) !important; }
+  .light-mode .assistant-text,
+  .light-mode .assistant-text p,
+  .light-mode .assistant-text span,
+  .light-mode .assistant-text div { color: rgb(76, 29, 149) !important; }
+  .light-mode .assistant-text strong { color: rgb(55, 20, 110) !important; }
+  .light-mode .assistant-text code { color: rgb(91, 33, 182) !important; }
   .light-mode .text-white\\/90 { color: rgb(55, 20, 110) !important; }
   .light-mode .text-violet-300 { color: rgb(76, 29, 149) !important; }
   .light-mode .text-violet-400 { color: rgb(91, 33, 182) !important; }
@@ -669,7 +675,7 @@ export function VoiceChat() {
 
       {/* ── Header ── */}
       <div
-        className="shrink-0 flex flex-col items-center px-6 pt-3 pb-4 relative transition-all duration-400"
+        className="shrink-0 flex flex-col items-center px-8 pt-3 pb-4 relative transition-all duration-400"
         style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-10px)', transitionDelay: '0.1s' }}
       >
         {/* Top row: restart + waveform + terminal all in line */}
@@ -1068,7 +1074,7 @@ export function VoiceChat() {
                 </div>
               ) : (
                 /* ── Assistant text ── */
-                <div className="px-1">
+                <div className="px-1 assistant-text">
                   {i === lastResultIndex && !msg.replayed ? (
                     <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
                   ) : (
