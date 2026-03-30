@@ -854,7 +854,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.1</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.2</span>
             </div>
           </motion.div>
         )}
@@ -1126,14 +1126,14 @@ export function VoiceChat() {
 
       {/* ── Bottom controls ── */}
       <div
-        className={cn('shrink-0 transition-all duration-300', lightMode ? 'bg-white' : 'bg-black')}
-        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s' }}
+        className="shrink-0 transition-all duration-300"
+        style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s', background: 'transparent' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
         {(isListening && transcript) || micError ? (
           <div className="max-h-[3.5rem] flex items-end justify-center px-5 overflow-hidden w-full min-w-0 pb-1">
             {isListening && transcript ? (
-              <p className="text-xs text-violet-300/60 text-center w-full min-w-0 leading-relaxed line-clamp-3">&ldquo;{transcript}&rdquo;</p>
+              <p className="text-xs text-center w-full min-w-0 leading-relaxed line-clamp-3" style={{ color: lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
             ) : micError ? (
               <p className="text-xs text-red-400 text-center">{micError}</p>
             ) : null}
