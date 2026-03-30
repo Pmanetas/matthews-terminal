@@ -452,9 +452,16 @@ export function VoiceChat() {
 
   // Sync body/html/theme-color with light mode so safe-area + home bar match
   useEffect(() => {
-    const bg = (showSplash || !lightMode) ? '#000000' : '#ffffff'
+    const isLight = !showSplash && lightMode
+    const bg = isLight ? '#ffffff' : '#000000'
     document.body.style.setProperty('background', bg, 'important')
     document.documentElement.style.setProperty('background', bg, 'important')
+    // Toggle class on html for CSS ::after pseudo-element
+    if (isLight) {
+      document.documentElement.classList.add('light-bg')
+    } else {
+      document.documentElement.classList.remove('light-bg')
+    }
     // Update meta theme-color for iOS status bar / home indicator area
     const meta = document.querySelector('meta[name="theme-color"]')
     if (meta) meta.setAttribute('content', bg)
@@ -1253,8 +1260,6 @@ export function VoiceChat() {
         </div>
       </div>
 
-      {/* Cover iPhone home indicator area — real div, not pseudo-element */}
-      <div style={{ position: 'fixed', bottom: '-100px', left: '-10px', right: '-10px', height: '150px', background: lightMode ? '#fff' : '#000', zIndex: 9999, pointerEvents: 'none' as const }} />
     </div>
   )
 }
