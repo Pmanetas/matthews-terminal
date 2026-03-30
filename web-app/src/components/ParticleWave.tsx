@@ -15,8 +15,13 @@ export function ParticleWave() {
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1
-      canvas.width = canvas.offsetWidth * dpr
-      canvas.height = canvas.offsetHeight * dpr
+      // Use the LARGER of offsetHeight and screen.height to guarantee
+      // dots cover the full physical screen on iOS (where offsetHeight
+      // may not include the home indicator safe area)
+      const w = canvas.offsetWidth
+      const h = Math.max(canvas.offsetHeight, window.screen.height, window.innerHeight + 50)
+      canvas.width = w * dpr
+      canvas.height = h * dpr
       ctx.scale(dpr, dpr)
     }
 
@@ -29,7 +34,8 @@ export function ParticleWave() {
 
     const draw = () => {
       const w = canvas.offsetWidth
-      const h = canvas.offsetHeight
+      // Use full screen height for dot rendering, not just canvas CSS height
+      const h = Math.max(canvas.offsetHeight, window.screen.height, window.innerHeight + 50)
 
       ctx.clearRect(0, 0, w, h)
 
@@ -94,8 +100,8 @@ export function ParticleWave() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed w-full pointer-events-none"
-      style={{ zIndex: 0, top: 0, left: 0, right: 0, bottom: '-50px', height: 'calc(100% + 50px)' }}
+      className="fixed inset-0 w-full h-full pointer-events-none"
+      style={{ zIndex: 0 }}
     />
   )
 }

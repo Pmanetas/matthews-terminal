@@ -123,14 +123,21 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
   const alreadyDone = animatedTexts.has(text)
   const [chars, setChars] = useState(animate && !alreadyDone ? 0 : text.length)
   const textRef = useRef(text)
+  const charsRef = useRef(animate && !alreadyDone ? 0 : text.length)
   const onUpdateRef = useRef(onUpdate)
+  const rafRef = useRef(0)
   onUpdateRef.current = onUpdate
 
   // Reset when text changes
   useEffect(() => {
     if (text !== textRef.current) {
       textRef.current = text
-      if (animatedTexts.has(text)) { setChars(text.length); return }
+      if (animatedTexts.has(text)) {
+        charsRef.current = text.length
+        setChars(text.length)
+        return
+      }
+      charsRef.current = 0
       setChars(0)
     }
   }, [text])
@@ -142,16 +149,26 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     }
   }, [chars, text])
 
-  // Single animation loop — runs once per mount, never restarts from deps
+  // Single animation loop — runs once per mount, uses refs for current values
   useEffect(() => {
-    if (!animate || alreadyDone) { setChars(text.length); return }
+    if (!animate || alreadyDone) {
+      charsRef.current = text.length
+      setChars(text.length)
+      return
+    }
 
     let waitStart = 0
     let revealStart = 0
     const WAIT_TIMEOUT = 4000
+    let stopped = false
 
     const tick = (now: number) => {
+      if (stopped) return
       const currentText = textRef.current
+      const currentChars = charsRef.current
+
+      // Already done — stop
+      if (currentChars >= currentText.length) return
 
       // Phase 1: wait for result audio to start (max 4s)
       if (!audioStartedForResult) {
@@ -162,37 +179,37 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         }
       }
 
+      let newChars = currentChars
+
       // Phase 2: sync to result audio if playing
       if (audioStartedForResult && sharedAudio && sharedAudio.duration > 0 && !sharedAudio.paused) {
         const progress = sharedAudio.currentTime / sharedAudio.duration
-        const target = Math.floor(progress * currentText.length)
-        setChars((c) => Math.min(Math.max(c, target), currentText.length))
+        newChars = Math.min(Math.max(currentChars, Math.floor(progress * currentText.length)), currentText.length)
       } else if (audioStartedForResult || now - waitStart >= WAIT_TIMEOUT) {
         // Phase 3: audio done or timed out — reveal at 80 chars/sec
         if (revealStart === 0) revealStart = now
         const elapsed = now - revealStart
-        const target = Math.floor(elapsed * 0.08)
-        setChars((c) => {
-          const next = Math.min(Math.max(c, target), currentText.length)
-          if (next >= currentText.length) return currentText.length
-          return next
-        })
+        newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
+      }
+
+      // Update state if changed
+      if (newChars !== currentChars) {
+        charsRef.current = newChars
+        setChars(newChars)
       }
 
       onUpdateRef.current?.()
 
-      // Stop loop when done
-      setChars((c) => {
-        if (c >= currentText.length) return c
+      // Continue if not done
+      if (newChars < currentText.length) {
         rafRef.current = requestAnimationFrame(tick)
-        return c
-      })
+      }
     }
 
-    const rafRef = { current: requestAnimationFrame(tick) }
-    return () => cancelAnimationFrame(rafRef.current)
+    rafRef.current = requestAnimationFrame(tick)
+    return () => { stopped = true; cancelAnimationFrame(rafRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // intentionally empty — runs once, uses refs for current values
+  }, []) // intentionally empty — runs once per mount, uses refs
 
   return <MarkdownMessage text={text.slice(0, chars)} />
 }
@@ -677,7 +694,7 @@ export function VoiceChat() {
   return (
     <div
       className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'text-black light-mode' : 'text-white')}
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', paddingBottom: 'max(env(safe-area-inset-bottom), 34px)', overscrollBehavior: 'none', position: 'fixed', top: 0, left: 0, right: 0, bottom: '-50px', overflow: 'hidden', background: lightMode ? '#ffffff' : '#000000' }}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', position: 'fixed', inset: 0, overflow: 'hidden', background: lightMode ? '#ffffff' : '#000000' }}
     >
       <style>{globalCSS}</style>
 
@@ -691,8 +708,8 @@ export function VoiceChat() {
 
       {/* Particle wave — fades in after splash, hidden in light mode */}
       <div
-        className="fixed pointer-events-none transition-opacity duration-1000"
-        style={{ zIndex: 0, top: 0, left: 0, right: 0, bottom: '-50px', opacity: introReady && !lightMode ? 1 : 0 }}
+        className="fixed inset-0 pointer-events-none transition-opacity duration-1000"
+        style={{ zIndex: 0, opacity: introReady && !lightMode ? 1 : 0 }}
       >
         <ParticleWave />
       </div>
@@ -863,7 +880,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.6</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.7</span>
             </div>
           </motion.div>
         )}
