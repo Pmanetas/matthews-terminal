@@ -409,6 +409,13 @@ export function VoiceChat() {
   const [showTerminal, setShowTerminal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
+
+  // Sync body/html background with light mode so safe-area doesn't show black
+  useEffect(() => {
+    const bg = lightMode ? '#ffffff' : '#000000'
+    document.body.style.background = bg
+    document.documentElement.style.background = bg
+  }, [lightMode])
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
   const { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
@@ -550,19 +557,17 @@ export function VoiceChat() {
   }
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
     e.target.value = ''
 
-    if (file.size > MAX_IMAGE_SIZE) {
-      console.warn('[Image] Large file, resizing...')
-    }
-
-    try {
-      const { data, mimeType } = await resizeImage(file)
-      setPendingImages(prev => [...prev, { data, mimeType, name: file.name }])
-    } catch (err) {
-      console.error('[Image] Failed to process:', err)
+    for (const file of Array.from(files)) {
+      try {
+        const { data, mimeType } = await resizeImage(file)
+        setPendingImages(prev => [...prev, { data, mimeType, name: file.name }])
+      } catch (err) {
+        console.error('[Image] Failed to process:', err)
+      }
     }
   }
 
@@ -1057,6 +1062,7 @@ export function VoiceChat() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handleImageSelect}
         />
