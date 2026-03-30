@@ -673,7 +673,7 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
+      className={cn('app-root flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', paddingBottom: 'env(safe-area-inset-bottom)', overscrollBehavior: 'none', position: 'fixed', inset: 0 }}
     >
       <style>{globalCSS}</style>
