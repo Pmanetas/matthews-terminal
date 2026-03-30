@@ -63,7 +63,7 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="mt-2 rounded-lg overflow-hidden" style={{ border: lightMode ? '2px solid rgba(109, 40, 217, 0.3)' : '2px solid rgba(167, 139, 250, 0.45)', background: lightMode ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.7)' }}>
+            <div className="mt-2 rounded-lg overflow-hidden" style={{ border: lightMode ? '2px solid rgba(109, 40, 217, 0.35)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(0, 0, 0, 0.7)' }}>
               <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
                 {diffLines.map((line, i) => {
                   const trimmed = line.trim()
@@ -73,30 +73,40 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
                   return (
                     <div
                       key={i}
-                      className={cn(
-                        'flex items-start font-mono text-[11px] leading-5',
-                        isRemove && 'bg-red-500/[0.15] border-l-2 border-l-red-500/60',
-                        isAdd && 'bg-emerald-500/[0.15] border-l-2 border-l-emerald-500/60',
-                        !isRemove && !isAdd && 'border-l-2 border-l-transparent',
-                      )}
+                      className="flex items-start font-mono text-[11px] leading-5"
+                      style={
+                        isRemove
+                          ? { background: lightMode ? 'rgba(220, 38, 38, 0.1)' : 'rgba(239, 68, 68, 0.15)', borderLeft: '3px solid rgba(239, 68, 68, 0.7)' }
+                          : isAdd
+                          ? { background: lightMode ? 'rgba(5, 150, 105, 0.1)' : 'rgba(16, 185, 129, 0.15)', borderLeft: '3px solid rgba(16, 185, 129, 0.7)' }
+                          : { borderLeft: '3px solid transparent' }
+                      }
                     >
-                      <span className={cn(
-                        'w-8 shrink-0 text-right pr-2 select-none border-r',
-                        isRemove ? 'text-red-400/50 border-red-500/25' :
-                        isAdd ? 'text-emerald-400/50 border-emerald-500/25' :
-                        'text-white/15 border-white/[0.06]'
-                      )}>{i + 1}</span>
+                      <span
+                        className="shrink-0 text-right select-none"
+                        style={{
+                          width: '2.5rem',
+                          paddingLeft: '0.5rem',
+                          paddingRight: '0.5rem',
+                          borderRight: isRemove ? '1px solid rgba(239, 68, 68, 0.2)' : isAdd ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(255,255,255,0.06)',
+                          color: isRemove ? 'rgba(239, 68, 68, 0.5)' : isAdd ? 'rgba(16, 185, 129, 0.5)' : 'rgba(255,255,255,0.15)',
+                        }}
+                      >{i + 1}</span>
                       <span className="w-5 shrink-0 text-center select-none">
-                        {isRemove ? <span className="text-red-400/70">−</span> :
-                         isAdd ? <span className="text-emerald-400/70">+</span> :
+                        {isRemove ? <span style={{ color: 'rgba(239, 68, 68, 0.7)' }}>−</span> :
+                         isAdd ? <span style={{ color: 'rgba(16, 185, 129, 0.7)' }}>+</span> :
                          null}
                       </span>
-                      <code className={cn(
-                        'whitespace-pre pr-3',
-                        isRemove ? 'text-red-300/80' :
-                        isAdd ? 'text-emerald-300/80' :
-                        'text-white/30'
-                      )}>{code}</code>
+                      <code
+                        className="whitespace-pre pr-3"
+                        style={{
+                          color: isRemove
+                            ? (lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.8)')
+                            : isAdd
+                            ? (lightMode ? 'rgb(5, 120, 85)' : 'rgba(110, 231, 183, 0.8)')
+                            : (lightMode ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.3)')
+                        }}
+                      >{code}</code>
                     </div>
                   )
                 })}
@@ -337,6 +347,19 @@ const globalCSS = `
   .no-scrollbar { scrollbar-width: none; }
   * { scrollbar-width: none; }
   *::-webkit-scrollbar { display: none; }
+  /* Cover iPhone home indicator area */
+  .app-root::after {
+    content: '';
+    position: fixed;
+    bottom: -200px;
+    left: -50px;
+    right: -50px;
+    height: 250px;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  .app-root.bg-black::after { background: #000; }
+  .app-root.bg-white::after { background: #fff; }
   @keyframes msgFadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -997,7 +1020,7 @@ export function VoiceChat() {
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
         style={{ overscrollBehavior: 'none' }}
       >
-        <div className="flex flex-col gap-3 px-6 py-4 w-full overflow-hidden box-border">
+        <div className="flex flex-col gap-3 px-5 py-4 w-full overflow-hidden box-border">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
@@ -1057,9 +1080,9 @@ export function VoiceChat() {
                     className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200"
                     style={
                       toolType === 'read'
-                        ? { border: lightMode ? '1px solid rgba(217, 119, 6, 0.4)' : '1px solid rgba(217, 119, 6, 0.5)', background: lightMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.12)' }
+                        ? { border: lightMode ? '1.5px solid rgba(180, 120, 0, 0.5)' : '1.5px solid rgba(250, 204, 21, 0.45)', background: lightMode ? 'rgba(250, 204, 21, 0.15)' : 'rgba(250, 204, 21, 0.08)' }
                         : toolType === 'edit'
-                        ? { border: lightMode ? '1px solid rgba(109, 40, 217, 0.3)' : '1px solid rgba(139, 92, 246, 0.4)', background: lightMode ? 'rgba(109, 40, 217, 0.06)' : 'rgba(139, 92, 246, 0.08)' }
+                        ? { border: lightMode ? '1.5px solid rgba(109, 40, 217, 0.35)' : '1.5px solid rgba(167, 139, 250, 0.45)', background: lightMode ? 'rgba(109, 40, 217, 0.06)' : 'rgba(139, 92, 246, 0.08)' }
                         : isExpanded
                         ? { border: '1px solid rgba(139, 92, 246, 0.2)', background: 'rgba(139, 92, 246, 0.04)' }
                         : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.06)', background: lightMode ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)' }
