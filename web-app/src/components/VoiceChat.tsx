@@ -46,7 +46,7 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
   return (
     <div className="flex flex-col min-w-0 w-full">
       <div className="flex items-center gap-2">
-        <span className="text-[13px] text-white/50 leading-tight">{header}</span>
+        <span className="text-[13px] leading-tight" style={{ color: lightMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.5)' }}>{header}</span>
         {hasDiff && (
           <span className="flex items-center gap-1.5 text-[11px] shrink-0 ml-auto">
             {added > 0 && <span className="text-emerald-400/70">+{added}</span>}
@@ -76,9 +76,9 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
                       className="flex items-start font-mono text-[11px] leading-5"
                       style={
                         isRemove
-                          ? { background: lightMode ? 'rgba(220, 38, 38, 0.1)' : 'rgba(239, 68, 68, 0.15)', borderLeft: '3px solid rgba(239, 68, 68, 0.7)' }
+                          ? { background: lightMode ? 'rgba(220, 38, 38, 0.15)' : 'rgba(239, 68, 68, 0.2)', borderLeft: '3px solid rgba(239, 68, 68, 0.8)', borderTop: '1px solid rgba(239, 68, 68, 0.15)', borderBottom: '1px solid rgba(239, 68, 68, 0.15)' }
                           : isAdd
-                          ? { background: lightMode ? 'rgba(5, 150, 105, 0.1)' : 'rgba(16, 185, 129, 0.15)', borderLeft: '3px solid rgba(16, 185, 129, 0.7)' }
+                          ? { background: lightMode ? 'rgba(5, 150, 105, 0.15)' : 'rgba(16, 185, 129, 0.2)', borderLeft: '3px solid rgba(16, 185, 129, 0.8)', borderTop: '1px solid rgba(16, 185, 129, 0.15)', borderBottom: '1px solid rgba(16, 185, 129, 0.15)' }
                           : { borderLeft: '3px solid transparent' }
                       }
                     >
@@ -668,7 +668,7 @@ export function VoiceChat() {
   return (
     <div
       className={cn('flex flex-col relative transition-colors duration-500', lightMode ? 'bg-white text-black light-mode' : 'bg-black text-white')}
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', paddingBottom: 'env(safe-area-inset-bottom)', overscrollBehavior: 'none', position: 'fixed', inset: 0 }}
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', position: 'absolute', inset: 0, background: lightMode ? '#ffffff' : '#000000' }}
     >
       <style>{globalCSS}</style>
 
@@ -853,6 +853,9 @@ export function VoiceChat() {
               {lightMode ? <Moon className="w-4 h-4 text-violet-500" /> : <Sun className="w-4 h-4 text-amber-400" />}
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
+            <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v2.1</span>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1074,12 +1077,12 @@ export function VoiceChat() {
                     className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200"
                     style={
                       toolType === 'read'
-                        ? { border: lightMode ? '1.5px solid rgba(180, 120, 0, 0.5)' : '1.5px solid rgba(250, 204, 21, 0.45)', background: lightMode ? 'rgba(250, 204, 21, 0.15)' : 'rgba(250, 204, 21, 0.08)' }
+                        ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' }
                         : toolType === 'edit'
-                        ? { border: lightMode ? '1.5px solid rgba(109, 40, 217, 0.35)' : '1.5px solid rgba(167, 139, 250, 0.45)', background: lightMode ? 'rgba(109, 40, 217, 0.06)' : 'rgba(139, 92, 246, 0.08)' }
+                        ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' }
                         : isExpanded
-                        ? { border: '1px solid rgba(139, 92, 246, 0.2)', background: 'rgba(139, 92, 246, 0.04)' }
-                        : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.06)', background: lightMode ? 'rgba(0, 0, 0, 0.02)' : 'rgba(255, 255, 255, 0.02)' }
+                        ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' }
+                        : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }
                     }
                   >
                     <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
@@ -1175,7 +1178,7 @@ export function VoiceChat() {
         </AnimatePresence>
 
         {/* Action row — centered orb with flanking buttons */}
-        <div className="flex items-center justify-center gap-5 px-4 pb-2">
+        <div className="flex items-center justify-center gap-5 px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
           {/* File browser button (left) */}
           {!showStop && (
             <button

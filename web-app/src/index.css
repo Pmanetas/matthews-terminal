@@ -21,24 +21,19 @@ body {
 
 #root {
   min-height: 100dvh;
-}
-
-/* iPhone bottom gap cover — extends background below viewport only */
-#root::after {
-  content: '';
-  display: block;
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: -200px;
-  height: 200px;
-  background: inherit;
-  z-index: 99999;
-  pointer-events: none;
+  inset: 0;
+  overflow: hidden;
 }
 
-html.light-bg, html.light-bg body, html.light-bg #root::after { background: #fff !important; }
-html:not(.light-bg), html:not(.light-bg) body, html:not(.light-bg) #root::after { background: #000 !important; }
+/* Light/dark background — applied to html, body, AND #root for complete coverage */
+html.light-bg,
+html.light-bg body,
+html.light-bg #root { background: #ffffff !important; }
+
+html:not(.light-bg),
+html:not(.light-bg) body,
+html:not(.light-bg) #root { background: #000000 !important; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
