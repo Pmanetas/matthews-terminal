@@ -163,6 +163,7 @@ export class CodexRunner {
                 'exec',
                 '--json',
                 '-s', 'danger-full-access',
+                '-',  // read prompt from stdin
             ];
 
             // Add image flags if Codex supports them
@@ -170,16 +171,17 @@ export class CodexRunner {
                 args.push('-i', img);
             }
 
-            // Add the prompt as the final argument
-            args.push(fullPrompt);
-
-            console.log(`${C.dim}[Codex] Spawning: codex ${args.slice(0, 3).join(' ')} ...${C.reset}`);
+            console.log(`${C.dim}[Codex] Spawning: codex ${args.slice(0, 3).join(' ')} ... (prompt via stdin)${C.reset}`);
 
             this.activeProcess = spawn('codex', args, {
                 cwd: this.projectDir,
                 shell: true,
                 env: { ...process.env },
             });
+
+            // Write prompt via stdin to avoid shell escaping issues with newlines
+            this.activeProcess.stdin?.write(fullPrompt);
+            this.activeProcess.stdin?.end();
 
             let fullResponseText = '';
             let lineBuffer = '';
