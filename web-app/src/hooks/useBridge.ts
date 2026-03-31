@@ -285,8 +285,11 @@ export function useBridge(onAudioDone?: () => void) {
               replayBufferRef.current.push(msg)
             } else {
               setMessages((prev) => {
-                const last = prev[prev.length - 1]
-                if (last && last.role === msg.role && last.text === msg.text && last.engine === msg.engine) return prev
+                // Check last 5 messages for duplicates
+                for (let j = prev.length - 1; j >= Math.max(0, prev.length - 5); j--) {
+                  const p = prev[j]
+                  if (p.role === msg.role && p.text === msg.text && p.engine === msg.engine) return prev
+                }
                 return [...prev, msg]
               })
             }
@@ -297,8 +300,10 @@ export function useBridge(onAudioDone?: () => void) {
               replayBufferRef.current.push(msg)
             } else {
               setMessages((prev) => {
-                const last = prev[prev.length - 1]
-                if (last && last.role === msg.role && last.text === msg.text && last.engine === msg.engine) return prev
+                for (let j = prev.length - 1; j >= Math.max(0, prev.length - 5); j--) {
+                  const p = prev[j]
+                  if (p.role === msg.role && p.text === msg.text && p.engine === msg.engine) return prev
+                }
                 return [...prev, msg]
               })
             }
@@ -320,8 +325,10 @@ export function useBridge(onAudioDone?: () => void) {
               replayBufferRef.current.push(msg)
             } else {
               setMessages((prev) => {
-                const last = prev[prev.length - 1]
-                if (last && last.role === msg.role && last.text === msg.text && last.engine === msg.engine) return prev
+                for (let j = prev.length - 1; j >= Math.max(0, prev.length - 5); j--) {
+                  const p = prev[j]
+                  if (p.role === msg.role && p.text === msg.text && p.engine === msg.engine) return prev
+                }
                 return [...prev, msg]
               })
             }

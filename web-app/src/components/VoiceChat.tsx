@@ -314,46 +314,54 @@ function MicOrb({ isListening, onClick, disabled, codexMode }: {
   }, [isListening])
 
   return (
-    <motion.button
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.8, opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      onClick={onClick}
-      disabled={disabled}
-      whileTap={{ scale: 0.9 }}
-      className={cn(
-        'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-colors',
-        isListening
-          ? codexMode
-            ? 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6)]'
-            : 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
-          : 'bg-white/[0.06] hover:bg-white/[0.1]',
-        disabled && 'opacity-30 cursor-not-allowed',
-      )}
-    >
-      {/* Voice-reactive pulse rings */}
-      <span
-        ref={ring1Ref}
-        className={cn('absolute inset-0 rounded-full transition-none', codexMode ? 'bg-red-500/30' : 'bg-violet-500/30')}
-        style={{ opacity: 0 }}
-      />
-      <span
-        ref={ring2Ref}
-        className={cn('absolute -inset-2 rounded-full border-2 transition-none', codexMode ? 'border-red-400/30' : 'border-violet-400/30')}
-        style={{ opacity: 0 }}
-      />
-      <span
-        ref={ring3Ref}
-        className={cn('absolute -inset-5 rounded-full border transition-none', codexMode ? 'border-red-400/15' : 'border-violet-400/15')}
-        style={{ opacity: 0 }}
-      />
-      {isListening ? (
-        <MicOff className="w-6 h-6 text-white relative z-10" />
-      ) : (
-        <Mic className="w-6 h-6 text-white/50 relative z-10" />
-      )}
-    </motion.button>
+    <div className="flex flex-col items-center gap-1">
+      <motion.button
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={onClick}
+        disabled={disabled}
+        whileTap={{ scale: 0.9 }}
+        className={cn(
+          'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-colors',
+          isListening
+            ? codexMode
+              ? 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6)]'
+              : 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
+            : codexMode
+              ? 'bg-red-500/15 border-2 border-red-500/30'
+              : 'bg-violet-500/15 border-2 border-violet-500/30',
+          disabled && 'opacity-30 cursor-not-allowed',
+        )}
+      >
+        {/* Voice-reactive pulse rings */}
+        <span
+          ref={ring1Ref}
+          className={cn('absolute inset-0 rounded-full transition-none', codexMode ? 'bg-red-500/30' : 'bg-violet-500/30')}
+          style={{ opacity: 0 }}
+        />
+        <span
+          ref={ring2Ref}
+          className={cn('absolute -inset-2 rounded-full border-2 transition-none', codexMode ? 'border-red-400/30' : 'border-violet-400/30')}
+          style={{ opacity: 0 }}
+        />
+        <span
+          ref={ring3Ref}
+          className={cn('absolute -inset-5 rounded-full border transition-none', codexMode ? 'border-red-400/15' : 'border-violet-400/15')}
+          style={{ opacity: 0 }}
+        />
+        {isListening ? (
+          <MicOff className="w-6 h-6 text-white relative z-10" />
+        ) : (
+          <Mic className={cn('w-6 h-6 relative z-10', codexMode ? 'text-red-400' : 'text-violet-400')} />
+        )}
+      </motion.button>
+      {/* Label under mic */}
+      <span className={cn('text-[9px] font-bold uppercase tracking-wider', codexMode ? 'text-red-400/60' : 'text-violet-400/60')}>
+        {codexMode ? 'Codex' : 'Claude'}
+      </span>
+    </div>
   )
 }
 
@@ -733,6 +741,7 @@ export function VoiceChat() {
       stopListening()
     } else {
       micTargetRef.current = 'codex'
+      setShowCodex(true) // Open Codex panel when using Codex mic
       stopAllAudio()
       setPendingMessage('')
       hasSentRef.current = false
@@ -1090,11 +1099,7 @@ export function VoiceChat() {
                       </div>
                     ) : (
                       <div className="px-1 codex-text">
-                        {i === codexLastResultIndex && !msg.replayed ? (
-                          <TypingMarkdown text={msg.text} animate={true} onUpdate={() => codexEndRef.current?.scrollIntoView({ behavior: 'instant' })} />
-                        ) : (
-                          <MarkdownMessage text={msg.text} />
-                        )}
+                        <MarkdownMessage text={msg.text} />
                       </div>
                     )
 
