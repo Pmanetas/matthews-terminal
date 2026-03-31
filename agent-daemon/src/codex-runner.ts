@@ -291,12 +291,11 @@ export class CodexRunner {
 
                 if (item.type === 'agent_message' && item.text) {
                     console.log(`${C.cyan}[Codex] Message: ${item.text.slice(0, 150)}${C.reset}`);
-                    appendText(item.text);
+                    appendText(item.text + '\n');
 
-                    // Check if this looks like narration (short, mid-task) vs final result
-                    // Codex sends multiple agent_message items — narration + final answer
+                    // Only narrate — don't send as result here, the final result
+                    // is sent once the turn completes (avoids duplicate messages)
                     sink.sendNarration(item.text);
-                    sink.sendSpeak(item.text);
                 }
 
                 if (item.type === 'command_execution') {

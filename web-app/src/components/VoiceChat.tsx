@@ -487,14 +487,13 @@ export function VoiceChat() {
 
   const [showTerminal, setShowTerminal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [showCodex, setShowCodex] = useState(false)
+  const [splitMode, setSplitMode] = useState(false)
   const [codexExpandedTools, setCodexExpandedTools] = useState<Set<number>>(new Set())
-  const [codexPanelW, setCodexPanelW] = useState(() => Math.min(340, window.innerWidth - 24))
-  const [codexPanelH, setCodexPanelH] = useState(360)
+  const [splitRatio, setSplitRatio] = useState(0.5) // 0-1, portion for Claude (top)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
   const codexEndRef = useRef<HTMLDivElement>(null)
   const codexScrollRef = useRef<HTMLDivElement>(null)
-  const codexDragRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0, dragging: false })
+  const splitDragRef = useRef({ startY: 0, startRatio: 0.5, dragging: false })
 
   // Track which mic is active — 'claude' for main, 'codex' for Codex panel
   const micTargetRef = useRef<'claude' | 'codex'>('claude')
@@ -563,8 +562,8 @@ export function VoiceChat() {
 
   // Auto-scroll Codex panel
   useEffect(() => {
-    if (showCodex) codexEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [codexMessages.length, showCodex])
+    if (splitMode) codexEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [codexMessages.length, splitMode])
 
   // Codex-specific processing state
   const codexIsProcessing = isCodexWaiting || (codexMessages.length > 0 && codexMessages[codexMessages.length - 1].role !== 'assistant')
@@ -742,7 +741,7 @@ export function VoiceChat() {
       stopListening()
     } else {
       micTargetRef.current = 'codex'
-      setShowCodex(true) // Open Codex panel when using Codex mic
+      setSplitMode(true) // Open split mode when using Codex mic
       stopAllAudio()
       setPendingMessage('')
       hasSentRef.current = false
@@ -981,180 +980,6 @@ export function VoiceChat() {
         <div className="fixed inset-0 z-[55]" onClick={() => setShowSettings(false)} />
       )}
 
-      {/* ── Codex panel — floating corner window, drag top-left to resize ── */}
-      <AnimatePresence>
-        {showCodex && (
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-            className={cn(
-              'absolute z-[45] flex flex-col rounded-2xl border backdrop-blur-2xl shadow-2xl overflow-hidden codex-panel',
-              lightMode
-                ? 'bg-white/90 border-red-400/20 shadow-red-500/10'
-                : 'bg-[#0A0A0B]/90 border-red-500/15 shadow-red-500/5'
-            )}
-            style={{
-              right: 12,
-              bottom: '10rem',
-              width: codexPanelW,
-              height: codexPanelH,
-            }}
-          >
-            {/* Codex panel header with drag-to-resize handle on top-left corner */}
-            <div className={cn('shrink-0 flex items-center justify-between px-3 pt-2 pb-1.5 border-b', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
-              <div className="flex items-center gap-2">
-                {/* Resize handle — drag from here to resize width+height */}
-                <div
-                  className="flex items-center justify-center w-6 h-6 cursor-grab active:cursor-grabbing touch-none"
-                  onTouchStart={(e) => {
-                    e.stopPropagation()
-                    codexDragRef.current = {
-                      startX: e.touches[0].clientX,
-                      startY: e.touches[0].clientY,
-                      startW: codexPanelW,
-                      startH: codexPanelH,
-                      dragging: true,
-                    }
-                  }}
-                  onTouchMove={(e) => {
-                    e.stopPropagation()
-                    if (!codexDragRef.current.dragging) return
-                    const dx = codexDragRef.current.startX - e.touches[0].clientX
-                    const dy = codexDragRef.current.startY - e.touches[0].clientY
-                    const newW = Math.max(200, Math.min(window.innerWidth - 24, codexDragRef.current.startW + dx))
-                    const newH = Math.max(180, Math.min(window.innerHeight - 160, codexDragRef.current.startH + dy))
-                    setCodexPanelW(newW)
-                    setCodexPanelH(newH)
-                  }}
-                  onTouchEnd={() => { codexDragRef.current.dragging = false }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" className={lightMode ? 'text-black/20' : 'text-white/20'}>
-                    <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1.5" />
-                    <line x1="0" y1="6" x2="6" y2="0" stroke="currentColor" strokeWidth="1.5" />
-                    <line x1="0" y1="2" x2="2" y2="0" stroke="currentColor" strokeWidth="1.5" />
-                  </svg>
-                </div>
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
-                <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
-              </div>
-              <button
-                onClick={() => setShowCodex(false)}
-                className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
-              >
-                <X className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
-              </button>
-            </div>
-
-            {/* Codex messages — full rendering like main chat */}
-            <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
-              <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
-                {codexMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center mt-12 gap-3">
-                    <p className={cn('text-sm text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
-                      Tap the red mic to talk to Codex
-                    </p>
-                    <p className={cn('text-[11px] text-center', lightMode ? 'text-black/15' : 'text-white/10')}>
-                      Ask it to review Claude's work or tackle something independently
-                    </p>
-                  </div>
-                ) : (
-                  codexMessages.map((msg, i) => {
-                    const isNextTool = codexMessages[i + 1]?.role === 'tool'
-                    const isPrevTool = i > 0 && codexMessages[i - 1]?.role === 'tool'
-                    const isLastTool = i === codexLastToolIndex
-                    const defaultExpanded = isLastTool && !codexHasResultAfterTools
-                    const isExpanded = codexExpandedTools.has(i) ? !defaultExpanded : defaultExpanded
-                    const isRecent = i >= codexMessages.length - 3
-
-                    if (msg.narration) return null
-
-                    const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
-
-                    const content = msg.role === 'user' ? (
-                      <div className="user-bubble" style={{ background: 'rgb(185, 28, 28)' }}>
-                        {msg.images && msg.images.length > 0 && (
-                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
-                            {msg.images.map((img, j) => (
-                              img.data ? (
-                                <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-20 h-20 rounded-lg object-cover border border-white/10" />
-                              ) : null
-                            ))}
-                          </div>
-                        )}
-                        <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
-                      </div>
-                    ) : msg.role === 'tool' ? (
-                      <div
-                        className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer"
-                        onClick={() => toggleCodexToolExpand(i)}
-                      >
-                        <div className="flex flex-col items-center w-5 shrink-0">
-                          <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-red-500/15' : 'bg-transparent')} />
-                          {isLastTool && codexIsCurrentToolLoading ? (
-                            <LoaderCircle className="w-4 h-4 text-red-400 animate-spin shrink-0" />
-                          ) : (
-                            <div className="w-2 h-2 shrink-0 rounded-full bg-red-500/30" />
-                          )}
-                          <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-red-500/15' : 'bg-transparent')} />
-                        </div>
-                        <div
-                          className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200"
-                          style={
-                            toolType === 'read'
-                              ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' }
-                              : toolType === 'edit'
-                              ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' }
-                              : isExpanded
-                              ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' }
-                              : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }
-                          }
-                        >
-                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                            <ToolIcon text={msg.text} />
-                          </div>
-                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="px-1 codex-text">
-                        <MarkdownMessage text={msg.text} />
-                      </div>
-                    )
-
-                    return (
-                      <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>
-                        {content}
-                      </div>
-                    )
-                  })
-                )}
-                {codexIsThinking && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <div className="px-1">
-                      <ThinkingDots />
-                    </div>
-                  </motion.div>
-                )}
-                <div ref={codexEndRef} />
-              </div>
-            </div>
-
-            {/* Codex transcript — shows when Codex mic is active */}
-            {codexMicListening && transcript ? (
-              <div className={cn('shrink-0 border-t px-4 py-1.5', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
-                <p className="text-xs text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
-              </div>
-            ) : null}
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── File browser overlay ── */}
       <AnimatePresence>
@@ -1303,118 +1128,229 @@ export function VoiceChat() {
         )}
       </AnimatePresence>
 
-      {/* ── Chat messages ── */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
-        style={{ overscrollBehavior: 'none' }}
-      >
-        <div className="flex flex-col gap-3 px-5 py-4 w-full overflow-hidden box-border">
-          {claudeMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center mt-20 gap-4">
-              <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
-            </div>
-          ) : (
-            claudeMessages.map((msg, i) => {
-              const isNextTool = claudeMessages[i + 1]?.role === 'tool'
-              const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
-              const isLastTool = i === lastToolIndex
-              const defaultExpanded = isLastTool && !hasResultAfterTools
-              const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
-              const isRecent = i >= claudeMessages.length - 3
-
-              // Narrations are spoken via TTS but not displayed
-              if (msg.narration) return null
-
-              const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
-
-              const content = msg.role === 'user' ? (
-                /* ── User bubble — flush right ── */
-                <div className="user-bubble">
-                  {msg.images && msg.images.length > 0 && (
-                    <div className="flex gap-2 mb-2 flex-wrap justify-end">
-                      {msg.images.map((img, j) => (
-                        img.data ? (
-                          <img
-                            key={j}
-                            src={`data:${img.mimeType};base64,${img.data}`}
-                            className="w-28 h-28 rounded-lg object-cover border border-white/10"
-                          />
-                        ) : (
-                          <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
-                            <Camera className="w-6 h-6 text-white/20" />
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
-                </div>
-              ) : msg.role === 'tool' ? (
-                /* ── Tool call ── */
-                <div
-                  className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer"
-                  onClick={() => toggleToolExpand(i)}
-                >
-                  <div className="flex flex-col items-center w-5 shrink-0">
-                    <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                    {isLastTool && isCurrentToolLoading ? (
-                      <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
-                    ) : (
-                      <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />
-                    )}
-                    <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                  </div>
-                  <div
-                    className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200"
-                    style={
-                      toolType === 'read'
-                        ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' }
-                        : toolType === 'edit'
-                        ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' }
-                        : isExpanded
-                        ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' }
-                        : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }
-                    }
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                      <ToolIcon text={msg.text} />
-                    </div>
-                    <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
-                  </div>
-                </div>
-              ) : (
-                /* ── Assistant text ── */
-                <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
-                  {i === lastResultIndex && !msg.replayed ? (
-                    <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
-                  ) : (
-                    <MarkdownMessage text={msg.text} />
-                  )}
-                </div>
-              )
-
-              return (
-                <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>
-                  {content}
-                </div>
-              )
-            })
-          )}
-          {isThinking && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="px-1">
-                <ThinkingDots />
+      {/* ── Chat messages — split or single mode ── */}
+      {splitMode ? (
+        /* ── SPLIT VIEW — Claude top, Codex bottom, draggable divider ── */
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Claude panel (top) */}
+          <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: `${splitRatio} 1 0%` }}>
+            <div className={cn('shrink-0 flex items-center justify-between px-3 py-1.5 border-b', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+                <span className={cn('text-xs font-semibold', lightMode ? 'text-violet-700' : 'text-violet-400')}>Claude</span>
+                <span className={cn('text-[9px]', lightMode ? 'text-violet-400/50' : 'text-violet-500/30')}>Opus 4.6</span>
               </div>
-            </motion.div>
-          )}
-          <div ref={chatEndRef} />
+              <button onClick={sendNewChat} className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+              </button>
+            </div>
+            <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
+              <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
+                {claudeMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center mt-8 gap-3">
+                    <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the purple mic to talk to Claude</p>
+                  </div>
+                ) : (
+                  claudeMessages.map((msg, i) => {
+                    const isNextTool = claudeMessages[i + 1]?.role === 'tool'
+                    const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
+                    const isLastTool = i === lastToolIndex
+                    const defaultExpanded = isLastTool && !hasResultAfterTools
+                    const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                    const isRecent = i >= claudeMessages.length - 3
+                    if (msg.narration) return null
+                    const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                    const content = msg.role === 'user' ? (
+                      <div className="user-bubble">
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                            {msg.images.map((img, j) => img.data ? <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-20 h-20 rounded-lg object-cover border border-white/10" /> : null)}
+                          </div>
+                        )}
+                        <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                      </div>
+                    ) : msg.role === 'tool' ? (
+                      <div className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer" onClick={() => toggleToolExpand(i)}>
+                        <div className="flex flex-col items-center w-5 shrink-0">
+                          <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                          {isLastTool && isCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />}
+                          <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                        </div>
+                        <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' } : isExpanded ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
+                        {i === lastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
+                      </div>
+                    )
+                    return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+                  })
+                )}
+                {isThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Draggable divider ── */}
+          <div
+            className={cn('shrink-0 flex items-center justify-center touch-none cursor-row-resize', lightMode ? 'bg-black/[0.04]' : 'bg-white/[0.04]')}
+            style={{ height: 20 }}
+            onTouchStart={(e) => {
+              splitDragRef.current = { startY: e.touches[0].clientY, startRatio: splitRatio, dragging: true }
+            }}
+            onTouchMove={(e) => {
+              if (!splitDragRef.current.dragging) return
+              const container = e.currentTarget.parentElement
+              if (!container) return
+              const containerH = container.clientHeight
+              const dy = e.touches[0].clientY - splitDragRef.current.startY
+              const newRatio = Math.max(0.2, Math.min(0.8, splitDragRef.current.startRatio + dy / containerH))
+              setSplitRatio(newRatio)
+            }}
+            onTouchEnd={() => { splitDragRef.current.dragging = false }}
+          >
+            <div className={cn('w-10 h-1 rounded-full', lightMode ? 'bg-black/20' : 'bg-white/20')} />
+          </div>
+
+          {/* Codex panel (bottom) */}
+          <div className="flex flex-col min-h-0 overflow-hidden codex-panel" style={{ flex: `${1 - splitRatio} 1 0%` }}>
+            <div className={cn('shrink-0 flex items-center justify-between px-3 py-1.5 border-b', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
+              </div>
+              <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+              </button>
+            </div>
+            <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
+              <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
+                {codexMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center mt-8 gap-3">
+                    <p className={cn('text-sm text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
+                      Tap the red mic to talk to Codex
+                    </p>
+                  </div>
+                ) : (
+                  codexMessages.map((msg, i) => {
+                    const isNextTool = codexMessages[i + 1]?.role === 'tool'
+                    const isPrevTool = i > 0 && codexMessages[i - 1]?.role === 'tool'
+                    const isLastTool = i === codexLastToolIndex
+                    const defaultExpanded = isLastTool && !codexHasResultAfterTools
+                    const isExpanded = codexExpandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                    const isRecent = i >= codexMessages.length - 3
+                    if (msg.narration) return null
+                    const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                    const content = msg.role === 'user' ? (
+                      <div className="user-bubble" style={{ background: 'rgb(185, 28, 28)' }}>
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                            {msg.images.map((img, j) => img.data ? <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-20 h-20 rounded-lg object-cover border border-white/10" /> : null)}
+                          </div>
+                        )}
+                        <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                      </div>
+                    ) : msg.role === 'tool' ? (
+                      <div className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer" onClick={() => toggleCodexToolExpand(i)}>
+                        <div className="flex flex-col items-center w-5 shrink-0">
+                          <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-red-500/15' : 'bg-transparent')} />
+                          {isLastTool && codexIsCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-red-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-red-500/30" />}
+                          <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-red-500/15' : 'bg-transparent')} />
+                        </div>
+                        <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-1 codex-text">
+                        <MarkdownMessage text={msg.text} />
+                      </div>
+                    )
+                    return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+                  })
+                )}
+                {codexIsThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
+                <div ref={codexEndRef} />
+              </div>
+            </div>
+            {/* Codex transcript */}
+            {codexMicListening && transcript ? (
+              <div className={cn('shrink-0 border-t px-4 py-1.5', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+                <p className="text-xs text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ── SINGLE VIEW — Claude only (original layout) ── */
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
+          style={{ overscrollBehavior: 'none' }}
+        >
+          <div className="flex flex-col gap-3 px-5 py-4 w-full overflow-hidden box-border">
+            {claudeMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center mt-20 gap-4">
+                <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
+              </div>
+            ) : (
+              claudeMessages.map((msg, i) => {
+                const isNextTool = claudeMessages[i + 1]?.role === 'tool'
+                const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
+                const isLastTool = i === lastToolIndex
+                const defaultExpanded = isLastTool && !hasResultAfterTools
+                const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                const isRecent = i >= claudeMessages.length - 3
+                if (msg.narration) return null
+                const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                const content = msg.role === 'user' ? (
+                  <div className="user-bubble">
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                        {msg.images.map((img, j) => (
+                          img.data ? <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-28 h-28 rounded-lg object-cover border border-white/10" /> : (
+                            <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center"><Camera className="w-6 h-6 text-white/20" /></div>
+                          )
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                  </div>
+                ) : msg.role === 'tool' ? (
+                  <div className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer" onClick={() => toggleToolExpand(i)}>
+                    <div className="flex flex-col items-center w-5 shrink-0">
+                      <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                      {isLastTool && isCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />}
+                      <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                    </div>
+                    <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' } : isExpanded ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                      <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                      <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
+                    {i === lastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
+                  </div>
+                )
+                return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+              })
+            )}
+            {isThinking && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                <div className="px-1"><ThinkingDots /></div>
+              </motion.div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+        </div>
+      )}
 
       {/* ── Bottom controls ── */}
       <div
@@ -1607,13 +1543,17 @@ export function VoiceChat() {
                   <Camera className="w-4 h-4 text-white/40" />
                 </button>
                 <button
-                  onClick={() => setShowCodex(prev => !prev)}
+                  onClick={() => setSplitMode(prev => !prev)}
                   className={cn(
                     'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    showCodex ? 'bg-red-500/30' : 'bg-white/[0.06]'
+                    splitMode ? 'bg-red-500/30' : 'bg-white/[0.06]'
                   )}
                 >
-                  <span className={cn('text-[11px] font-bold', showCodex ? 'text-red-400' : 'text-white/40')}>CX</span>
+                  {splitMode ? (
+                    <X className="w-4 h-4 text-red-400" />
+                  ) : (
+                    <span className="text-[11px] font-bold text-white/40">CX</span>
+                  )}
                 </button>
                 <button
                   onClick={() => {
