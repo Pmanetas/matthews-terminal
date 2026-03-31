@@ -254,9 +254,13 @@ export function useBridge(onAudioDone?: () => void) {
             const buffered = replayBufferRef.current
             replayBufferRef.current = []
             if (buffered.length > 0) {
-              // Merge: keep any messages the user sent during replay
+              // Merge: keep any messages the user sent during replay, dedup against buffer
               setMessages(prev => {
-                const liveMessages = prev.filter(m => !m.replayed)
+                const liveMessages = prev.filter(m => {
+                  if (m.replayed) return false
+                  // Skip live messages that already exist in the replay buffer
+                  return !buffered.some(b => b.role === m.role && b.text === m.text && b.engine === m.engine)
+                })
                 return [...buffered, ...liveMessages]
               })
             }

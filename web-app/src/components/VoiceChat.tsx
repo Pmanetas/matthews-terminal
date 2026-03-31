@@ -389,15 +389,15 @@ const globalCSS = `
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
-  /* Codex mode — red theme */
-  .codex-mode .user-bubble {
+  /* Codex panel — red user bubbles */
+  .codex-panel .user-bubble {
     background: rgb(185, 28, 28) !important;
   }
   /* Light mode overrides */
   .light-mode .user-bubble {
     background: rgb(91, 33, 182) !important;
   }
-  .light-mode.codex-mode .user-bubble {
+  .light-mode .codex-panel .user-bubble {
     background: rgb(185, 28, 28) !important;
   }
   .light-mode .user-bubble p { color: #fff !important; }
@@ -990,14 +990,14 @@ export function VoiceChat() {
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 320 }}
             className={cn(
-              'absolute z-[45] flex flex-col rounded-2xl border backdrop-blur-2xl shadow-2xl overflow-hidden',
+              'absolute z-[45] flex flex-col rounded-2xl border backdrop-blur-2xl shadow-2xl overflow-hidden codex-panel',
               lightMode
                 ? 'bg-white/90 border-red-400/20 shadow-red-500/10'
                 : 'bg-[#0A0A0B]/90 border-red-500/15 shadow-red-500/5'
             )}
             style={{
               right: 12,
-              bottom: '6.5rem',
+              bottom: '10rem',
               width: codexPanelW,
               height: codexPanelH,
             }}
