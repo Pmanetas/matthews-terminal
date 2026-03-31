@@ -5,6 +5,8 @@ interface VoiceWaveformProps {
   isActive?: boolean
   size?: number
   getAudioLevel?: () => number
+  /** 'violet' (default) or 'red' for Codex */
+  color?: 'violet' | 'red'
 }
 
 const BAR_COUNT = 100
@@ -13,7 +15,7 @@ const BAR_GAP = 1
 const MIN_HEIGHT = 1
 const MAX_HEIGHT_RATIO = 0.9
 
-export function VoiceWaveform({ isActive = false, size = 200, getAudioLevel }: VoiceWaveformProps) {
+export function VoiceWaveform({ isActive = false, size = 200, getAudioLevel, color = 'violet' }: VoiceWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef(0)
   const barsRef = useRef<number[]>(Array(BAR_COUNT).fill(MIN_HEIGHT))
@@ -76,13 +78,19 @@ export function VoiceWaveform({ isActive = false, size = 200, getAudioLevel }: V
         const x = startX + i * (BAR_WIDTH + BAR_GAP)
         const h = Math.max(MIN_HEIGHT, bars[i])
 
-        // Violet gradient with glow
+        // Gradient with glow — violet for Claude, red for Codex
         const intensity = Math.min(1, h / (maxBarH * 0.4))
         const alpha = MIN_HEIGHT + 0.1 < h ? 0.3 + 0.6 * intensity : 0.1
         const gradient = ctx.createLinearGradient(x, centerY - h / 2, x, centerY + h / 2)
-        gradient.addColorStop(0, `rgba(167, 139, 250, ${alpha * 0.6})`)
-        gradient.addColorStop(0.5, `rgba(139, 92, 246, ${alpha})`)
-        gradient.addColorStop(1, `rgba(167, 139, 250, ${alpha * 0.6})`)
+        if (color === 'red') {
+          gradient.addColorStop(0, `rgba(252, 165, 165, ${alpha * 0.6})`)
+          gradient.addColorStop(0.5, `rgba(239, 68, 68, ${alpha})`)
+          gradient.addColorStop(1, `rgba(252, 165, 165, ${alpha * 0.6})`)
+        } else {
+          gradient.addColorStop(0, `rgba(167, 139, 250, ${alpha * 0.6})`)
+          gradient.addColorStop(0.5, `rgba(139, 92, 246, ${alpha})`)
+          gradient.addColorStop(1, `rgba(167, 139, 250, ${alpha * 0.6})`)
+        }
 
         ctx.fillStyle = gradient
         ctx.beginPath()
@@ -95,7 +103,7 @@ export function VoiceWaveform({ isActive = false, size = 200, getAudioLevel }: V
 
     rafRef.current = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafRef.current)
-  }, [isActive, canvasW, canvasH])
+  }, [isActive, canvasW, canvasH, color])
 
   return (
     <div className="flex items-center justify-center" style={{ width: canvasW, height: canvasH }}>

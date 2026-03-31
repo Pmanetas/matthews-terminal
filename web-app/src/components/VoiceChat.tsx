@@ -4,7 +4,7 @@ import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pe
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioWillPlay } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, lastResultEngine, onAudioWillPlay } from '@/hooks/useBridge'
 import { SplashScreen } from '@/components/SplashScreen'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage } from '@/lib/image-utils'
@@ -489,11 +489,12 @@ export function VoiceChat() {
   const [showSettings, setShowSettings] = useState(false)
   const [showCodex, setShowCodex] = useState(false)
   const [codexExpandedTools, setCodexExpandedTools] = useState<Set<number>>(new Set())
-  const [codexPanelTop, setCodexPanelTop] = useState(128) // pixels from top
+  const [codexPanelW, setCodexPanelW] = useState(() => Math.min(340, window.innerWidth - 24))
+  const [codexPanelH, setCodexPanelH] = useState(360)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
   const codexEndRef = useRef<HTMLDivElement>(null)
   const codexScrollRef = useRef<HTMLDivElement>(null)
-  const codexDragRef = useRef({ startY: 0, startTop: 0, dragging: false })
+  const codexDragRef = useRef({ startX: 0, startY: 0, startW: 0, startH: 0, dragging: false })
 
   // Track which mic is active — 'claude' for main, 'codex' for Codex panel
   const micTargetRef = useRef<'claude' | 'codex'>('claude')
@@ -822,7 +823,7 @@ export function VoiceChat() {
           </div>
 
           <div className="flex-1 flex justify-center">
-            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={200} />
+            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={200} color={isAudioPlaying && lastResultEngine === 'codex' ? 'red' : 'violet'} />
           </div>
 
           <div className="flex items-center gap-2">
@@ -980,51 +981,71 @@ export function VoiceChat() {
         <div className="fixed inset-0 z-[55]" onClick={() => setShowSettings(false)} />
       )}
 
-      {/* ── Codex panel (overlays chat area, drag to resize) ── */}
+      {/* ── Codex panel — floating corner window, drag top-left to resize ── */}
       <AnimatePresence>
         {showCodex && (
           <motion.div
-            initial={{ y: 40, opacity: 0, scale: 0.97 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 40, opacity: 0, scale: 0.97 }}
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 320 }}
             className={cn(
-              'absolute inset-x-3 z-[45] flex flex-col rounded-2xl border backdrop-blur-2xl shadow-2xl overflow-hidden',
+              'absolute z-[45] flex flex-col rounded-2xl border backdrop-blur-2xl shadow-2xl overflow-hidden',
               lightMode
                 ? 'bg-white/90 border-red-400/20 shadow-red-500/10'
                 : 'bg-[#0A0A0B]/90 border-red-500/15 shadow-red-500/5'
             )}
-            style={{ bottom: '5.5rem', top: codexPanelTop + 'px' }}
+            style={{
+              right: 12,
+              bottom: '6.5rem',
+              width: codexPanelW,
+              height: codexPanelH,
+            }}
           >
-            {/* Codex panel header — drag handle to resize */}
-            <div
-              className={cn('shrink-0 flex flex-col items-center border-b cursor-grab active:cursor-grabbing', lightMode ? 'border-red-200/30' : 'border-red-500/10')}
-              onTouchStart={(e) => {
-                codexDragRef.current = { startY: e.touches[0].clientY, startTop: codexPanelTop, dragging: true }
-              }}
-              onTouchMove={(e) => {
-                if (!codexDragRef.current.dragging) return
-                const dy = e.touches[0].clientY - codexDragRef.current.startY
-                const newTop = Math.max(80, Math.min(window.innerHeight - 200, codexDragRef.current.startTop + dy))
-                setCodexPanelTop(newTop)
-              }}
-              onTouchEnd={() => { codexDragRef.current.dragging = false }}
-            >
-              {/* Drag pill indicator */}
-              <div className={cn('w-8 h-1 rounded-full mt-2', lightMode ? 'bg-black/15' : 'bg-white/15')} />
-              <div className="flex items-center justify-between w-full px-4 pt-1.5 pb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className={cn('text-sm font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
-                  <span className={cn('text-[10px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
-                </div>
-                <button
-                  onClick={() => setShowCodex(false)}
-                  className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+            {/* Codex panel header with drag-to-resize handle on top-left corner */}
+            <div className={cn('shrink-0 flex items-center justify-between px-3 pt-2 pb-1.5 border-b', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+              <div className="flex items-center gap-2">
+                {/* Resize handle — drag from here to resize width+height */}
+                <div
+                  className="flex items-center justify-center w-6 h-6 cursor-grab active:cursor-grabbing touch-none"
+                  onTouchStart={(e) => {
+                    e.stopPropagation()
+                    codexDragRef.current = {
+                      startX: e.touches[0].clientX,
+                      startY: e.touches[0].clientY,
+                      startW: codexPanelW,
+                      startH: codexPanelH,
+                      dragging: true,
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    e.stopPropagation()
+                    if (!codexDragRef.current.dragging) return
+                    const dx = codexDragRef.current.startX - e.touches[0].clientX
+                    const dy = codexDragRef.current.startY - e.touches[0].clientY
+                    const newW = Math.max(200, Math.min(window.innerWidth - 24, codexDragRef.current.startW + dx))
+                    const newH = Math.max(180, Math.min(window.innerHeight - 160, codexDragRef.current.startH + dy))
+                    setCodexPanelW(newW)
+                    setCodexPanelH(newH)
+                  }}
+                  onTouchEnd={() => { codexDragRef.current.dragging = false }}
                 >
-                  <X className={cn('w-3.5 h-3.5', lightMode ? 'text-black/40' : 'text-white/40')} />
-                </button>
+                  <svg width="10" height="10" viewBox="0 0 10 10" className={lightMode ? 'text-black/20' : 'text-white/20'}>
+                    <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1.5" />
+                    <line x1="0" y1="6" x2="6" y2="0" stroke="currentColor" strokeWidth="1.5" />
+                    <line x1="0" y1="2" x2="2" y2="0" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                </div>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
               </div>
+              <button
+                onClick={() => setShowCodex(false)}
+                className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+              >
+                <X className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+              </button>
             </div>
 
             {/* Codex messages — full rendering like main chat */}

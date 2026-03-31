@@ -176,6 +176,7 @@ export function stopAllAudio() {
 }
 
 export let audioStartedForResult = false
+export let lastResultEngine: 'claude' | 'codex' | undefined
 let _onAudioStarted: (() => void) | null = null
 export function onAudioStarted(cb: () => void) { _onAudioStarted = cb }
 
@@ -315,6 +316,7 @@ export function useBridge(onAudioDone?: () => void) {
               startResultFallback(onAudioDoneRef)
             }
             const resultEngine = data.engine as 'claude' | 'codex' | undefined
+            lastResultEngine = resultEngine
             if (resultEngine === 'codex') {
               setIsCodexWaiting(false)
             } else {
