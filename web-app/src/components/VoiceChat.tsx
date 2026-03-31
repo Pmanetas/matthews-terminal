@@ -784,7 +784,7 @@ export function VoiceChat() {
           <span className={cn(
             'ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide',
             showCodex
-              ? 'bg-emerald-500/20 text-emerald-400'
+              ? 'bg-red-500/20 text-red-400'
               : 'bg-violet-500/20 text-violet-400'
           )}>{showCodex ? 'Codex' : 'Claude'}</span>
         </div>
@@ -909,17 +909,17 @@ export function VoiceChat() {
             className={cn(
               'absolute inset-x-3 z-[45] flex flex-col rounded-2xl border backdrop-blur-2xl shadow-2xl',
               lightMode
-                ? 'bg-white/90 border-emerald-400/20 shadow-emerald-500/10'
-                : 'bg-[#0A0A0B]/90 border-emerald-500/15 shadow-emerald-500/5'
+                ? 'bg-white/90 border-red-400/20 shadow-red-500/10'
+                : 'bg-[#0A0A0B]/90 border-red-500/15 shadow-red-500/5'
             )}
             style={{ bottom: '6.5rem', top: '8rem' }}
           >
             {/* Codex panel header */}
-            <div className={cn('shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b', lightMode ? 'border-emerald-200/30' : 'border-emerald-500/10')}>
+            <div className={cn('shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className={cn('text-sm font-semibold', lightMode ? 'text-emerald-700' : 'text-emerald-400')}>Codex</span>
-                <span className={cn('text-[10px]', lightMode ? 'text-emerald-400/50' : 'text-emerald-500/30')}>GPT-5.4</span>
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className={cn('text-sm font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                <span className={cn('text-[10px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
               </div>
               <button
                 onClick={() => setShowCodex(false)}
@@ -944,16 +944,16 @@ export function VoiceChat() {
                 codexMessages.map((msg, i) => (
                   <div key={i} className={cn('min-w-0 overflow-hidden', i >= codexMessages.length - 3 && 'msg-fade-in')}>
                     {msg.role === 'user' ? (
-                      <div className="user-bubble" style={{ background: 'rgb(5, 150, 105)' }}>
+                      <div className="user-bubble" style={{ background: 'rgb(185, 28, 28)' }}>
                         <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
                       </div>
                     ) : msg.role === 'tool' ? (
                       <div className="flex items-center gap-2 ml-1">
-                        <div className="w-2 h-2 shrink-0 rounded-full bg-emerald-500/30" />
-                        <span className="text-[13px] leading-tight" style={{ color: lightMode ? 'rgba(5, 150, 105, 0.5)' : 'rgba(52, 211, 153, 0.5)' }}>{msg.text.split('\n')[0]}</span>
+                        <div className="w-2 h-2 shrink-0 rounded-full bg-red-500/30" />
+                        <span className="text-[13px] leading-tight" style={{ color: lightMode ? 'rgba(185, 28, 28, 0.5)' : 'rgba(248, 113, 113, 0.5)' }}>{msg.text.split('\n')[0]}</span>
                       </div>
                     ) : (
-                      <div className="px-1 assistant-text" style={{ color: lightMode ? 'rgb(5, 150, 105)' : 'rgb(52, 211, 153)' }}>
+                      <div className="px-1 assistant-text" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgb(248, 113, 113)' }}>
                         <MarkdownMessage text={msg.text} />
                       </div>
                     )}
@@ -1228,7 +1228,7 @@ export function VoiceChat() {
 
       {/* ── Bottom controls ── */}
       <div
-        className="shrink-0 transition-all duration-300"
+        className="shrink-0 relative z-[50] transition-all duration-300"
         style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s', background: 'transparent' }}
       >
         {/* Transcript while listening — max 3 lines, collapses when empty */}
@@ -1406,10 +1406,10 @@ export function VoiceChat() {
                   onClick={() => setShowCodex(prev => !prev)}
                   className={cn(
                     'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    showCodex ? 'bg-emerald-500/30' : 'bg-white/[0.06]'
+                    showCodex ? 'bg-red-500/30' : 'bg-white/[0.06]'
                   )}
                 >
-                  <span className={cn('text-[11px] font-bold', showCodex ? 'text-emerald-400' : 'text-white/40')}>CX</span>
+                  <span className={cn('text-[11px] font-bold', showCodex ? 'text-red-400' : 'text-white/40')}>CX</span>
                 </button>
                 <button
                   onClick={() => {
