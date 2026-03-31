@@ -809,8 +809,8 @@ export function VoiceChat() {
 
       {/* Particle wave removed — caused persistent bottom gap on iOS */}
 
-      {/* ── Header ── */}
-      <div
+      {/* ── Header (hidden in split mode — each panel has its own) ── */}
+      {!splitMode && <div
         className="shrink-0 flex flex-col items-center px-8 pt-3 pb-4 relative transition-all duration-400"
         style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-10px)', transitionDelay: '0.1s' }}
       >
@@ -882,7 +882,7 @@ export function VoiceChat() {
             <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── Terminal overlay ── */}
       <AnimatePresence>
@@ -1140,15 +1140,21 @@ export function VoiceChat() {
         <div className="flex-1 min-h-0 flex flex-col">
           {/* Claude panel (top) */}
           <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: `${splitRatio} 1 0%` }}>
-            <div className={cn('shrink-0 flex items-center justify-between px-3 py-1.5 border-b', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
+            {/* Claude header — matches main header style */}
+            <div className={cn('shrink-0 flex items-center justify-between px-4 py-2 border-b', lightMode ? 'border-black/[0.08] bg-white/80' : 'border-white/[0.06] bg-black/40')}>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-                <span className={cn('text-xs font-semibold', lightMode ? 'text-violet-700' : 'text-violet-400')}>Claude</span>
+                <button onClick={sendNewChat} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                  <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                </button>
+                <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{claudeMessages.filter(m => m.role === 'user').length} msgs</span>
+              </div>
+              <div className="flex-1 flex justify-center">
+                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine !== 'codex'} getAudioLevel={getAudioLevel} size={120} color="violet" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
                 <span className={cn('text-[9px]', lightMode ? 'text-violet-400/50' : 'text-violet-500/30')}>Opus 4.6</span>
               </div>
-              <button onClick={sendNewChat} className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
-                <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
-              </button>
             </div>
             <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
@@ -1199,12 +1205,18 @@ export function VoiceChat() {
                 <div ref={chatEndRef} />
               </div>
             </div>
+            {/* Claude transcript in split mode */}
+            {mainMicListening && transcript ? (
+              <div className={cn('shrink-0 border-t px-4 py-1', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
+                <p className="text-[11px] text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              </div>
+            ) : null}
           </div>
 
           {/* ── Draggable divider ── */}
           <div
-            className={cn('shrink-0 flex items-center justify-center touch-none cursor-row-resize', lightMode ? 'bg-black/[0.04]' : 'bg-white/[0.04]')}
-            style={{ height: 20 }}
+            className={cn('shrink-0 flex items-center justify-center touch-none cursor-row-resize', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+            style={{ height: 24 }}
             onTouchStart={(e) => {
               splitDragRef.current = { startY: e.touches[0].clientY, startRatio: splitRatio, dragging: true }
             }}
@@ -1219,20 +1231,26 @@ export function VoiceChat() {
             }}
             onTouchEnd={() => { splitDragRef.current.dragging = false }}
           >
-            <div className={cn('w-10 h-1 rounded-full', lightMode ? 'bg-black/20' : 'bg-white/20')} />
+            <div className={cn('w-12 h-1 rounded-full', lightMode ? 'bg-black/20' : 'bg-white/25')} />
           </div>
 
           {/* Codex panel (bottom) */}
           <div className="flex flex-col min-h-0 overflow-hidden codex-panel" style={{ flex: `${1 - splitRatio} 1 0%` }}>
-            <div className={cn('shrink-0 flex items-center justify-between px-3 py-1.5 border-b', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+            {/* Codex header — matches Claude header style but red */}
+            <div className={cn('shrink-0 flex items-center justify-between px-4 py-2 border-b', lightMode ? 'border-red-200/30 bg-white/80' : 'border-red-500/10 bg-black/40')}>
               <div className="flex items-center gap-2">
-                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={60} color="red" />
-                <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                  <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                </button>
+                <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{codexMessages.filter(m => m.role === 'user').length} msgs</span>
+              </div>
+              <div className="flex-1 flex justify-center">
+                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={120} color="red" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-red-500/20 text-red-400">Codex</span>
                 <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
               </div>
-              <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
-                <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
-              </button>
             </div>
             <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
@@ -1287,8 +1305,8 @@ export function VoiceChat() {
             </div>
             {/* Codex transcript */}
             {codexMicListening && transcript ? (
-              <div className={cn('shrink-0 border-t px-4 py-1.5', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
-                <p className="text-xs text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              <div className={cn('shrink-0 border-t px-4 py-1', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+                <p className="text-[11px] text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
               </div>
             ) : null}
           </div>
@@ -1459,8 +1477,8 @@ export function VoiceChat() {
         className="shrink-0 relative z-[50] transition-all duration-300"
         style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s', background: 'transparent' }}
       >
-        {/* Transcript while listening — only show here for Claude mic */}
-        {(mainMicListening && transcript) || micError ? (
+        {/* Transcript while listening — only show here for Claude mic in single mode */}
+        {!splitMode && ((mainMicListening && transcript) || micError) ? (
           <div className="max-h-[3.5rem] flex items-end justify-center px-5 overflow-hidden w-full min-w-0 pb-1">
             {mainMicListening && transcript ? (
               <p className="text-xs text-center w-full min-w-0 leading-relaxed line-clamp-3" style={{ color: lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
@@ -1646,19 +1664,19 @@ export function VoiceChat() {
                 </button>
                 <button
                   onClick={() => {
-                    if (codexPopup) {
+                    if (splitMode || codexPopup) {
+                      setSplitMode(false)
                       setCodexPopup(false)
                     } else {
-                      setSplitMode(false)
                       setCodexPopup(true)
                     }
                   }}
                   className={cn(
                     'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    codexPopup ? 'bg-red-500/30' : 'bg-white/[0.06]'
+                    (codexPopup || splitMode) ? 'bg-red-500/30' : 'bg-white/[0.06]'
                   )}
                 >
-                  {codexPopup ? (
+                  {(codexPopup || splitMode) ? (
                     <X className="w-4 h-4 text-red-400" />
                   ) : (
                     <span className="text-[11px] font-bold text-white/40">CX</span>

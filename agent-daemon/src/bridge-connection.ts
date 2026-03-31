@@ -234,8 +234,8 @@ export class BridgeConnection {
         const agentInfo = this.manager.getAgent(agentId);
         const engine = agentInfo?.engine || 'claude';
         return {
-            sendStatus: (text) => this.send({ type: 'status', text }),
-            sendToolStatus: (text) => this.send({ type: 'tool_status', text }),
+            sendStatus: (text) => this.send({ type: 'status', text, engine }),
+            sendToolStatus: (text) => this.send({ type: 'tool_status', text, engine }),
             sendResult: (text) => this.send({ type: 'result', text, engine }),
             sendSpeak: (text) => this.send({ type: 'speak', text, engine }),
             sendNarration: (text) => this.send({ type: 'narration', text, engine }),

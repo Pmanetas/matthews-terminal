@@ -292,10 +292,8 @@ export class CodexRunner {
                 if (item.type === 'agent_message' && item.text) {
                     console.log(`${C.cyan}[Codex] Message: ${item.text.slice(0, 150)}${C.reset}`);
                     appendText(item.text + '\n');
-
-                    // Only narrate — don't send as result here, the final result
-                    // is sent once the turn completes (avoids duplicate messages)
-                    sink.sendNarration(item.text);
+                    // Don't narrate — the final result already contains this text.
+                    // Sending it as narration caused duplicate messages on the phone.
                 }
 
                 if (item.type === 'command_execution') {
