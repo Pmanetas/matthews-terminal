@@ -262,7 +262,17 @@ export class AgentRunner {
     }
 
     dispose(): void {
-        this.activeProcess?.kill();
+        // On Windows, .kill() doesn't kill child processes — use taskkill /F /T
+        // to kill the entire process tree so Claude agents don't become orphans
+        const pid = this.activeProcess?.pid;
+        if (pid) {
+            if (process.platform === 'win32') {
+                spawn('taskkill', ['/F', '/T', '/PID', pid.toString()], { shell: true });
+            } else {
+                this.activeProcess?.kill('SIGTERM');
+            }
+        }
+        this.activeProcess = undefined;
         if (this.toolSpeechTimer) clearTimeout(this.toolSpeechTimer);
         this.clearIdleTimer();
     }
