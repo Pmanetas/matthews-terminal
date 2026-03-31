@@ -222,10 +222,11 @@ function ThinkingDots() {
 
 // ── Mic orb with voice-reactive pulse ────────────────────────────
 
-function MicOrb({ isListening, onClick, disabled }: {
+function MicOrb({ isListening, onClick, disabled, codexMode }: {
   isListening: boolean
   onClick: () => void
   disabled: boolean
+  codexMode?: boolean
 }) {
   const ring1Ref = useRef<HTMLSpanElement>(null)
   const ring2Ref = useRef<HTMLSpanElement>(null)
@@ -324,7 +325,9 @@ function MicOrb({ isListening, onClick, disabled }: {
       className={cn(
         'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-colors',
         isListening
-          ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
+          ? codexMode
+            ? 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6)]'
+            : 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
           : 'bg-white/[0.06] hover:bg-white/[0.1]',
         disabled && 'opacity-30 cursor-not-allowed',
       )}
@@ -332,17 +335,17 @@ function MicOrb({ isListening, onClick, disabled }: {
       {/* Voice-reactive pulse rings */}
       <span
         ref={ring1Ref}
-        className="absolute inset-0 rounded-full bg-violet-500/30 transition-none"
+        className={cn('absolute inset-0 rounded-full transition-none', codexMode ? 'bg-red-500/30' : 'bg-violet-500/30')}
         style={{ opacity: 0 }}
       />
       <span
         ref={ring2Ref}
-        className="absolute -inset-2 rounded-full border-2 border-violet-400/30 transition-none"
+        className={cn('absolute -inset-2 rounded-full border-2 transition-none', codexMode ? 'border-red-400/30' : 'border-violet-400/30')}
         style={{ opacity: 0 }}
       />
       <span
         ref={ring3Ref}
-        className="absolute -inset-5 rounded-full border border-violet-400/15 transition-none"
+        className={cn('absolute -inset-5 rounded-full border transition-none', codexMode ? 'border-red-400/15' : 'border-violet-400/15')}
         style={{ opacity: 0 }}
       />
       {isListening ? (
@@ -378,9 +381,16 @@ const globalCSS = `
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
+  /* Codex mode — red theme */
+  .codex-mode .user-bubble {
+    background: rgb(185, 28, 28) !important;
+  }
   /* Light mode overrides */
   .light-mode .user-bubble {
     background: rgb(91, 33, 182) !important;
+  }
+  .light-mode.codex-mode .user-bubble {
+    background: rgb(185, 28, 28) !important;
   }
   .light-mode .user-bubble p { color: #fff !important; }
   .light-mode .text-white\\/50,
@@ -701,7 +711,7 @@ export function VoiceChat() {
 
   return (
     <div
-      className={cn('flex flex-col relative', lightMode ? 'text-black light-mode' : 'text-white')}
+      className={cn('flex flex-col relative', lightMode ? 'text-black light-mode' : 'text-white', showCodex && 'codex-mode')}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)', overscrollBehavior: 'none', position: 'fixed', inset: 0, overflow: 'hidden', background: lightMode ? '#ffffff' : '#000000' }}
     >
       <style>{globalCSS}</style>
@@ -1235,7 +1245,7 @@ export function VoiceChat() {
         {(isListening && transcript) || micError ? (
           <div className="max-h-[3.5rem] flex items-end justify-center px-5 overflow-hidden w-full min-w-0 pb-1">
             {isListening && transcript ? (
-              <p className="text-xs text-center w-full min-w-0 leading-relaxed line-clamp-3" style={{ color: lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              <p className="text-xs text-center w-full min-w-0 leading-relaxed line-clamp-3" style={{ color: showCodex ? (lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)') : (lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)') }}>&ldquo;{transcript}&rdquo;</p>
             ) : micError ? (
               <p className="text-xs text-red-400 text-center">{micError}</p>
             ) : null}
@@ -1309,7 +1319,7 @@ export function VoiceChat() {
                 }
                 setShowTyping(false)
               }}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+              className={cn('flex items-center justify-center w-8 h-8 rounded-full shrink-0 active:scale-90 transition-transform', showCodex ? 'bg-red-600' : 'bg-violet-500')}
             >
               <ArrowUp className="w-3.5 h-3.5 text-white" />
             </button>
@@ -1360,7 +1370,7 @@ export function VoiceChat() {
                 exit={{ scale: 0.8, opacity: 0 }}
                 transition={{ duration: 0.15 }}
                 onClick={handleSend}
-                className="relative flex items-center justify-center w-16 h-16 rounded-full bg-violet-500 shrink-0"
+                className={cn('relative flex items-center justify-center w-16 h-16 rounded-full shrink-0', showCodex ? 'bg-red-600' : 'bg-violet-500')}
               >
                 <ArrowUp className="w-6 h-6 text-white" />
               </motion.button>
@@ -1370,6 +1380,7 @@ export function VoiceChat() {
                 isListening={isListening}
                 onClick={handleMicClick}
                 disabled={!supported}
+                codexMode={showCodex}
               />
             )}
           </AnimatePresence>
@@ -1390,7 +1401,7 @@ export function VoiceChat() {
                 exit={{ scale: 0.8, opacity: 0 }}
                 transition={{ duration: 0.15 }}
                 onClick={handleSend}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+                className={cn('flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-transform', showCodex ? 'bg-red-600' : 'bg-violet-500')}
               >
                 <ArrowUp className="w-4 h-4 text-white" />
               </motion.button>
