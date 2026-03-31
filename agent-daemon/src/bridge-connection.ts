@@ -17,8 +17,9 @@ export class BridgeConnection {
     private shouldReconnect = false;
     private bridgeUrl: string;
     public manager: AgentManager;
-    // Default agent for single-agent compatibility mode (works with existing bridge)
-    private defaultAgentId: string | null = null;
+    // Dual-agent mode: Claude is the primary, Codex is the reviewer
+    private claudeAgentId: string | null = null;
+    private codexAgentId: string | null = null;
     private defaultProjectDir: string;
 
     constructor(bridgeUrl: string, defaultProjectDir: string) {
@@ -59,11 +60,16 @@ export class BridgeConnection {
                 // Now safe to log (client is identified, daemon_log will be forwarded)
                 console.log('\x1b[32m[Daemon] Connected to bridge\x1b[0m');
 
-                // Auto-spawn the default agent if not already running
-                if (!this.defaultAgentId) {
-                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', 'claude');
-                    this.defaultAgentId = info.agentId;
-                    console.log(`\x1b[36m[Daemon] Default agent ready: ${info.agentId} in ${this.defaultProjectDir}\x1b[0m`);
+                // Auto-spawn both Claude and Codex agents
+                if (!this.claudeAgentId) {
+                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'claude', 'claude');
+                    this.claudeAgentId = info.agentId;
+                    console.log(`\x1b[36m[Daemon] Claude agent ready: ${info.agentId} in ${this.defaultProjectDir}\x1b[0m`);
+                }
+                if (!this.codexAgentId) {
+                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'codex', 'codex');
+                    this.codexAgentId = info.agentId;
+                    console.log(`\x1b[36m[Daemon] Codex agent ready: ${info.agentId} in ${this.defaultProjectDir}\x1b[0m`);
                 }
             });
 
@@ -125,40 +131,26 @@ export class BridgeConnection {
                 // Check for "new chat" / "new session" / "start fresh" commands
                 if (/^(new\s*(chat|session)|start\s*(fresh|over|new)|reset\s*(chat|session))\s*[.!]?\s*$/i.test(text)) {
                     console.log('\x1b[33m[Daemon] Starting new chat session...\x1b[0m');
-                    const agentId = this.defaultAgentId;
-                    if (agentId) {
-                        this.manager.killAgent(agentId);
-                    }
-                    // Spawn fresh agent with requested engine (or default to claude)
-                    const newEngine: 'claude' | 'codex' = msg.engine === 'codex' ? 'codex' : 'claude';
-                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', newEngine);
-                    this.defaultAgentId = info.agentId;
+                    // Kill both agents and respawn
+                    if (this.claudeAgentId) this.manager.killAgent(this.claudeAgentId);
+                    if (this.codexAgentId) this.manager.killAgent(this.codexAgentId);
+                    const claude = this.manager.spawnAgent(this.defaultProjectDir, 'claude', 'claude');
+                    this.claudeAgentId = claude.agentId;
+                    const codex = this.manager.spawnAgent(this.defaultProjectDir, 'codex', 'codex');
+                    this.codexAgentId = codex.agentId;
                     // Tell bridge to clear phone history
                     this.send({ type: 'new_session' });
                     // Tell user
-                    const sink = this.createSink(info.agentId);
+                    const sink = this.createSink(claude.agentId);
                     sink.sendResult('Fresh session started. What do you need?');
                     sink.sendSpeak('Fresh session started. What do you need?');
-                    console.log(`\x1b[32m[Daemon] New session ready: ${info.agentId}\x1b[0m`);
+                    console.log(`\x1b[32m[Daemon] New session ready: Claude=${claude.agentId}, Codex=${codex.agentId}\x1b[0m`);
                     break;
                 }
-                let agentId = msg.agentId || this.defaultAgentId;
 
-                // Engine switching: if phone requests a different engine, respawn the agent
+                // Route to the right agent based on engine field
                 const requestedEngine: 'claude' | 'codex' = msg.engine === 'codex' ? 'codex' : 'claude';
-                if (agentId) {
-                    const currentAgent = this.manager.getAgent(agentId);
-                    if (currentAgent && currentAgent.engine !== requestedEngine) {
-                        console.log(`\x1b[33m[Daemon] Switching engine: ${currentAgent.engine} → ${requestedEngine}\x1b[0m`);
-                        this.manager.killAgent(agentId);
-                        const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', requestedEngine);
-                        this.defaultAgentId = info.agentId;
-                        agentId = info.agentId;
-                        const switchSink = this.createSink(agentId);
-                        const engineName = requestedEngine === 'codex' ? 'Codex' : 'Claude';
-                        switchSink.sendSpeak(`Switched to ${engineName}. Go ahead.`);
-                    }
-                }
+                const agentId = requestedEngine === 'codex' ? this.codexAgentId : this.claudeAgentId;
 
                 if (!agentId) {
                     console.error('[Daemon] No agent available for command');
@@ -178,7 +170,8 @@ export class BridgeConnection {
             }
 
             case 'stop': {
-                const agentId = msg.agentId || this.defaultAgentId;
+                const stopEngine: 'claude' | 'codex' = msg.engine === 'codex' ? 'codex' : 'claude';
+                const agentId = msg.agentId || (stopEngine === 'codex' ? this.codexAgentId : this.claudeAgentId);
                 if (agentId) {
                     console.log(`\x1b[33m[Daemon] Stop → ${agentId}\x1b[0m`);
                     this.manager.stopAgent(agentId);

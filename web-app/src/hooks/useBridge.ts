@@ -275,16 +275,18 @@ export function useBridge(onAudioDone?: () => void) {
             // Skip live user_command — we already added it locally in sendCommand
           } else if (data.type === 'tool_status') {
             const isNarration = typeof data.text === 'string' && data.text.startsWith('💬 ')
+            const engine = data.engine as 'claude' | 'codex' | undefined
             const msg: Message = isNarration
-              ? { role: 'assistant' as const, text: data.text.slice(2), timestamp: Date.now(), replayed: isReplayingRef.current, narration: true }
-              : { role: 'tool' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+              ? { role: 'assistant' as const, text: data.text.slice(2), timestamp: Date.now(), replayed: isReplayingRef.current, narration: true, engine }
+              : { role: 'tool' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, engine }
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {
               setMessages((prev) => [...prev, msg])
             }
           } else if (data.type === 'narration') {
-            const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, narration: true }
+            const narrationEngine = data.engine as 'claude' | 'codex' | undefined
+            const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, narration: true, engine: narrationEngine }
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {
@@ -297,8 +299,9 @@ export function useBridge(onAudioDone?: () => void) {
               audioStartedForResult = false
               startResultFallback(onAudioDoneRef)
             }
+            const resultEngine = data.engine as 'claude' | 'codex' | undefined
             setIsWaiting(false)
-            const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current }
+            const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, engine: resultEngine }
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {
@@ -368,7 +371,7 @@ export function useBridge(onAudioDone?: () => void) {
       setIsWaiting(true)
       setMessages((prev) => [
         ...prev,
-        { role: 'user' as const, text, timestamp: Date.now(), images },
+        { role: 'user' as const, text, timestamp: Date.now(), images, engine },
       ])
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -385,11 +388,13 @@ export function useBridge(onAudioDone?: () => void) {
     [],
   )
 
-  const sendStop = useCallback(() => {
+  const sendStop = useCallback((engine?: 'claude' | 'codex') => {
     stopAllAudio()
     setIsWaiting(false)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'stop' }))
+      const payload: Record<string, unknown> = { type: 'stop' }
+      if (engine) payload.engine = engine
+      wsRef.current.send(JSON.stringify(payload))
     }
   }, [])
 

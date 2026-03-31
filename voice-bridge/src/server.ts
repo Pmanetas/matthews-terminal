@@ -468,7 +468,9 @@ wss.on('connection', (ws) => {
     if (role === 'phone' && msg.type === 'stop') {
       const ext = getClient('extension');
       if (ext) {
-        sendJSON(ext, { type: 'stop' });
+        const stopPayload: Record<string, unknown> = { type: 'stop' };
+        if ((msg as any).engine) stopPayload.engine = (msg as any).engine;
+        sendJSON(ext, stopPayload);
         console.log(`[${timestamp()}] Stop command forwarded to extension`);
       }
       state.currentTaskStatus = 'idle';
@@ -493,7 +495,9 @@ wss.on('connection', (ws) => {
 
     // ── Extension/daemon sends tool status (separate step on phone) ──
     if (isExtOrDaemon && msg.type === 'tool_status') {
-      const entry = { type: 'tool_status', text: msg.text };
+      const engine = (msg as any).engine;
+      const entry: Record<string, unknown> = { type: 'tool_status', text: msg.text };
+      if (engine) entry.engine = engine;
       pushHistory(entry);
       broadcastToRole('phone', entry);
 
@@ -538,8 +542,10 @@ wss.on('connection', (ws) => {
 
     // ── Extension/daemon sends narration (display only, TTS comes via separate 'speak') ──
     if (isExtOrDaemon && msg.type === 'narration') {
-      console.log(`[${timestamp()}] NARRATION: "${(msg.text || '').slice(0, 100)}"`);
-      const narrationEntry = { type: 'narration', text: msg.text };
+      const engine = (msg as any).engine;
+      console.log(`[${timestamp()}] NARRATION [${engine || 'claude'}]: "${(msg.text || '').slice(0, 100)}"`);
+      const narrationEntry: Record<string, unknown> = { type: 'narration', text: msg.text };
+      if (engine) narrationEntry.engine = engine;
       pushHistory(narrationEntry);
       broadcastToRole('phone', narrationEntry);
       return;
@@ -571,7 +577,9 @@ wss.on('connection', (ws) => {
       state.lastOutputSummary = msg.text;
 
       // Send result text IMMEDIATELY so phone shows it right away
-      const resultEntry = { type: 'result', text: msg.text };
+      const resultEngine = (msg as any).engine;
+      const resultEntry: Record<string, unknown> = { type: 'result', text: msg.text };
+      if (resultEngine) resultEntry.engine = resultEngine;
       pushHistory(resultEntry);
       broadcastToRole('phone', resultEntry);
 

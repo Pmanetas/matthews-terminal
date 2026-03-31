@@ -16,4 +16,5 @@ export interface Message {
   images?: ImageAttachment[]
   replayed?: boolean
   narration?: boolean
+  engine?: 'claude' | 'codex'
 }

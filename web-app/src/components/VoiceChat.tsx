@@ -378,6 +378,9 @@ const globalCSS = `
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
+  .codex-bubble {
+    background: rgb(153, 27, 27) !important;
+  }
   /* Light mode overrides */
   .light-mode .user-bubble {
     background: rgb(91, 33, 182) !important;
@@ -462,8 +465,12 @@ export function VoiceChat() {
 
   const [showTerminal, setShowTerminal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showCodex, setShowCodex] = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
-  const [engine, setEngine] = useState<'claude' | 'codex'>(() => (localStorage.getItem('matthews-engine') as 'claude' | 'codex') || 'claude')
+  const codexEndRef = useRef<HTMLDivElement>(null)
+
+  // Engine is determined by which panel is active
+  const engine: 'claude' | 'codex' = showCodex ? 'codex' : 'claude'
 
   // Sync body/html/theme-color with light mode so safe-area + home bar match
   useEffect(() => {
@@ -522,6 +529,15 @@ export function VoiceChat() {
   useEffect(() => {
     if (showTerminal) terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [daemonLogs, showTerminal])
+
+  // Split messages by engine for dual-panel display
+  const claudeMessages = messages.filter(m => !m.engine || m.engine === 'claude')
+  const codexMessages = messages.filter(m => m.engine === 'codex')
+
+  // Auto-scroll Codex panel
+  useEffect(() => {
+    if (showCodex) codexEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [codexMessages.length, showCodex])
 
   // Clear stale expanded tools when messages get replaced (replay/clear)
   const prevMsgLenRef = useRef(messages.length)
@@ -594,7 +610,7 @@ export function VoiceChat() {
 
     if (/^(matthew\s+stop|stop|shut up|quiet|be quiet|enough)\s*[.!]?\s*$/i.test(trimmed)) {
       hasSentRef.current = true
-      sendStop()
+      sendStop(engine)
       stopListening()
       setPendingMessage('')
       setTimeout(() => startListening(), 1500)
@@ -665,7 +681,7 @@ export function VoiceChat() {
   }
 
   const handleStop = () => {
-    sendStop()
+    sendStop(engine)
   }
 
   const toggleToolExpand = (i: number) => {
@@ -770,10 +786,10 @@ export function VoiceChat() {
           <span className={cn('text-[10px] truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/30')}>{statusLabel}</span>
           <span className={cn(
             'ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide',
-            engine === 'codex'
-              ? 'bg-emerald-500/20 text-emerald-400'
+            showCodex
+              ? 'bg-red-500/20 text-red-400'
               : 'bg-violet-500/20 text-violet-400'
-          )}>{engine}</span>
+          )}>{showCodex ? 'Codex' : 'Claude'}</span>
         </div>
         {activeFile && (
           <div className="flex items-center gap-1 mt-0.5">
@@ -874,36 +890,8 @@ export function VoiceChat() {
               {lightMode ? <Moon className="w-4 h-4 text-violet-500" /> : <Sun className="w-4 h-4 text-amber-400" />}
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
-            {/* Engine selector */}
-            <div className={cn('px-5 py-3 border-t', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px] font-semibold uppercase tracking-wider', lightMode ? 'text-black/40' : 'text-white/40')}>AI Engine</span>
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => { setEngine('claude'); localStorage.setItem('matthews-engine', 'claude') }}
-                  className={cn(
-                    'flex-1 py-2 rounded-lg text-xs font-medium transition-all',
-                    engine === 'claude'
-                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30'
-                      : lightMode ? 'bg-black/[0.06] text-black/50' : 'bg-white/[0.06] text-white/40'
-                  )}
-                >
-                  Claude
-                </button>
-                <button
-                  onClick={() => { setEngine('codex'); localStorage.setItem('matthews-engine', 'codex') }}
-                  className={cn(
-                    'flex-1 py-2 rounded-lg text-xs font-medium transition-all',
-                    engine === 'codex'
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-                      : lightMode ? 'bg-black/[0.06] text-black/50' : 'bg-white/[0.06] text-white/40'
-                  )}
-                >
-                  Codex
-                </button>
-              </div>
-            </div>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.2</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.3 — Dual Engine</span>
             </div>
           </motion.div>
         )}
@@ -912,6 +900,72 @@ export function VoiceChat() {
       {showSettings && (
         <div className="fixed inset-0 z-[55]" onClick={() => setShowSettings(false)} />
       )}
+
+      {/* ── Codex panel (slides up from bottom) ── */}
+      <AnimatePresence>
+        {showCodex && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: '0%' }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            className={cn(
+              'absolute inset-x-0 bottom-0 z-[45] flex flex-col rounded-t-3xl border-t-2 backdrop-blur-xl shadow-2xl',
+              lightMode
+                ? 'bg-white/95 border-red-400/30'
+                : 'bg-[#1A0A0A]/95 border-red-500/30'
+            )}
+            style={{ height: '55%' }}
+          >
+            {/* Codex panel header */}
+            <div className={cn('shrink-0 flex items-center justify-between px-4 pt-3 pb-2 border-b', lightMode ? 'border-red-200/40' : 'border-red-500/15')}>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className={cn('text-sm font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                <span className={cn('text-[10px]', lightMode ? 'text-red-400/60' : 'text-red-400/40')}>GPT-5.4</span>
+              </div>
+              <button
+                onClick={() => setShowCodex(false)}
+                className={cn('flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-red-100' : 'bg-red-500/10')}
+              >
+                <X className={cn('w-4 h-4', lightMode ? 'text-red-400' : 'text-red-400/70')} />
+              </button>
+            </div>
+
+            {/* Codex messages */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-4 py-3 space-y-3">
+              {codexMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-2">
+                  <span className={cn('text-3xl')}>🔍</span>
+                  <p className={cn('text-sm text-center', lightMode ? 'text-red-400/50' : 'text-red-400/30')}>
+                    Talk to Codex here — ask it to review Claude's work or tackle a task independently
+                  </p>
+                </div>
+              ) : (
+                codexMessages.map((msg, i) => (
+                  <div key={i} className={cn('min-w-0 overflow-hidden', i >= codexMessages.length - 3 && 'msg-fade-in')}>
+                    {msg.role === 'user' ? (
+                      <div className="user-bubble codex-bubble">
+                        <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                      </div>
+                    ) : msg.role === 'tool' ? (
+                      <div className="flex items-center gap-2 ml-1">
+                        <div className="w-2 h-2 shrink-0 rounded-full bg-red-500/30" />
+                        <span className="text-[13px] leading-tight" style={{ color: lightMode ? 'rgba(180, 0, 0, 0.5)' : 'rgba(248, 113, 113, 0.5)' }}>{msg.text.split('\n')[0]}</span>
+                      </div>
+                    ) : (
+                      <div className="px-1" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgb(248, 113, 113)' }}>
+                        <MarkdownMessage text={msg.text} />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+              <div ref={codexEndRef} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── File browser overlay ── */}
       <AnimatePresence>
@@ -1067,18 +1121,18 @@ export function VoiceChat() {
         style={{ overscrollBehavior: 'none' }}
       >
         <div className="flex flex-col gap-3 px-5 py-4 w-full overflow-hidden box-border">
-          {messages.length === 0 ? (
+          {claudeMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center mt-20 gap-4">
               <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
             </div>
           ) : (
-            messages.map((msg, i) => {
-              const isNextTool = messages[i + 1]?.role === 'tool'
-              const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
+            claudeMessages.map((msg, i) => {
+              const isNextTool = claudeMessages[i + 1]?.role === 'tool'
+              const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
               const isLastTool = i === lastToolIndex
               const defaultExpanded = isLastTool && !hasResultAfterTools
               const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
-              const isRecent = i >= messages.length - 3
+              const isRecent = i >= claudeMessages.length - 3
 
               // Narrations are spoken via TTS but not displayed
               if (msg.narration) return null
@@ -1348,6 +1402,15 @@ export function VoiceChat() {
                   className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
                 >
                   <Camera className="w-4 h-4 text-white/40" />
+                </button>
+                <button
+                  onClick={() => setShowCodex(prev => !prev)}
+                  className={cn(
+                    'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                    showCodex ? 'bg-red-500/30' : 'bg-white/[0.06]'
+                  )}
+                >
+                  <span className={cn('text-[11px] font-bold', showCodex ? 'text-red-400' : 'text-white/40')}>CX</span>
                 </button>
                 <button
                   onClick={() => {
