@@ -205,6 +205,7 @@ export function useBridge(onAudioDone?: () => void) {
   const [workspacePath, setWorkspacePath] = useState<string | null>(null)
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [isWaiting, setIsWaiting] = useState(false)
+  const [isCodexWaiting, setIsCodexWaiting] = useState(false)
   const [daemonConnected, setDaemonConnected] = useState(false)
   const [daemonLogs, setDaemonLogs] = useState<string[]>([])
   const [fileList, setFileList] = useState<{ name: string; type: string }[]>([])
@@ -265,6 +266,7 @@ export function useBridge(onAudioDone?: () => void) {
             setMessages(prev => prev.filter(m => !m.replayed))
             setDaemonLogs([])
             setIsWaiting(false)
+            setIsCodexWaiting(false)
             return
           } else if (data.type === 'user_command') {
             // Only add if replaying — live user_commands duplicate the local message
@@ -282,7 +284,11 @@ export function useBridge(onAudioDone?: () => void) {
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {
-              setMessages((prev) => [...prev, msg])
+              setMessages((prev) => {
+                const last = prev[prev.length - 1]
+                if (last && last.role === msg.role && last.text === msg.text && last.engine === msg.engine) return prev
+                return [...prev, msg]
+              })
             }
           } else if (data.type === 'narration') {
             const narrationEngine = data.engine as 'claude' | 'codex' | undefined
@@ -290,7 +296,11 @@ export function useBridge(onAudioDone?: () => void) {
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {
-              setMessages((prev) => [...prev, msg])
+              setMessages((prev) => {
+                const last = prev[prev.length - 1]
+                if (last && last.role === msg.role && last.text === msg.text && last.engine === msg.engine) return prev
+                return [...prev, msg]
+              })
             }
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
@@ -300,12 +310,20 @@ export function useBridge(onAudioDone?: () => void) {
               startResultFallback(onAudioDoneRef)
             }
             const resultEngine = data.engine as 'claude' | 'codex' | undefined
-            setIsWaiting(false)
+            if (resultEngine === 'codex') {
+              setIsCodexWaiting(false)
+            } else {
+              setIsWaiting(false)
+            }
             const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, engine: resultEngine }
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
             } else {
-              setMessages((prev) => [...prev, msg])
+              setMessages((prev) => {
+                const last = prev[prev.length - 1]
+                if (last && last.role === msg.role && last.text === msg.text && last.engine === msg.engine) return prev
+                return [...prev, msg]
+              })
             }
           } else if (data.type === 'workspace') {
             setWorkspace(data.workspace || data.repo || null)
@@ -368,7 +386,11 @@ export function useBridge(onAudioDone?: () => void) {
   const sendCommand = useCallback(
     (text: string, images?: ImageAttachment[], engine?: 'claude' | 'codex') => {
       unlockAudio()
-      setIsWaiting(true)
+      if (engine === 'codex') {
+        setIsCodexWaiting(true)
+      } else {
+        setIsWaiting(true)
+      }
       setMessages((prev) => [
         ...prev,
         { role: 'user' as const, text, timestamp: Date.now(), images, engine },
@@ -390,7 +412,11 @@ export function useBridge(onAudioDone?: () => void) {
 
   const sendStop = useCallback((engine?: 'claude' | 'codex') => {
     stopAllAudio()
-    setIsWaiting(false)
+    if (engine === 'codex') {
+      setIsCodexWaiting(false)
+    } else {
+      setIsWaiting(false)
+    }
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       const payload: Record<string, unknown> = { type: 'stop' }
       if (engine) payload.engine = engine
@@ -403,6 +429,7 @@ export function useBridge(onAudioDone?: () => void) {
     setMessages([])
     setDaemonLogs([])
     setIsWaiting(false)
+    setIsCodexWaiting(false)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'new_chat' }))
     }
@@ -429,5 +456,5 @@ export function useBridge(onAudioDone?: () => void) {
     }
   }, [connect])
 
-  return { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs }
+  return { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, isCodexWaiting, daemonConnected, daemonLogs }
 }
