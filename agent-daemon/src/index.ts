@@ -111,7 +111,8 @@ console.log('');
 connection.connect();
 
 // ── Auto-restart on rebuild ─────────────────────────────────
-// Watch dist/ for changes so daemon picks up new code automatically
+// Watch dist/ for changes — exit with code 75, wrapper script restarts us.
+// This is much more reliable on Windows than trying to spawn a child process.
 
 const distDir = path.join(__dirname);
 let restartDebounce: ReturnType<typeof setTimeout> | undefined;
@@ -120,25 +121,11 @@ fs.watch(distDir, { recursive: true }, (_event, filename) => {
     if (!filename || !filename.endsWith('.js')) return;
     if (restartDebounce) clearTimeout(restartDebounce);
     restartDebounce = setTimeout(() => {
-        console.log(`\x1b[33m[Daemon] Code changed (${filename}) — auto-restarting...\x1b[0m`);
+        console.log(`\x1b[33m[Daemon] Code changed (${filename}) — restarting...\x1b[0m`);
         connection.dispose();
-        // Re-exec the same process with the same args
-        // detached: true + unref() so child survives parent exit on Windows
-        const { spawn: spawnChild } = require('child_process');
-        // Quote all args to handle spaces in paths (e.g. "Program Files", "Matthews Terminal")
-        const quotedArgs = process.argv.slice(1).map((a: string) => `"${a}"`).join(' ');
-        const cmd = `"${process.argv[0]}" ${quotedArgs}`;
-        const child = spawnChild(cmd, [], {
-            stdio: 'inherit',
-            shell: true,
-            detached: false, // stay in same terminal window on Windows
-        });
-        child.on('error', (err: any) => {
-            origError('[Daemon] Failed to restart:', err.message);
-        });
-        // Give child a moment to start, then exit old process
-        setTimeout(() => process.exit(0), 1000);
-    }, 1500); // 1.5s debounce to let tsc finish writing all files
+        // Exit with special code 75 — the wrapper script sees this and restarts
+        setTimeout(() => process.exit(75), 500);
+    }, 1500);
 });
 
 console.log('  \x1b[90m[Auto-restart enabled — watching dist/ for changes]\x1b[0m');

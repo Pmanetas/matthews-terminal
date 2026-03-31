@@ -1,12 +1,22 @@
 /**
- * AgentManager — holds multiple AgentRunner instances and routes commands to them.
+ * AgentManager — holds multiple agent instances (Claude or Codex) and routes commands to them.
  */
 
 import { AgentRunner } from './agent-runner';
+import { CodexRunner } from './codex-runner';
 import { AgentSink, AgentInfo, AgentStatus, ImageData } from './types';
 
+/** Common interface both AgentRunner and CodexRunner implement */
+interface Runner {
+    readonly id: string;
+    readonly busy: boolean;
+    handleCommand(text: string, sink: AgentSink, images?: ImageData[]): Promise<void>;
+    abortCommand(sink: AgentSink): void;
+    dispose(): void;
+}
+
 export class AgentManager {
-    private agents = new Map<string, { runner: AgentRunner; info: AgentInfo }>();
+    private agents = new Map<string, { runner: Runner; info: AgentInfo }>();
     private nextId = 1;
     private sinkFactory: (agentId: string) => AgentSink;
 
@@ -16,7 +26,9 @@ export class AgentManager {
 
     spawnAgent(projectDir: string, name: string, engine: 'claude' | 'codex' = 'claude'): AgentInfo {
         const agentId = `agent-${this.nextId++}`;
-        const runner = new AgentRunner(agentId, projectDir);
+        const runner: Runner = engine === 'codex'
+            ? new CodexRunner(agentId, projectDir)
+            : new AgentRunner(agentId, projectDir);
         const info: AgentInfo = { agentId, name, projectDir, engine, status: 'idle' };
         this.agents.set(agentId, { runner, info });
         console.log(`[AgentManager] Spawned ${agentId} (${name}) in ${projectDir} [${engine}]`);

@@ -24,7 +24,7 @@ Phone (web-app) <-> Voice Bridge (Render) <-> Agent Daemon / VS Code Extension <
 - `agent-daemon/src/agent-runner.ts` — Individual Claude CLI agent process
 - `agent-daemon/src/session-context.ts` — Persists conversation to `.matthews/session-context.json`
 - `agent-daemon/src/conversation-log.ts` — Full conversation history to `.matthews/conversation.md`
-- `agent-daemon/src/claude-md-updater.ts` — Auto-updates this CLAUDE.md after each exchange
+- `agent-daemon/src/claude-md-updater.ts` — (DISABLED) Was auto-updating CLAUDE.md with conversation history
 - `agent-daemon/src/types.ts` — AgentSink, AgentInfo, BridgeCommand, DaemonMessage types
 - `vscode-extension/src/extension.ts` — VS Code extension activation
 - `vscode-extension/src/bridge-client.ts` — Extension WebSocket client
@@ -68,7 +68,7 @@ The daemon automatically maintains two conversation files in `.matthews/`:
 - **`session-context.json`** — Rolling log of last 20 exchanges (JSON). Used internally for session recovery when daemon restarts.
 - **`conversation.md`** — Full append-only conversation log (Markdown). Every user message and assistant response, with timestamps. Never truncated.
 
-The daemon also auto-updates this CLAUDE.md file after each exchange, appending the recent conversation to the bottom between `<!-- AUTO-UPDATED -->` markers. This means any new Claude session entering this repo gets full context automatically.
+Full conversation history is in `.matthews/conversation.md` — read it if you need context from past sessions. It is NOT loaded automatically to save token usage.
 
 ## Conventions
 

@@ -9,6 +9,7 @@ export interface AgentSink {
     sendSpeak(text: string): void;
     sendNarration(text: string): void;
     sendNewSession(): void;
+    sendWorkspace(dir: string): void;
 }
 
 // ── Image Data ──────────────────────────────────────────────
@@ -40,9 +41,9 @@ export type DaemonMessage =
     | { type: 'agent_list'; agents: AgentInfo[] }
     | { type: 'status'; agentId: string; text: string }
     | { type: 'tool_status'; agentId: string; text: string }
-    | { type: 'result'; agentId: string; text: string }
-    | { type: 'speak'; agentId: string; text: string }
-    | { type: 'narration'; agentId: string; text: string }
+    | { type: 'result'; agentId: string; text: string; engine?: string }
+    | { type: 'speak'; agentId: string; text: string; engine?: string }
+    | { type: 'narration'; agentId: string; text: string; engine?: string }
     | { type: 'new_session'; agentId: string };
 
 export type BridgeCommand =

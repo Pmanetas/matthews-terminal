@@ -69,7 +69,7 @@ function pcmToWav(pcm: Buffer, sampleRate: number, silenceMs = 0): Buffer {
   return Buffer.concat([header, silence, pcm]);
 }
 
-async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
+async function generateSpeechOpenAI(text: string, voice: string = 'onyx'): Promise<Buffer | null> {
   if (!OPENAI_API_KEY) return null;
 
   const ttsText = cleanTextForTTS(text);
@@ -84,7 +84,7 @@ async function generateSpeechOpenAI(text: string): Promise<Buffer | null> {
       },
       body: JSON.stringify({
         model: 'tts-1',
-        voice: 'onyx',
+        voice,
         input: ttsText,
         response_format: 'pcm',  // raw 24kHz 16-bit mono
         speed: 1.12,
@@ -145,9 +145,10 @@ async function generateSpeechGroq(text: string): Promise<Buffer | null> {
   }
 }
 
-/** Try OpenAI first, fall back to Groq (free) */
-async function generateSpeech(text: string): Promise<Buffer | null> {
-  const openaiResult = await generateSpeechOpenAI(text);
+/** Try OpenAI first, fall back to Groq (free).
+ *  voice: 'onyx' = deep male (Claude/Matthew), 'nova' = female (Codex) */
+async function generateSpeech(text: string, voice: string = 'onyx'): Promise<Buffer | null> {
+  const openaiResult = await generateSpeechOpenAI(text, voice);
   if (openaiResult) return openaiResult;
 
   console.log(`[${timestamp()}] OpenAI TTS unavailable, falling back to Groq`);
@@ -543,8 +544,9 @@ wss.on('connection', (ws) => {
     // ── Extension/daemon sends speak (TTS only, no display) ───
     if (isExtOrDaemon && msg.type === 'speak') {
       const phoneCount = [...clients].filter(([w, r]) => r === 'phone' && w.readyState === WebSocket.OPEN).length;
-      console.log(`[${timestamp()}] SPEAK received (${phoneCount} phone(s) online): "${(msg.text || '').slice(0, 100)}"`);
-      generateSpeech(msg.text).then((audioBuffer) => {
+      const ttsVoice = (msg as any).engine === 'codex' ? 'nova' : 'onyx';
+      console.log(`[${timestamp()}] SPEAK received [${ttsVoice}] (${phoneCount} phone(s) online): "${(msg.text || '').slice(0, 100)}"`);
+      generateSpeech(msg.text, ttsVoice).then((audioBuffer) => {
         if (audioBuffer) {
           const phoneCountNow = [...clients].filter(([w, r]) => r === 'phone' && w.readyState === WebSocket.OPEN).length;
           const base64 = audioBuffer.toString('base64');
@@ -570,7 +572,8 @@ wss.on('connection', (ws) => {
       broadcastToRole('phone', resultEntry);
 
       // Generate TTS in background — audio arrives after text
-      generateSpeech(msg.text).then((audioBuffer) => {
+      const resultVoice = (msg as any).engine === 'codex' ? 'nova' : 'onyx';
+      generateSpeech(msg.text, resultVoice).then((audioBuffer) => {
         if (audioBuffer) {
           const base64 = audioBuffer.toString('base64');
           broadcastToRole('phone', { type: 'audio', data: base64, final: true });

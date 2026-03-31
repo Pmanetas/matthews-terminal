@@ -217,16 +217,17 @@ export class BridgeConnection {
 
     /**
      * Create an AgentSink for sending messages back to the bridge.
-     * In compatibility mode (identifying as 'extension'), messages are sent
-     * WITHOUT agentId so the existing bridge handles them normally.
+     * Includes engine type in speak/result/narration so bridge can pick the right TTS voice.
      */
     private createSink(agentId: string): AgentSink {
+        const agentInfo = this.manager.getAgent(agentId);
+        const engine = agentInfo?.engine || 'claude';
         return {
             sendStatus: (text) => this.send({ type: 'status', text }),
             sendToolStatus: (text) => this.send({ type: 'tool_status', text }),
-            sendResult: (text) => this.send({ type: 'result', text }),
-            sendSpeak: (text) => this.send({ type: 'speak', text }),
-            sendNarration: (text) => this.send({ type: 'narration', text }),
+            sendResult: (text) => this.send({ type: 'result', text, engine }),
+            sendSpeak: (text) => this.send({ type: 'speak', text, engine }),
+            sendNarration: (text) => this.send({ type: 'narration', text, engine }),
             sendNewSession: () => this.send({ type: 'new_session' }),
             sendWorkspace: (dir) => {
                 const path = require('path');
