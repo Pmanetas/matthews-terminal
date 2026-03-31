@@ -363,7 +363,7 @@ export function useBridge(onAudioDone?: () => void) {
   }, [connect])
 
   const sendCommand = useCallback(
-    (text: string, images?: ImageAttachment[]) => {
+    (text: string, images?: ImageAttachment[], engine?: 'claude' | 'codex') => {
       unlockAudio()
       setIsWaiting(true)
       setMessages((prev) => [
@@ -375,6 +375,9 @@ export function useBridge(onAudioDone?: () => void) {
         const payload: Record<string, unknown> = { type: 'command', text }
         if (images && images.length > 0) {
           payload.images = images
+        }
+        if (engine) {
+          payload.engine = engine
         }
         wsRef.current.send(JSON.stringify(payload))
       }

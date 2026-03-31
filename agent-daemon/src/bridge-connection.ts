@@ -129,8 +129,9 @@ export class BridgeConnection {
                     if (agentId) {
                         this.manager.killAgent(agentId);
                     }
-                    // Spawn fresh agent
-                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', 'claude');
+                    // Spawn fresh agent with requested engine (or default to claude)
+                    const newEngine: 'claude' | 'codex' = msg.engine === 'codex' ? 'codex' : 'claude';
+                    const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', newEngine);
                     this.defaultAgentId = info.agentId;
                     // Tell bridge to clear phone history
                     this.send({ type: 'new_session' });
@@ -141,12 +142,29 @@ export class BridgeConnection {
                     console.log(`\x1b[32m[Daemon] New session ready: ${info.agentId}\x1b[0m`);
                     break;
                 }
-                const agentId = msg.agentId || this.defaultAgentId;
+                let agentId = msg.agentId || this.defaultAgentId;
+
+                // Engine switching: if phone requests a different engine, respawn the agent
+                const requestedEngine: 'claude' | 'codex' = msg.engine === 'codex' ? 'codex' : 'claude';
+                if (agentId) {
+                    const currentAgent = this.manager.getAgent(agentId);
+                    if (currentAgent && currentAgent.engine !== requestedEngine) {
+                        console.log(`\x1b[33m[Daemon] Switching engine: ${currentAgent.engine} → ${requestedEngine}\x1b[0m`);
+                        this.manager.killAgent(agentId);
+                        const info = this.manager.spawnAgent(this.defaultProjectDir, 'default', requestedEngine);
+                        this.defaultAgentId = info.agentId;
+                        agentId = info.agentId;
+                        const switchSink = this.createSink(agentId);
+                        const engineName = requestedEngine === 'codex' ? 'Codex' : 'Claude';
+                        switchSink.sendSpeak(`Switched to ${engineName}. Go ahead.`);
+                    }
+                }
+
                 if (!agentId) {
                     console.error('[Daemon] No agent available for command');
                     return;
                 }
-                console.log(`\x1b[35m[Daemon] Command → ${agentId}: "${text.slice(0, 60)}"\x1b[0m`);
+                console.log(`\x1b[35m[Daemon] Command → ${agentId} [${requestedEngine}]: "${text.slice(0, 60)}"\x1b[0m`);
 
                 // Immediate contextual acknowledgment — user hears something right away
                 const ackSink = this.createSink(agentId);

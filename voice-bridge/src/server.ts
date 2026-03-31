@@ -417,6 +417,10 @@ wss.on('connection', (ws) => {
           payload.images = msg.images;
           console.log(`[${timestamp()}] Forwarding ${msg.images.length} image(s) to extension`);
         }
+        if (msg.engine) {
+          payload.engine = msg.engine;
+          console.log(`[${timestamp()}] Engine requested: ${msg.engine}`);
+        }
         sendJSON(ext, payload);
         sendJSON(ws, { type: 'status', text: 'Command sent...' });
       } else {

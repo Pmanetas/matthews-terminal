@@ -463,6 +463,7 @@ export function VoiceChat() {
   const [showTerminal, setShowTerminal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
+  const [engine, setEngine] = useState<'claude' | 'codex'>(() => (localStorage.getItem('matthews-engine') as 'claude' | 'codex') || 'claude')
 
   // Sync body/html/theme-color with light mode so safe-area + home bar match
   useEffect(() => {
@@ -609,7 +610,8 @@ export function VoiceChat() {
         stopListening()
         sendCommand(
           msg || 'What do you see in this image?',
-          pendingImages.length > 0 ? pendingImages : undefined
+          pendingImages.length > 0 ? pendingImages : undefined,
+          engine
         )
         setPendingMessage('')
         setPendingImages([])
@@ -626,7 +628,8 @@ export function VoiceChat() {
       setExpandedTools(new Set())
       sendCommand(
         pendingMessage || 'What do you see in this image?',
-        pendingImages.length > 0 ? pendingImages : undefined
+        pendingImages.length > 0 ? pendingImages : undefined,
+        engine
       )
       setPendingMessage('')
       setPendingImages([])
@@ -765,6 +768,12 @@ export function VoiceChat() {
         <div className="flex items-center gap-1.5 mt-1">
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
           <span className={cn('text-[10px] truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/30')}>{statusLabel}</span>
+          <span className={cn(
+            'ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide',
+            engine === 'codex'
+              ? 'bg-emerald-500/20 text-emerald-400'
+              : 'bg-violet-500/20 text-violet-400'
+          )}>{engine}</span>
         </div>
         {activeFile && (
           <div className="flex items-center gap-1 mt-0.5">
@@ -865,8 +874,36 @@ export function VoiceChat() {
               {lightMode ? <Moon className="w-4 h-4 text-violet-500" /> : <Sun className="w-4 h-4 text-amber-400" />}
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
+            {/* Engine selector */}
+            <div className={cn('px-5 py-3 border-t', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
+              <span className={cn('text-[10px] font-semibold uppercase tracking-wider', lightMode ? 'text-black/40' : 'text-white/40')}>AI Engine</span>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => { setEngine('claude'); localStorage.setItem('matthews-engine', 'claude') }}
+                  className={cn(
+                    'flex-1 py-2 rounded-lg text-xs font-medium transition-all',
+                    engine === 'claude'
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30'
+                      : lightMode ? 'bg-black/[0.06] text-black/50' : 'bg-white/[0.06] text-white/40'
+                  )}
+                >
+                  Claude
+                </button>
+                <button
+                  onClick={() => { setEngine('codex'); localStorage.setItem('matthews-engine', 'codex') }}
+                  className={cn(
+                    'flex-1 py-2 rounded-lg text-xs font-medium transition-all',
+                    engine === 'codex'
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                      : lightMode ? 'bg-black/[0.06] text-black/50' : 'bg-white/[0.06] text-white/40'
+                  )}
+                >
+                  Codex
+                </button>
+              </div>
+            </div>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.1</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.2</span>
             </div>
           </motion.div>
         )}
