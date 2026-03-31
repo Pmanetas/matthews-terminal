@@ -162,8 +162,7 @@ export class CodexRunner {
             const args = [
                 'exec',
                 '--json',
-                '--dangerously-bypass-approvals-and-sandbox',
-                '-C', this.projectDir,
+                '-s', 'danger-full-access',
             ];
 
             // Add image flags if Codex supports them
