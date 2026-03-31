@@ -276,7 +276,8 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'user_command') {
             // Only add if replaying — live user_commands duplicate the local message
             if (isReplayingRef.current) {
-              const msg: Message = { role: 'user' as const, text: data.text, timestamp: Date.now(), replayed: true }
+              const replayEngine = data.engine as 'claude' | 'codex' | undefined
+              const msg: Message = { role: 'user' as const, text: data.text, timestamp: Date.now(), replayed: true, engine: replayEngine }
               replayBufferRef.current.push(msg)
             }
             // Skip live user_command — we already added it locally in sendCommand

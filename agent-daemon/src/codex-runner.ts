@@ -292,8 +292,10 @@ export class CodexRunner {
                 if (item.type === 'agent_message' && item.text) {
                     console.log(`${C.cyan}[Codex] Message: ${item.text.slice(0, 150)}${C.reset}`);
                     appendText(item.text + '\n');
-                    // Don't narrate — the final result already contains this text.
-                    // Sending it as narration caused duplicate messages on the phone.
+                    // Narrate each message as it comes so the user hears it via TTS
+                    // The final result will be the displayed text in chat (no separate speak)
+                    sink.sendNarration(item.text);
+                    sink.sendSpeak(item.text);
                 }
 
                 if (item.type === 'command_execution') {
@@ -303,6 +305,16 @@ export class CodexRunner {
                     const exitCode = item.exit_code ?? '?';
                     console.log(`${C.yellow}[Codex] Command done (exit ${exitCode}): ${shortCmd}${C.reset}`);
                     sink.sendToolStatus(`Command finished (exit ${exitCode})`);
+                }
+
+                if (item.type === 'file_read' && item.filename) {
+                    console.log(`${C.yellow}[Codex] Read: ${item.filename}${C.reset}`);
+                    sink.sendToolStatus(`Reading ${item.filename}`);
+                }
+
+                if (item.type === 'file_edit' && item.filename) {
+                    console.log(`${C.yellow}[Codex] Edited: ${item.filename}${C.reset}`);
+                    sink.sendToolStatus(`Editing ${item.filename}`);
                 }
                 break;
             }

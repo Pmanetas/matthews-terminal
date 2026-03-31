@@ -35,7 +35,7 @@ function parseDiffStats(lines: string[]): { added: number; removed: number } {
   return { added, removed }
 }
 
-function ToolContent({ text, expanded, lightMode }: { text: string; expanded: boolean; lightMode?: boolean }) {
+function ToolContent({ text, expanded, lightMode, codexMode }: { text: string; expanded: boolean; lightMode?: boolean; codexMode?: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
   const diffLines = lines.slice(1)
@@ -45,7 +45,7 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
   return (
     <div className="flex flex-col min-w-0 w-full">
       <div className="flex items-center gap-2">
-        <span className="text-[13px] leading-tight" style={{ color: lightMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.5)' }}>{header}</span>
+        <span className="text-[13px] leading-tight" style={{ color: codexMode ? (lightMode ? 'rgba(185, 28, 28, 0.7)' : 'rgba(248, 113, 113, 0.6)') : (lightMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.5)') }}>{header}</span>
         {hasDiff && (
           <span className="flex items-center gap-1.5 text-[11px] shrink-0 ml-auto">
             {added > 0 && <span className="text-emerald-400/70">+{added}</span>}
@@ -455,6 +455,11 @@ const globalCSS = `
   .light-mode .codex-text, .light-mode .codex-text * { color: rgb(185, 28, 28) !important; }
   .light-mode .codex-text strong { color: rgb(153, 27, 27) !important; font-weight: 700 !important; }
   .light-mode .codex-text code { color: rgb(185, 28, 28) !important; background: rgba(185, 28, 28, 0.08) !important; }
+  /* Codex panel — tool icons and tool text override violet to red */
+  .codex-panel .text-violet-400 { color: rgb(248, 113, 113) !important; }
+  .codex-panel .text-amber-400 { color: rgb(248, 113, 113) !important; }
+  .light-mode .codex-panel .text-violet-400 { color: rgb(185, 28, 28) !important; }
+  .light-mode .codex-panel .text-amber-400 { color: rgb(185, 28, 28) !important; }
 `
 
 // Track which result texts have already been animated (survives re-renders and remounts)
@@ -1286,9 +1291,9 @@ export function VoiceChat() {
                           {isLastTool && codexIsCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-red-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-red-500/30" />}
                           <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-red-500/15' : 'bg-transparent')} />
                         </div>
-                        <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                        <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.4)' : '2px solid rgba(248, 113, 113, 0.4)', background: lightMode ? 'rgba(185, 28, 28, 0.08)' : 'rgba(248, 113, 113, 0.1)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
                           <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
-                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} codexMode />
                         </div>
                       </div>
                     ) : (
@@ -1444,9 +1449,9 @@ export function VoiceChat() {
                           {isLastTool && codexIsCurrentToolLoading ? <LoaderCircle className="w-3.5 h-3.5 text-red-400 animate-spin shrink-0" /> : <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-red-500/30" />}
                           <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-red-500/15' : 'bg-transparent')} />
                         </div>
-                        <div className="flex-1 flex items-start gap-2 py-2 px-3 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                        <div className="flex-1 flex items-start gap-2 py-2 px-3 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.4)' : '2px solid rgba(248, 113, 113, 0.4)', background: lightMode ? 'rgba(185, 28, 28, 0.08)' : 'rgba(248, 113, 113, 0.1)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
                           <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
-                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} codexMode />
                         </div>
                       </div>
                     ) : (
