@@ -139,14 +139,14 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
       playNextAudio(onAudioDoneRef)
     } else if (item.isFinal) {
       onAudioDoneRef.current?.()
-    } else {
-      // Non-final audio done and queue empty — wait briefly then resume mic
+    } else if (_resultReceived) {
+      // Non-final audio done, queue empty, and result already arrived
       // (covers narration-only flows where result has skipTts)
       setTimeout(() => {
         if (!isPlayingAudio && _audioQueue.length === 0) {
           onAudioDoneRef.current?.()
         }
-      }, 800)
+      }, 500)
     }
   }
   sharedAudio.play().then(() => {
@@ -185,6 +185,7 @@ export function stopAllAudio() {
 
 export let audioStartedForResult = false
 export let lastResultEngine: 'claude' | 'codex' | undefined
+let _resultReceived = false  // Set when result arrives, cleared on new command
 let _onAudioStarted: (() => void) | null = null
 export function onAudioStarted(cb: () => void) { _onAudioStarted = cb }
 
@@ -328,6 +329,7 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'status') {
             // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {
+            _resultReceived = true
             if (!isReplayingRef.current) {
               audioStartedForResult = false
               startResultFallback(onAudioDoneRef)
@@ -415,6 +417,8 @@ export function useBridge(onAudioDone?: () => void) {
       unlockAudio()
       // Set engine immediately so waveform shows correct color for ack audio
       lastResultEngine = engine
+      _resultReceived = false
+      audioStartedForResult = false
       if (engine === 'codex') {
         setIsCodexWaiting(true)
       } else {
