@@ -1156,7 +1156,7 @@ export function VoiceChat() {
           {/* Claude panel (top) */}
           <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: `${splitRatio} 1 0%` }}>
             {/* Claude header — matches main header style */}
-            <div className={cn('shrink-0 flex flex-col px-4 py-2 border-b', lightMode ? 'border-black/[0.08] bg-white/80' : 'border-white/[0.06] bg-black/40')}>
+            <div className={cn('shrink-0 flex flex-col px-4 py-2', lightMode ? 'bg-white/80' : 'bg-black/40')}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button onClick={sendNewChat} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
@@ -1182,30 +1182,10 @@ export function VoiceChat() {
                   </button>
                 </div>
               </div>
-              {workspace && daemonConnected && (
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <Terminal className="w-2.5 h-2.5 text-violet-400/60 shrink-0" />
-                  <span className={cn('text-[10px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/40')}>
-                    {(() => {
-                      const p = workspacePath || workspace
-                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
-                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
-                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
-                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
-                    })()}
-                  </span>
-                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
-                </div>
-              )}
             </div>
             <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
-                {claudeMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-3">
-                    <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the purple mic to talk to Claude</p>
-                  </div>
-                ) : (
-                  claudeMessages.map((msg, i) => {
+                {claudeMessages.map((msg, i) => {
                     const isNextTool = claudeMessages[i + 1]?.role === 'tool'
                     const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
                     const isLastTool = i === lastToolIndex
@@ -1241,8 +1221,7 @@ export function VoiceChat() {
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
-                  })
-                )}
+                })}
                 {isThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
                 <div ref={chatEndRef} />
               </div>
@@ -1279,7 +1258,7 @@ export function VoiceChat() {
           {/* Codex panel (bottom) */}
           <div className="flex flex-col min-h-0 overflow-hidden codex-panel" style={{ flex: `${1 - splitRatio} 1 0%` }}>
             {/* Codex header — matches Claude header style but red */}
-            <div className={cn('shrink-0 flex flex-col px-4 py-2 border-b', lightMode ? 'border-red-200/30 bg-white/80' : 'border-red-500/10 bg-black/40')}>
+            <div className={cn('shrink-0 flex flex-col px-4 py-2', lightMode ? 'bg-white/80' : 'bg-black/40')}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
@@ -1294,32 +1273,10 @@ export function VoiceChat() {
                 <div className="flex items-center gap-1.5" style={{ minWidth: 62 }}>
                 </div>
               </div>
-              {workspace && daemonConnected && (
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
-                  <span className={cn('text-[10px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/40')}>
-                    {(() => {
-                      const p = workspacePath || workspace
-                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
-                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
-                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
-                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
-                    })()}
-                  </span>
-                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
-                </div>
-              )}
             </div>
             <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
-                {codexMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-3">
-                    <p className={cn('text-sm text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
-                      Tap the red mic to talk to Codex
-                    </p>
-                  </div>
-                ) : (
-                  codexMessages.map((msg, i) => {
+                {codexMessages.map((msg, i) => {
                     const isNextTool = codexMessages[i + 1]?.role === 'tool'
                     const isPrevTool = i > 0 && codexMessages[i - 1]?.role === 'tool'
                     const isLastTool = i === codexLastToolIndex
@@ -1355,8 +1312,7 @@ export function VoiceChat() {
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
-                  })
-                )}
+                })}
                 {codexIsThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
                 <div ref={codexEndRef} />
               </div>

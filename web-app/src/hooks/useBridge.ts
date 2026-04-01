@@ -284,6 +284,8 @@ export function useBridge(onAudioDone?: () => void) {
           } else if (data.type === 'tool_status') {
             const isNarration = typeof data.text === 'string' && data.text.startsWith('💬 ')
             const engine = data.engine as 'claude' | 'codex' | undefined
+            // Update lastResultEngine so waveform color matches the active engine
+            if (engine) lastResultEngine = engine
             const msg: Message = isNarration
               ? { role: 'assistant' as const, text: data.text.slice(2), timestamp: Date.now(), replayed: isReplayingRef.current, narration: true, engine }
               : { role: 'tool' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, engine }
@@ -301,6 +303,7 @@ export function useBridge(onAudioDone?: () => void) {
             }
           } else if (data.type === 'narration') {
             const narrationEngine = data.engine as 'claude' | 'codex' | undefined
+            if (narrationEngine) lastResultEngine = narrationEngine
             const msg: Message = { role: 'assistant' as const, text: data.text, timestamp: Date.now(), replayed: isReplayingRef.current, narration: true, engine: narrationEngine }
             if (isReplayingRef.current) {
               replayBufferRef.current.push(msg)
