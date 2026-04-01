@@ -2,6 +2,12 @@
 
 A voice-controlled VS Code assistant. Speak from your phone, control your laptop, hear the results.
 
+## ⚠️ CRITICAL DEPLOYMENT RULE — READ THIS FIRST
+
+**ALWAYS git commit + git push BEFORE rebuilding the daemon.** Rebuilding the daemon (`npm run build` in agent-daemon) triggers an auto-restart that KILLS the current session. If you haven't pushed yet, all changes are LOST.
+
+The correct order is: make changes → git add → git commit → git push → THEN rebuild daemon. NEVER reverse steps 3 and 4. This rule is non-negotiable.
+
 ## Architecture
 
 Four components connected via WebSocket:
