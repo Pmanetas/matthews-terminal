@@ -112,14 +112,15 @@ export class CodexRunner {
             if (this.aborted) {
                 console.log(`[Codex ${this.agentId}] Command was aborted, skipping result`);
             } else {
-                // If narrations already covered the speech, use just the last message as result
-                // (avoids repeating all narrations in the final result bubble)
-                const alreadySpoken = this.narratedTexts.length > 0;
-                const finalText = alreadySpoken
+                // Use the last agent message as result text when narrations were sent
+                const hadNarrations = this.narratedTexts.length > 0;
+                const finalText = hadNarrations
                     ? (this.lastAgentMessage.trim() || result.trim() || 'Done')
                     : (result.trim() || 'Done');
                 console.log(`\n${C.green}✅ Codex Result:${C.reset} ${finalText.slice(0, 200)}${finalText.length > 200 ? '...' : ''}`);
-                sink.sendResult(finalText, alreadySpoken);
+                // Never skip TTS — the result needs its own audio so the phone can
+                // sync the typing animation to the speech (last narration was held back)
+                sink.sendResult(finalText);
                 this.sessionContext.saveExchange(this.lastUserPrompt, finalText);
                 this.conversationLog.logAssistant(finalText);
             }
@@ -154,10 +155,12 @@ export class CodexRunner {
 
     private narratedTexts: string[] = [];
     private lastAgentMessage: string = '';
+    private pendingSpeakText: string | null = null;
 
     private runCodex(prompt: string, sink: AgentSink, imageFiles: string[] = []): Promise<string> {
         this.narratedTexts = [];
         this.lastAgentMessage = '';
+        this.pendingSpeakText = null;
         return new Promise((resolve, reject) => {
             // Build the full prompt with system instructions
             let fullPrompt = `${CODEX_SYSTEM_PROMPT}\n\nUser: ${prompt}`;
@@ -301,12 +304,15 @@ export class CodexRunner {
 
                 if (item.type === 'agent_message' && item.text) {
                     console.log(`${C.cyan}[Codex] Message: ${item.text.slice(0, 150)}${C.reset}`);
-                    // Don't append to fullResponseText — narrations already display this
-                    // Only track the last message for the final result summary
+                    // Speak the PREVIOUS pending message (we now know it's not the last one)
+                    // The last message is held back so the result TTS can speak it instead,
+                    // allowing the phone's TypingMarkdown to sync text to audio.
+                    if (this.pendingSpeakText) {
+                        sink.sendSpeak(this.pendingSpeakText);
+                    }
                     this.lastAgentMessage = item.text;
-                    // Send narration so user sees+hears Codex thinking in real-time
                     sink.sendNarration(item.text);
-                    sink.sendSpeak(item.text);
+                    this.pendingSpeakText = item.text;
                     this.narratedTexts.push(item.text);
                 }
 

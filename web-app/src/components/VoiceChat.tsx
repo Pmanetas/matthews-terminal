@@ -615,6 +615,11 @@ export function VoiceChat() {
   })()
   const codexHasResultAfterTools = codexLastResultIndex > codexLastToolIndex
 
+  // Current Codex activity — last tool message while processing (e.g. "Reading file.ts")
+  const codexCurrentActivity = codexIsProcessing && codexLastToolIndex >= 0 && codexLastToolIndex > codexLastUserIndex
+    ? codexMessages[codexLastToolIndex].text
+    : null
+
   // Clear stale expanded tools when messages get replaced (replay/clear)
   const prevMsgLenRef = useRef(messages.length)
   useEffect(() => {
@@ -1509,6 +1514,14 @@ export function VoiceChat() {
                   <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
                 </div>
               )}
+              {codexCurrentActivity && (
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <ToolIcon text={codexCurrentActivity} />
+                  <span className={cn('text-[9px] truncate max-w-[200px] animate-pulse', lightMode ? 'text-red-600/60' : 'text-red-300/60')}>
+                    {codexCurrentActivity}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Popup messages */}
@@ -1685,13 +1698,13 @@ export function VoiceChat() {
             </button>
           </div>
 
-          {/* Centre — dual mics always visible, stop button overlaid when processing */}
+          {/* Centre — show only Codex mic when popup is open, both otherwise */}
           <div className="relative flex items-center gap-3">
-            <MicOrb
+            {!codexPopup && <MicOrb
               isListening={mainMicListening}
               onClick={handleMicClick}
               disabled={!supported}
-            />
+            />}
             {/* Stop button between mics when processing */}
             <AnimatePresence>
               {showStop && (
