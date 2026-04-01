@@ -324,7 +324,7 @@ function MicOrb({ isListening, onClick, disabled, codexMode }: {
         disabled={disabled}
         whileTap={{ scale: 0.9 }}
         className={cn(
-          'relative flex items-center justify-center w-14 h-14 rounded-full shrink-0 transition-colors',
+          'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-colors',
           isListening
             ? codexMode
               ? 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6)]'
@@ -348,7 +348,7 @@ function MicOrb({ isListening, onClick, disabled, codexMode }: {
         />
         <span
           ref={ring3Ref}
-          className={cn('absolute -inset-4 rounded-full border transition-none', codexMode ? 'border-red-400/15' : 'border-violet-400/15')}
+          className={cn('absolute -inset-5 rounded-full border transition-none', codexMode ? 'border-red-400/15' : 'border-violet-400/15')}
           style={{ opacity: 0 }}
         />
         {isListening ? (
@@ -1629,9 +1629,9 @@ export function VoiceChat() {
         )}
 
         {/* Action row — mic stays dead centre, equal-width sides */}
-        <div className="flex items-center justify-center px-2 gap-1" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-          {/* Left side */}
-          <div className="flex items-center justify-start gap-1 flex-1">
+        <div className="flex items-center px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          {/* Left side — fixed width to balance right side */}
+          <div className="flex items-center justify-start gap-2 flex-1">
             <button
               onClick={() => {
                 setShowFiles(true)
@@ -1640,34 +1640,22 @@ export function VoiceChat() {
                 requestFiles()
               }}
               className={cn(
-                'flex items-center justify-center w-9 h-9 rounded-full shrink-0 active:scale-90 transition-all',
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
                 showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
               )}
             >
-              <FolderOpen className={cn('w-3.5 h-3.5', showFiles ? 'text-violet-400' : 'text-white/40')} />
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-            >
-              <Camera className="w-3.5 h-3.5 text-white/40" />
+              <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
             </button>
           </div>
 
-          {/* Centre — dual mics, stop button overlaid (absolute so no layout shift) */}
-          <div className="relative flex items-center gap-2 shrink-0">
+          {/* Centre — dual mics always visible, stop button overlaid when processing */}
+          <div className="relative flex items-center gap-3">
             <MicOrb
               isListening={mainMicListening}
               onClick={handleMicClick}
               disabled={!supported}
             />
-            <MicOrb
-              isListening={codexMicListening}
-              onClick={handleCodexMicClick}
-              disabled={!supported}
-              codexMode={true}
-            />
-            {/* Stop button — overlaid dead centre between mics, no layout shift */}
+            {/* Stop button between mics when processing */}
             <AnimatePresence>
               {showStop && (
                 <motion.button
@@ -1677,40 +1665,66 @@ export function VoiceChat() {
                   exit={{ scale: 0, opacity: 0 }}
                   transition={{ duration: 0.15 }}
                   onClick={handleStop}
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-red-500/90 shrink-0 active:scale-90 transition-transform shadow-lg"
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-red-500/80 shrink-0 active:scale-90 transition-transform"
                 >
-                  <Square className="w-3.5 h-3.5 text-white fill-white" />
+                  <Square className="w-4 h-4 text-white fill-white" />
                 </motion.button>
               )}
             </AnimatePresence>
+            <MicOrb
+              isListening={codexMicListening}
+              onClick={handleCodexMicClick}
+              disabled={!supported}
+              codexMode={true}
+            />
           </div>
 
-          {/* Right side — CX (cycles: off → popup → split → off) + keyboard */}
-          <div className="flex items-center justify-end gap-1 flex-1">
+          {/* Right side — camera + CX + split + keyboard, always visible */}
+          <div className="flex items-center justify-end gap-2 flex-1">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <Camera className="w-4 h-4 text-white/40" />
+            </button>
             <button
               onClick={() => {
-                // Cycle: off → popup → split → off
-                if (splitMode) {
+                if (splitMode || codexPopup) {
                   setSplitMode(false)
                   setCodexPopup(false)
-                } else if (codexPopup) {
-                  setCodexPopup(false)
-                  setSplitMode(true)
                 } else {
                   setCodexPopup(true)
                 }
               }}
               className={cn(
-                'flex items-center justify-center w-9 h-9 rounded-full shrink-0 active:scale-90 transition-all',
-                splitMode ? 'bg-red-500/30' : codexPopup ? 'bg-red-500/20' : 'bg-white/[0.06]'
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                (codexPopup || splitMode) ? 'bg-red-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              {(codexPopup || splitMode) ? (
+                <X className="w-4 h-4 text-red-400" />
+              ) : (
+                <span className="text-[11px] font-bold text-white/40">CX</span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                if (splitMode) {
+                  setSplitMode(false)
+                } else {
+                  setCodexPopup(false)
+                  setSplitMode(true)
+                }
+              }}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                splitMode ? 'bg-red-500/30' : 'bg-white/[0.06]'
               )}
             >
               {splitMode ? (
-                <Columns2 className="w-3.5 h-3.5 text-red-400" />
-              ) : codexPopup ? (
-                <span className="text-[10px] font-bold text-red-400">CX</span>
+                <X className="w-4 h-4 text-red-400" />
               ) : (
-                <span className="text-[10px] font-bold text-white/40">CX</span>
+                <Columns2 className="w-4 h-4 text-white/40" />
               )}
             </button>
             <button
@@ -1719,11 +1733,11 @@ export function VoiceChat() {
                 setTimeout(() => typingInputRef.current?.focus(), 100)
               }}
               className={cn(
-                'flex items-center justify-center w-9 h-9 rounded-full shrink-0 active:scale-90 transition-all',
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
                 showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
               )}
             >
-              <Keyboard className={cn('w-3.5 h-3.5', showTyping ? 'text-violet-400' : 'text-white/40')} />
+              <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
             </button>
           </div>
         </div>
