@@ -139,6 +139,14 @@ function playNextAudio(onAudioDoneRef: { current: (() => void) | undefined }) {
       playNextAudio(onAudioDoneRef)
     } else if (item.isFinal) {
       onAudioDoneRef.current?.()
+    } else {
+      // Non-final audio done and queue empty — wait briefly then resume mic
+      // (covers narration-only flows where result has skipTts)
+      setTimeout(() => {
+        if (!isPlayingAudio && _audioQueue.length === 0) {
+          onAudioDoneRef.current?.()
+        }
+      }, 800)
     }
   }
   sharedAudio.play().then(() => {
@@ -405,6 +413,8 @@ export function useBridge(onAudioDone?: () => void) {
   const sendCommand = useCallback(
     (text: string, images?: ImageAttachment[], engine?: 'claude' | 'codex') => {
       unlockAudio()
+      // Set engine immediately so waveform shows correct color for ack audio
+      lastResultEngine = engine
       if (engine === 'codex') {
         setIsCodexWaiting(true)
       } else {
