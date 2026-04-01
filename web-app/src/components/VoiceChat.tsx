@@ -1446,7 +1446,7 @@ export function VoiceChat() {
             }}
           >
             {/* Popup header */}
-            <div className={cn('shrink-0 flex flex-col px-5 py-3 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+            <div className={cn('shrink-0 flex flex-col border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')} style={{ padding: '14px 18px 10px 18px' }}>
               <div className="flex items-center justify-between">
                 <div className="w-8" />
                 <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={48} color="red" />
