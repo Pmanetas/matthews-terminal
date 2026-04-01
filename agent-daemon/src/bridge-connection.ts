@@ -152,8 +152,9 @@ export class BridgeConnection {
                 }
 
                 // ── Sabrina handoff detection ──
-                // Check if user wants to hand off to Sabrina for review/audit
-                const sabrinaPattern = /\b(pass\s*(it\s*)?(to|over\s*to)\s*sabrina|send\s*(it\s*)?(to|over\s*to)\s*sabrina|get\s*sabrina\s*to|sabrina\s*(audit|review|check|look|have a look))\b/i;
+                // Only trigger on very deliberate handoff phrases — must be explicit intent
+                // to hand work over, not just casually mentioning Sabrina in conversation.
+                const sabrinaPattern = /\b(pass\s+(it\s+)?(to|over\s+to)\s+sabrina|hand\s+(it\s+)?(to|over\s+to)\s+sabrina|send\s+(it\s+)?(to|over\s+to)\s+sabrina|give\s+(it\s+)?to\s+sabrina|sabrina\s+audit\s+this|sabrina\s+review\s+this|sabrina\s+check\s+this)\b/i;
                 if (sabrinaPattern.test(text) && this.codexAgentId) {
                     console.log('\x1b[35m[Daemon] Sabrina handoff detected — building audit prompt\x1b[0m');
                     const sabrinaSink = this.createSink(this.codexAgentId);

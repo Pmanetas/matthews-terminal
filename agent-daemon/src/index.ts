@@ -35,6 +35,21 @@ try {
     console.error('[Daemon] Failed to load projects.json:', err);
 }
 
+// ── Cleanup orphaned processes from previous daemon instances ──
+import { execSync } from 'child_process';
+
+function killOrphanedProcesses() {
+    if (process.platform !== 'win32') return;
+    try {
+        // Kill any lingering codex.exe processes from previous daemon runs
+        execSync('taskkill /F /IM codex.exe 2>nul', { stdio: 'ignore' });
+    } catch {
+        // No codex processes running — that's fine
+    }
+}
+
+killOrphanedProcesses();
+
 // ── Start ───────────────────────────────────────────────────
 
 const connection = new BridgeConnection(BRIDGE_URL, DEFAULT_PROJECT);
@@ -123,8 +138,10 @@ fs.watch(distDir, { recursive: true }, (_event, filename) => {
     restartDebounce = setTimeout(() => {
         console.log(`\x1b[33m[Daemon] Code changed (${filename}) — restarting...\x1b[0m`);
         connection.dispose();
+        // Kill any codex processes before exit to prevent orphans
+        killOrphanedProcesses();
         // Exit with special code 75 — the wrapper script sees this and restarts
-        setTimeout(() => process.exit(75), 500);
+        setTimeout(() => process.exit(75), 1000);
     }, 1500);
 });
 
