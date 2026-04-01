@@ -611,9 +611,19 @@ export class AgentRunner {
         }
 
         // Live workspace tracking — resolve relative paths to absolute
+        // Also check sibling repos (e.g. bets-and-regrets next to Matthews Terminal)
         let absolutePath = filePath;
         if (filePath && !path.isAbsolute(filePath)) {
-            absolutePath = path.resolve(this.projectDir, filePath);
+            const candidate1 = path.resolve(this.projectDir, filePath);
+            const parentDir = path.dirname(this.projectDir);
+            const candidate2 = path.resolve(parentDir, filePath);
+            if (fs.existsSync(candidate1)) {
+                absolutePath = candidate1;
+            } else if (fs.existsSync(candidate2)) {
+                absolutePath = candidate2;
+            } else {
+                absolutePath = candidate1; // fallback
+            }
         }
         this.checkWorkspace(absolutePath, sink);
 
@@ -630,7 +640,10 @@ export class AgentRunner {
             try {
                 let resolvedPath = input.file_path;
                 if (!path.isAbsolute(resolvedPath)) {
-                    resolvedPath = path.join(this.projectDir, resolvedPath);
+                    const c1 = path.join(this.projectDir, resolvedPath);
+                    const parentDir = path.dirname(this.projectDir);
+                    const c2 = path.join(parentDir, resolvedPath);
+                    resolvedPath = fs.existsSync(c1) ? c1 : fs.existsSync(c2) ? c2 : c1;
                 }
                 const content = fs.readFileSync(resolvedPath, 'utf-8');
                 const allLines = content.split('\n');
