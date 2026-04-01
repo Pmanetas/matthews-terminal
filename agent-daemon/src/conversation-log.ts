@@ -6,7 +6,6 @@
  * entering the repo can read the complete history of what's been discussed.
  *
  * The file is append-only and human-readable.
- * Auto-rotates: keeps the last ~500 lines in conversation.md, archives older content.
  */
 
 import * as fs from 'fs';
@@ -14,13 +13,10 @@ import * as path from 'path';
 
 const SESSION_DIR = '.matthews';
 const CONVERSATION_FILE = 'conversation.md';
-const ARCHIVE_FILE = 'conversation-archive.md';
-const MAX_LINES = 500;
 const TIMEZONE = 'Australia/Melbourne';
 
 export class ConversationLog {
     private readonly filePath: string;
-    private readonly archivePath: string;
 
     constructor(projectDir: string) {
         const dir = path.join(projectDir, SESSION_DIR);
@@ -28,7 +24,6 @@ export class ConversationLog {
             fs.mkdirSync(dir, { recursive: true });
         }
         this.filePath = path.join(dir, CONVERSATION_FILE);
-        this.archivePath = path.join(dir, ARCHIVE_FILE);
 
         // Create file with header if it doesn't exist
         if (!fs.existsSync(this.filePath)) {
@@ -105,44 +100,8 @@ export class ConversationLog {
     private append(text: string): void {
         try {
             fs.appendFileSync(this.filePath, text, 'utf-8');
-            this.rotateIfNeeded();
         } catch (err) {
             console.error('[ConversationLog] Failed to write:', err);
-        }
-    }
-
-    /** Move older content to archive when conversation.md gets too long */
-    private rotateIfNeeded(): void {
-        try {
-            const content = fs.readFileSync(this.filePath, 'utf-8');
-            const lines = content.split('\n');
-            if (lines.length <= MAX_LINES) return;
-
-            // Find a session boundary near the midpoint to split cleanly
-            const cutTarget = lines.length - MAX_LINES;
-            let cutAt = cutTarget;
-            for (let i = cutTarget; i < cutTarget + 50 && i < lines.length; i++) {
-                if (lines[i].startsWith('## Session')) {
-                    cutAt = i;
-                    break;
-                }
-            }
-
-            const archiveContent = lines.slice(0, cutAt).join('\n');
-            const keepContent = '# Matthews Terminal — Conversation Log\n\n_(Older history in conversation-archive.md)_\n\n---\n\n' + lines.slice(cutAt).join('\n');
-
-            // Append to archive
-            if (fs.existsSync(this.archivePath)) {
-                fs.appendFileSync(this.archivePath, '\n' + archiveContent, 'utf-8');
-            } else {
-                fs.writeFileSync(this.archivePath, archiveContent, 'utf-8');
-            }
-
-            // Rewrite main file with just recent content
-            fs.writeFileSync(this.filePath, keepContent, 'utf-8');
-            console.log(`[ConversationLog] Rotated: archived ${cutAt} lines, kept ${lines.length - cutAt} lines`);
-        } catch (err) {
-            console.error('[ConversationLog] Rotation failed:', err);
         }
     }
 }

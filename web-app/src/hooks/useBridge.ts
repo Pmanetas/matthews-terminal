@@ -221,7 +221,7 @@ export function useBridge(onAudioDone?: () => void) {
   const [daemonLogs, setDaemonLogs] = useState<string[]>([])
   const [fileList, setFileList] = useState<{ name: string; type: string }[]>([])
   const [filePath, setFilePath] = useState<string | null>(null)
-  const [fileContent, setFileContent] = useState<{ path: string; content: string | null; error?: string } | null>(null)
+  const [fileContent, setFileContent] = useState<{ path: string; content: string | null; error?: string; truncated?: boolean; startLine?: number } | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isReplayingRef = useRef(false)
@@ -372,7 +372,7 @@ export function useBridge(onAudioDone?: () => void) {
             setFileList(data.files || [])
             setFilePath(data.path || null)
           } else if (data.type === 'file_content') {
-            setFileContent({ path: data.path, content: data.content, error: data.error })
+            setFileContent({ path: data.path, content: data.content, error: data.error, truncated: data.truncated, startLine: data.startLine })
           } else if (data.type === 'audio' && data.data) {
             try {
               const audioBytes = Uint8Array.from(atob(data.data), c => c.charCodeAt(0))
@@ -417,6 +417,10 @@ export function useBridge(onAudioDone?: () => void) {
   const sendCommand = useCallback(
     (text: string, images?: ImageAttachment[], engine?: 'claude' | 'codex') => {
       unlockAudio()
+      // Stop any leftover audio from previous message so it doesn't interfere
+      // with the new result's typewriter animation
+      stopAllAudio()
+      clearResultFallback()
       // Set engine immediately so waveform shows correct color for ack audio
       lastResultEngine = engine
       _resultReceived = false

@@ -279,15 +279,35 @@ export class BridgeConnection {
 
     private handleReadFile(filePath: string): void {
         const fs = require('fs');
+        const TAIL_SIZE = 50 * 1024; // 50KB tail for large files
         try {
             const stat = fs.statSync(filePath);
-            // Limit to 100KB to avoid sending huge files over WebSocket
             if (stat.size > 100 * 1024) {
-                this.send({ type: 'file_content', path: filePath, content: null, error: 'File too large (>100KB)' });
-                return;
+                // Large file — read just the last 50KB so phone sees most recent content
+                const fd = fs.openSync(filePath, 'r');
+                const start = stat.size - TAIL_SIZE;
+                const buf = Buffer.alloc(TAIL_SIZE);
+                fs.readSync(fd, buf, 0, TAIL_SIZE, start);
+                // Count newlines in the skipped portion to get accurate line numbers
+                const headBuf = Buffer.alloc(start);
+                fs.readSync(fd, headBuf, 0, start, 0);
+                fs.closeSync(fd);
+                let tail = buf.toString('utf-8');
+                // Drop the first partial line (we likely landed mid-line)
+                const firstNewline = tail.indexOf('\n');
+                if (firstNewline > 0) tail = tail.slice(firstNewline + 1);
+                // Count lines in skipped portion
+                let skippedLines = 1; // start at line 1
+                for (let i = 0; i < headBuf.length; i++) {
+                    if (headBuf[i] === 0x0a) skippedLines++;
+                }
+                // Add lines from the dropped partial first line
+                if (firstNewline > 0) skippedLines++;
+                this.send({ type: 'file_content', path: filePath, content: tail, truncated: true, startLine: skippedLines });
+            } else {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                this.send({ type: 'file_content', path: filePath, content });
             }
-            const content = fs.readFileSync(filePath, 'utf-8');
-            this.send({ type: 'file_content', path: filePath, content });
         } catch (err: any) {
             console.error('[Daemon] Failed to read file:', err.message);
             this.send({ type: 'file_content', path: filePath, content: null, error: err.message });

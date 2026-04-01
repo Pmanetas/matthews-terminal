@@ -119,26 +119,18 @@ function ToolContent({ text, expanded, lightMode, codexMode }: { text: string; e
 }
 
 function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: boolean; onUpdate?: () => void }) {
-  const alreadyDone = animatedTexts.has(text)
-  const [chars, setChars] = useState(animate && !alreadyDone ? 0 : text.length)
+  const [chars, setChars] = useState(0)
   const textRef = useRef(text)
-  const charsRef = useRef(animate && !alreadyDone ? 0 : text.length)
+  const charsRef = useRef(0)
   const onUpdateRef = useRef(onUpdate)
   const rafRef = useRef(0)
   onUpdateRef.current = onUpdate
 
-  // Reset when text changes
+  // When text changes (new result message), reset animation state
   useEffect(() => {
-    if (text !== textRef.current) {
-      textRef.current = text
-      if (animatedTexts.has(text)) {
-        charsRef.current = text.length
-        setChars(text.length)
-        return
-      }
-      charsRef.current = 0
-      setChars(0)
-    }
+    textRef.current = text
+    charsRef.current = 0
+    setChars(0)
   }, [text])
 
   // Mark text as animated once complete
@@ -148,13 +140,25 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     }
   }, [chars, text])
 
-  // Single animation loop — runs once per mount, uses refs for current values
+  // Animation loop — restarts on text change to guarantee fresh animation
+  // Uses text as dep so cleanup kills old loop and new one starts clean
   useEffect(() => {
-    if (!animate || alreadyDone) {
+    if (!animate) {
       charsRef.current = text.length
       setChars(text.length)
       return
     }
+
+    // Skip animation for text that was already fully revealed
+    if (animatedTexts.has(text)) {
+      charsRef.current = text.length
+      setChars(text.length)
+      return
+    }
+
+    // Reset for fresh animation
+    charsRef.current = 0
+    setChars(0)
 
     let revealStart = 0
     let waitStart = 0
@@ -166,7 +170,13 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
       const currentChars = charsRef.current
 
       // Already done — stop
-      if (currentChars >= currentText.length) return
+      if (currentChars >= currentText.length && currentText.length > 0) return
+
+      // Text not loaded yet — keep waiting
+      if (currentText.length === 0) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
 
       let newChars = currentChars
 
@@ -182,7 +192,7 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
       } else if (resultSkippedTts) {
         // Narrations already spoke this — reveal text immediately at natural speech pace
-        // ~20 chars/sec ≈ 150 words per minute, feels like someone reading aloud
+        // ~20 chars/sec = 150 words per minute, feels like someone reading aloud
         if (revealStart === 0) revealStart = now
         const elapsed = now - revealStart
         newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.02)), currentText.length)
@@ -214,7 +224,7 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     rafRef.current = requestAnimationFrame(tick)
     return () => { stopped = true; cancelAnimationFrame(rafRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // intentionally empty — runs once per mount, uses refs
+  }, [text]) // restart animation when text changes (new result message)
 
   return <MarkdownMessage text={text.slice(0, chars)} />
 }
@@ -678,6 +688,14 @@ export function VoiceChat() {
     prevMsgCountRef.current = messages.length
   }, [messages.length])
 
+  // Clear animated text cache when user sends a new command —
+  // ensures the next result gets a fresh typewriter animation
+  useEffect(() => {
+    if (isWaiting || isCodexWaiting) {
+      animatedTexts.clear()
+    }
+  }, [isWaiting, isCodexWaiting])
+
   useEffect(() => { scrollToBottom() }, [messages, expandedTools, scrollToBottom])
   useEffect(() => {
     const t = setTimeout(scrollToBottom, 300)
@@ -1106,14 +1124,21 @@ export function VoiceChat() {
                 ) : fileContent.error ? (
                   <p className="text-red-400/60 text-center text-sm mt-8">{fileContent.error}</p>
                 ) : (
-                  <pre className={cn('font-mono text-[11px] leading-relaxed whitespace-pre', lightMode ? 'text-black/60' : 'text-white/50')}>
-                    {(fileContent.content || '').split('\n').map((line, i) => (
-                      <div key={i} className="flex">
-                        <span className={cn('w-10 shrink-0 text-right pr-3 select-none', lightMode ? 'text-black/20' : 'text-white/15')}>{i + 1}</span>
-                        <span className="whitespace-pre">{line}</span>
-                      </div>
-                    ))}
-                  </pre>
+                  <>
+                    {fileContent.truncated && (
+                      <p className={cn('text-center text-xs py-2 mb-1', lightMode ? 'text-black/30' : 'text-white/25')}>
+                        Showing last ~50KB (from line {fileContent.startLine || '?'})
+                      </p>
+                    )}
+                    <pre className={cn('font-mono text-[11px] leading-relaxed whitespace-pre', lightMode ? 'text-black/60' : 'text-white/50')}>
+                      {(fileContent.content || '').split('\n').map((line, i) => (
+                        <div key={i} className="flex">
+                          <span className={cn('w-10 shrink-0 text-right pr-3 select-none', lightMode ? 'text-black/20' : 'text-white/15')}>{(fileContent.startLine || 1) + i}</span>
+                          <span className="whitespace-pre">{line}</span>
+                        </div>
+                      ))}
+                    </pre>
+                  </>
                 )}
               </div>
             ) : (
@@ -1161,7 +1186,9 @@ export function VoiceChat() {
             >
               <span className={cn('text-[11px]', lightMode ? 'text-black/30' : 'text-white/25')}>
                 {viewingFile
-                  ? `${(fileContent?.content || '').split('\n').length} lines`
+                  ? fileContent?.truncated
+                    ? `${(fileContent?.content || '').split('\n').length} lines (tail)`
+                    : `${(fileContent?.content || '').split('\n').length} lines`
                   : `${fileList.filter(f => f.type === 'dir').length} folders, ${fileList.filter(f => f.type === 'file').length} files`}
               </span>
             </div>
@@ -1252,7 +1279,7 @@ export function VoiceChat() {
                       </div>
                     ) : (
                       <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
-                        {i === lastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
+                        {i === lastResultIndex && !msg.replayed ? <TypingMarkdown key={`typing-${msg.timestamp}`} text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
@@ -1358,7 +1385,7 @@ export function VoiceChat() {
                       </div>
                     ) : (
                       <div className="px-1 codex-text">
-                        {i === codexLastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={() => codexEndRef.current?.scrollIntoView({ behavior: 'instant' })} /> : <MarkdownMessage text={msg.text} />}
+                        {i === codexLastResultIndex && !msg.replayed ? <TypingMarkdown key={`typing-${msg.timestamp}`} text={msg.text} animate={true} onUpdate={() => codexEndRef.current?.scrollIntoView({ behavior: 'instant' })} /> : <MarkdownMessage text={msg.text} />}
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
@@ -1424,7 +1451,7 @@ export function VoiceChat() {
                   </div>
                 ) : (
                   <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
-                    {i === lastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
+                    {i === lastResultIndex && !msg.replayed ? <TypingMarkdown key={`typing-${msg.timestamp}`} text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
                   </div>
                 )
                 return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
@@ -1561,7 +1588,7 @@ export function VoiceChat() {
                       </div>
                     ) : (
                       <div className="px-1 codex-text">
-                        {i === codexLastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={() => codexPopupEndRef.current?.scrollIntoView({ behavior: 'instant' })} /> : <MarkdownMessage text={msg.text} />}
+                        {i === codexLastResultIndex && !msg.replayed ? <TypingMarkdown key={`typing-${msg.timestamp}`} text={msg.text} animate={true} onUpdate={() => codexPopupEndRef.current?.scrollIntoView({ behavior: 'instant' })} /> : <MarkdownMessage text={msg.text} />}
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
