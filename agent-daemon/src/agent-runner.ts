@@ -622,6 +622,9 @@ export class AgentRunner {
         const isFromStderr = this.stderrToolsSent.delete(this.lastToolDescription);
         this.toolCallCount++;
 
+        // Log tool activity to conversation history so other agents can see what was done
+        this.conversationLog.logToolAction(this.lastToolDescription);
+
         // For Read tool: send file content preview instead of plain header
         if (toolName === 'Read' && input.file_path) {
             try {
