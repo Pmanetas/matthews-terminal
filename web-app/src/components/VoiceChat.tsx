@@ -1246,8 +1246,8 @@ export function VoiceChat() {
 
           {/* ── Draggable divider ── */}
           <div
-            className={cn('shrink-0 flex items-center justify-center touch-none cursor-row-resize', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
-            style={{ height: 24 }}
+            className={cn('shrink-0 flex items-center justify-center touch-none cursor-row-resize', lightMode ? 'bg-black/[0.04]' : 'bg-white/[0.04]')}
+            style={{ height: 10 }}
             onTouchStart={(e) => {
               splitDragRef.current = { startY: e.touches[0].clientY, startRatio: splitRatio, dragging: true }
             }}
@@ -1262,7 +1262,7 @@ export function VoiceChat() {
             }}
             onTouchEnd={() => { splitDragRef.current.dragging = false }}
           >
-            <div className={cn('w-12 h-1 rounded-full', lightMode ? 'bg-black/20' : 'bg-white/25')} />
+            <div className={cn('w-8 h-0.5 rounded-full', lightMode ? 'bg-black/15' : 'bg-white/20')} />
           </div>
 
           {/* Codex panel (bottom) */}
@@ -1446,14 +1446,14 @@ export function VoiceChat() {
             }}
           >
             {/* Popup header */}
-            <div className={cn('shrink-0 flex flex-col px-4 py-2.5 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+            <div className={cn('shrink-0 flex flex-col px-5 py-3.5 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
               <div className="flex items-center justify-center relative">
-                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
+                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={48} color="red" />
                 <button
                   onClick={() => setCodexPopup(false)}
-                  className={cn('absolute right-0 flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+                  className={cn('absolute right-1 flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.08]' : 'bg-white/[0.08]')}
                 >
-                  <X className={cn('w-3.5 h-3.5', lightMode ? 'text-black/40' : 'text-white/40')} />
+                  <X className={cn('w-4 h-4', lightMode ? 'text-black/50' : 'text-white/50')} />
                 </button>
               </div>
               {workspace && daemonConnected && (

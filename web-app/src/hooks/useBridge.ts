@@ -308,6 +308,7 @@ export function useBridge(onAudioDone?: () => void) {
               setMessages((prev) => {
                 for (let j = prev.length - 1; j >= Math.max(0, prev.length - 5); j--) {
                   const p = prev[j]
+                  if (p.narration) continue
                   if (p.role === msg.role && p.text === msg.text && p.engine === msg.engine) return prev
                 }
                 return [...prev, msg]
@@ -334,6 +335,7 @@ export function useBridge(onAudioDone?: () => void) {
               setMessages((prev) => {
                 for (let j = prev.length - 1; j >= Math.max(0, prev.length - 5); j--) {
                   const p = prev[j]
+                  if (p.narration) continue
                   if (p.role === msg.role && p.text === msg.text && p.engine === msg.engine) return prev
                 }
                 return [...prev, msg]

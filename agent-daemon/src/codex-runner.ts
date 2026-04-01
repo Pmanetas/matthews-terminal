@@ -114,7 +114,15 @@ export class CodexRunner {
             } else {
                 const finalText = result.trim() || 'Done';
                 console.log(`\n${C.green}✅ Codex Result:${C.reset} ${finalText.slice(0, 200)}${finalText.length > 200 ? '...' : ''}`);
-                sink.sendResult(finalText);
+                // If everything was already narrated, send a short completion result
+                // Otherwise send the full text (which the dedup in useBridge will handle)
+                const alreadyNarrated = this.narratedTexts.some(n => finalText.includes(n) || n.includes(finalText));
+                if (alreadyNarrated && this.narratedTexts.length > 0) {
+                    // Send the last narrated text as the proper result so it shows in chat
+                    sink.sendResult(this.narratedTexts[this.narratedTexts.length - 1]);
+                } else {
+                    sink.sendResult(finalText);
+                }
                 this.sessionContext.saveExchange(this.lastUserPrompt, finalText);
                 this.conversationLog.logAssistant(finalText);
             }
@@ -147,7 +155,10 @@ export class CodexRunner {
 
     // ── Codex CLI ──────────────────────────────────────────
 
+    private narratedTexts: string[] = [];
+
     private runCodex(prompt: string, sink: AgentSink, imageFiles: string[] = []): Promise<string> {
+        this.narratedTexts = [];
         return new Promise((resolve, reject) => {
             // Build the full prompt with system instructions
             let fullPrompt = `${CODEX_SYSTEM_PROMPT}\n\nUser: ${prompt}`;
@@ -295,6 +306,7 @@ export class CodexRunner {
                     // Send narration so user sees+hears Codex thinking in real-time
                     sink.sendNarration(item.text);
                     sink.sendSpeak(item.text);
+                    this.narratedTexts.push(item.text);
                 }
 
                 if (item.type === 'command_execution') {
