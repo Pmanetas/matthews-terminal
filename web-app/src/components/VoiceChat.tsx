@@ -879,7 +879,6 @@ export function VoiceChat() {
         <div className="flex items-center gap-1.5 mt-1">
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
           <span className={cn('text-[10px] truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/30')}>{statusLabel}</span>
-          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
         </div>
         {activeFile && (
           <div className="flex items-center gap-1 mt-0.5">
@@ -1158,7 +1157,6 @@ export function VoiceChat() {
                   <VoiceWaveform isActive={isAudioPlaying && lastResultEngine !== 'codex'} getAudioLevel={getAudioLevel} size={120} color="violet" />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
                   <button
                     onClick={() => setShowTerminal(prev => !prev)}
                     className={cn('flex items-center justify-center w-7 h-7 rounded-full transition-colors', showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]')}
@@ -1282,7 +1280,6 @@ export function VoiceChat() {
                   <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={120} color="red" />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-red-500/20 text-red-400">Codex</span>
                 </div>
               </div>
               {workspace && daemonConnected && (
@@ -1453,8 +1450,6 @@ export function VoiceChat() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
-                  <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
-                  <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
                 </div>
                 <button
                   onClick={() => setCodexPopup(false)}
