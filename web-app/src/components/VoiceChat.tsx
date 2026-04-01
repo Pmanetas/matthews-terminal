@@ -1648,55 +1648,36 @@ export function VoiceChat() {
             </button>
           </div>
 
-          {/* Centre — dual mics / stop / send */}
-          <AnimatePresence mode="wait">
-            {showStop ? (
-              <motion.button
-                key="stop"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={handleStop}
-                className="relative flex items-center justify-center w-16 h-16 rounded-full bg-red-500/80 shrink-0 active:scale-90 transition-transform"
-              >
-                <Square className="w-5 h-5 text-white fill-white" />
-              </motion.button>
-            ) : pendingMessage ? (
-              <motion.button
-                key="send"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={handleSend}
-                className="relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 bg-violet-500"
-              >
-                <ArrowUp className="w-6 h-6 text-white" />
-              </motion.button>
-            ) : (
-              <motion.div
-                key="dual-mics"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="flex items-center gap-3"
-              >
-                <MicOrb
-                  isListening={mainMicListening}
-                  onClick={handleMicClick}
-                  disabled={!supported}
-                />
-                <MicOrb
-                  isListening={codexMicListening}
-                  onClick={handleCodexMicClick}
-                  disabled={!supported}
-                  codexMode={true}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Centre — dual mics always visible, stop button overlaid when processing */}
+          <div className="relative flex items-center gap-3">
+            <MicOrb
+              isListening={mainMicListening}
+              onClick={handleMicClick}
+              disabled={!supported}
+            />
+            {/* Stop button between mics when processing */}
+            <AnimatePresence>
+              {showStop && (
+                <motion.button
+                  key="stop"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={handleStop}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-red-500/80 shrink-0 active:scale-90 transition-transform"
+                >
+                  <Square className="w-4 h-4 text-white fill-white" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <MicOrb
+              isListening={codexMicListening}
+              onClick={handleCodexMicClick}
+              disabled={!supported}
+              codexMode={true}
+            />
+          </div>
 
           {/* Right side — camera + CX + split + keyboard, always visible */}
           <div className="flex items-center justify-end gap-2 flex-1">
