@@ -236,7 +236,7 @@ export class BridgeConnection {
         return {
             sendStatus: (text) => this.send({ type: 'status', text, engine }),
             sendToolStatus: (text) => this.send({ type: 'tool_status', text, engine }),
-            sendResult: (text) => this.send({ type: 'result', text, engine }),
+            sendResult: (text, skipTts) => this.send({ type: 'result', text, engine, ...(skipTts ? { skipTts: true } : {}) }),
             sendSpeak: (text) => this.send({ type: 'speak', text, engine }),
             sendNarration: (text) => this.send({ type: 'narration', text, engine }),
             sendNewSession: () => this.send({ type: 'new_session' }),

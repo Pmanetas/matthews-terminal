@@ -5,7 +5,7 @@
 export interface AgentSink {
     sendStatus(text: string): void;
     sendToolStatus(text: string): void;
-    sendResult(text: string): void;
+    sendResult(text: string, skipTts?: boolean): void;
     sendSpeak(text: string): void;
     sendNarration(text: string): void;
     sendNewSession(): void;

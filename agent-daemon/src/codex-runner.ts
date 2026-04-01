@@ -114,15 +114,10 @@ export class CodexRunner {
             } else {
                 const finalText = result.trim() || 'Done';
                 console.log(`\n${C.green}✅ Codex Result:${C.reset} ${finalText.slice(0, 200)}${finalText.length > 200 ? '...' : ''}`);
-                // If everything was already narrated, send a short completion result
-                // Otherwise send the full text (which the dedup in useBridge will handle)
-                const alreadyNarrated = this.narratedTexts.some(n => finalText.includes(n) || n.includes(finalText));
-                if (alreadyNarrated && this.narratedTexts.length > 0) {
-                    // Send the last narrated text as the proper result so it shows in chat
-                    sink.sendResult(this.narratedTexts[this.narratedTexts.length - 1]);
-                } else {
-                    sink.sendResult(finalText);
-                }
+                // If narrations already covered the speech, skip TTS on the result
+                // (narrations already did sendSpeak for each piece). Otherwise TTS normally.
+                const alreadySpoken = this.narratedTexts.length > 0;
+                sink.sendResult(finalText, alreadySpoken);
                 this.sessionContext.saveExchange(this.lastUserPrompt, finalText);
                 this.conversationLog.logAssistant(finalText);
             }

@@ -584,14 +584,19 @@ wss.on('connection', (ws) => {
       broadcastToRole('phone', resultEntry);
 
       // Generate TTS in background — audio arrives after text
-      const resultVoice = (msg as any).engine === 'codex' ? 'nova' : 'onyx';
-      generateSpeech(msg.text, resultVoice).then((audioBuffer) => {
-        if (audioBuffer) {
-          const base64 = audioBuffer.toString('base64');
-          broadcastToRole('phone', { type: 'audio', data: base64, final: true });
-          console.log(`[${timestamp()}] Sent TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
-        }
-      }).catch(() => {});
+      // Skip TTS if narrations already spoke this content (skipTts flag from daemon)
+      if (!(msg as any).skipTts) {
+        const resultVoice = (msg as any).engine === 'codex' ? 'nova' : 'onyx';
+        generateSpeech(msg.text, resultVoice).then((audioBuffer) => {
+          if (audioBuffer) {
+            const base64 = audioBuffer.toString('base64');
+            broadcastToRole('phone', { type: 'audio', data: base64, final: true });
+            console.log(`[${timestamp()}] Sent TTS audio (${Math.round(audioBuffer.length / 1024)}KB)`);
+          }
+        }).catch(() => {});
+      } else {
+        console.log(`[${timestamp()}] Skipping TTS for result — narrations already spoke it`);
+      }
       return;
     }
 

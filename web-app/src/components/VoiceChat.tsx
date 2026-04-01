@@ -501,6 +501,8 @@ export function VoiceChat() {
   const codexScrollRef = useRef<HTMLDivElement>(null)
   const codexPopupEndRef = useRef<HTMLDivElement>(null)
   const splitDragRef = useRef({ startY: 0, startRatio: 0.5, dragging: false })
+  const [codexPopupHeight, setCodexPopupHeight] = useState(420)
+  const popupResizeRef = useRef({ startY: 0, startHeight: 420, dragging: false })
 
   // Track which mic is active — 'claude' for main, 'codex' for Codex panel
   const micTargetRef = useRef<'claude' | 'codex'>('claude')
@@ -1437,7 +1439,7 @@ export function VoiceChat() {
               left: '1rem',
               maxWidth: '400px',
               marginLeft: 'auto',
-              height: '420px',
+              height: `${codexPopupHeight}px`,
               borderRadius: '1rem',
               border: lightMode ? '1px solid rgba(185, 28, 28, 0.2)' : '1px solid rgba(248, 113, 113, 0.15)',
               background: lightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 18, 0.92)',
@@ -1445,13 +1447,31 @@ export function VoiceChat() {
               boxShadow: '0 8px 40px rgba(0, 0, 0, 0.4)',
             }}
           >
+            {/* Resize handle — top-left corner, drag up/down to resize */}
+            <div
+              className="absolute top-0 left-0 z-10 touch-none cursor-ns-resize flex items-center justify-center"
+              style={{ width: 40, height: 40, borderTopLeftRadius: '1rem' }}
+              onTouchStart={(e) => {
+                popupResizeRef.current = { startY: e.touches[0].clientY, startHeight: codexPopupHeight, dragging: true }
+              }}
+              onTouchMove={(e) => {
+                if (!popupResizeRef.current.dragging) return
+                const dy = popupResizeRef.current.startY - e.touches[0].clientY
+                const newH = Math.max(200, Math.min(700, popupResizeRef.current.startHeight + dy))
+                setCodexPopupHeight(newH)
+              }}
+              onTouchEnd={() => { popupResizeRef.current.dragging = false }}
+            >
+              <div className={cn('w-4 h-0.5 rounded-full rotate-45', lightMode ? 'bg-black/15' : 'bg-white/20')} />
+            </div>
+
             {/* Popup header */}
             <div className={cn('shrink-0 flex flex-col border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')} style={{ padding: '14px 18px 10px 18px' }}>
-              <div className="flex items-center justify-between">
-                <div className="w-8" />
+              <div className="flex items-center justify-center relative" style={{ minHeight: 32 }}>
                 <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={48} color="red" />
                 <button
                   onClick={() => setCodexPopup(false)}
+                  style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
                   className={cn('flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform shrink-0', lightMode ? 'bg-black/[0.08]' : 'bg-white/[0.08]')}
                 >
                   <X className={cn('w-4 h-4', lightMode ? 'text-black/50' : 'text-white/50')} />
