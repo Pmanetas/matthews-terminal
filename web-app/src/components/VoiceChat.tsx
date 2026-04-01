@@ -609,31 +609,32 @@ export function VoiceChat() {
     prevMsgLenRef.current = messages.length
   }, [messages.length])
 
-  const isProcessing = isWaiting || (messages.length > 0 && messages[messages.length - 1].role !== 'assistant')
+  // Claude-specific processing state (only looks at Claude messages, not Codex)
+  const isProcessing = isWaiting || (claudeMessages.length > 0 && claudeMessages[claudeMessages.length - 1].role !== 'assistant')
 
   const lastUserIndex = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'user') return i }
+    for (let i = claudeMessages.length - 1; i >= 0; i--) { if (claudeMessages[i].role === 'user') return i }
     return -1
   })()
 
   // Show thinking dots when waiting — narration messages shouldn't hide the dots
   const lastNonNarrationMsg = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (!(messages[i] as any).narration) return messages[i]
+    for (let i = claudeMessages.length - 1; i >= 0; i--) {
+      if (!(claudeMessages[i] as any).narration) return claudeMessages[i]
     }
     return null
   })()
-  const isThinking = isProcessing && messages.length > 0 && lastNonNarrationMsg?.role === 'user'
+  const isThinking = isProcessing && claudeMessages.length > 0 && lastNonNarrationMsg?.role === 'user'
 
   const lastToolIndex = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'tool') return i }
+    for (let i = claudeMessages.length - 1; i >= 0; i--) { if (claudeMessages[i].role === 'tool') return i }
     return -1
   })()
 
   const isCurrentToolLoading = isProcessing && lastToolIndex > lastUserIndex
 
   const lastResultIndex = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i].role === 'assistant' && !messages[i].narration) return i }
+    for (let i = claudeMessages.length - 1; i >= 0; i--) { if (claudeMessages[i].role === 'assistant' && !claudeMessages[i].narration) return i }
     return -1
   })()
 
@@ -703,14 +704,21 @@ export function VoiceChat() {
   }, [isListening, transcript, sendCommand, sendStop, stopListening, startListening])
 
   const handleSend = () => {
-    if ((pendingMessage || pendingImages.length > 0) && !hasSentRef.current) {
+    const text = pendingMessage || transcript || ''
+    if ((text || pendingImages.length > 0) && !hasSentRef.current) {
       hasSentRef.current = true
       userScrolledRef.current = false
-      setExpandedTools(new Set())
+      const target = micTargetRef.current
+      if (target === 'codex') {
+        setCodexExpandedTools(new Set())
+      } else {
+        setExpandedTools(new Set())
+      }
+      if (isListening) stopListening()
       sendCommand(
-        pendingMessage || 'What do you see in this image?',
+        text || 'What do you see in this image?',
         pendingImages.length > 0 ? pendingImages : undefined,
-        'claude'
+        target
       )
       setPendingMessage('')
       setPendingImages([])
