@@ -157,6 +157,7 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
     }
 
     let revealStart = 0
+    let waitStart = 0
     let stopped = false
 
     const tick = (now: number) => {
@@ -179,8 +180,17 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         if (revealStart === 0) revealStart = now
         const elapsed = now - revealStart
         newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
+      } else {
+        // No audio started — wait 1.5s then reveal text at 80 chars/sec
+        // (covers skipTts flows where narrations already spoke the content)
+        if (waitStart === 0) waitStart = now
+        const waited = now - waitStart
+        if (waited > 1500) {
+          if (revealStart === 0) revealStart = now
+          const elapsed = now - revealStart
+          newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
+        }
       }
-      // else: still waiting for audio — don't reveal anything, just keep looping
 
       // Update state if changed
       if (newChars !== currentChars) {
