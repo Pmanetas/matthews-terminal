@@ -292,8 +292,7 @@ export class CodexRunner {
                 if (item.type === 'agent_message' && item.text) {
                     console.log(`${C.cyan}[Codex] Message: ${item.text.slice(0, 150)}${C.reset}`);
                     appendText(item.text + '\n');
-                    // Narrate each message as it comes so the user hears it via TTS
-                    // The final result will be the displayed text in chat (no separate speak)
+                    // Send narration so user sees+hears Codex thinking in real-time
                     sink.sendNarration(item.text);
                     sink.sendSpeak(item.text);
                 }

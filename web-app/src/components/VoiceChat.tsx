@@ -1433,11 +1433,11 @@ export function VoiceChat() {
             className="absolute z-[45] flex flex-col codex-panel"
             style={{
               bottom: 'calc(5.5rem + env(safe-area-inset-bottom))',
-              right: '1rem',
-              left: '1rem',
+              right: '0.75rem',
+              left: '0.75rem',
               maxWidth: '400px',
               marginLeft: 'auto',
-              height: '340px',
+              height: '420px',
               borderRadius: '1rem',
               border: lightMode ? '1px solid rgba(185, 28, 28, 0.2)' : '1px solid rgba(248, 113, 113, 0.15)',
               background: lightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 18, 0.92)',
@@ -1446,20 +1446,20 @@ export function VoiceChat() {
             }}
           >
             {/* Popup header */}
-            <div className={cn('shrink-0 flex flex-col px-3 py-2 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+            <div className={cn('shrink-0 flex flex-col px-4 py-2.5 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
                 </div>
                 <button
                   onClick={() => setCodexPopup(false)}
-                  className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+                  className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
                 >
-                  <X className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                  <X className={cn('w-3.5 h-3.5', lightMode ? 'text-black/40' : 'text-white/40')} />
                 </button>
               </div>
               {workspace && daemonConnected && (
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex items-center justify-center gap-1.5 mt-1">
                   <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
                   <span className={cn('text-[9px] font-medium truncate max-w-[180px]', lightMode ? 'text-black/40' : 'text-white/40')}>
                     {(() => {
