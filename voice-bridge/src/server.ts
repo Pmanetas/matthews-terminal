@@ -408,7 +408,9 @@ wss.on('connection', (ws) => {
       state.lastCommand = msg.text;
       state.currentTaskStatus = 'running';
       // Store user message in history (without image data to save memory)
-      pushHistory({ type: 'user_command', text: msg.text });
+      const userEntry: Record<string, unknown> = { type: 'user_command', text: msg.text };
+      if (msg.engine) userEntry.engine = msg.engine;
+      pushHistory(userEntry);
 
       const ext = getClient('extension');
       if (ext) {

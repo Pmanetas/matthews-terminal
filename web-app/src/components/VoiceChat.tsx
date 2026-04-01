@@ -1282,7 +1282,8 @@ export function VoiceChat() {
                 <div className="flex-1 flex justify-center">
                   <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={120} color="red" />
                 </div>
-                <div className="flex items-center gap-1.5">
+                {/* Spacer to match Claude header's right buttons so waveform stays centered */}
+                <div className="flex items-center gap-1.5" style={{ minWidth: 62 }}>
                 </div>
               </div>
               {workspace && daemonConnected && (
@@ -1342,7 +1343,7 @@ export function VoiceChat() {
                       </div>
                     ) : (
                       <div className="px-1 codex-text">
-                        <MarkdownMessage text={msg.text} />
+                        {i === codexLastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={() => codexEndRef.current?.scrollIntoView({ behavior: 'instant' })} /> : <MarkdownMessage text={msg.text} />}
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
@@ -1538,7 +1539,7 @@ export function VoiceChat() {
                       </div>
                     ) : (
                       <div className="px-1 codex-text">
-                        <MarkdownMessage text={msg.text} />
+                        {i === codexLastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={() => codexPopupEndRef.current?.scrollIntoView({ behavior: 'instant' })} /> : <MarkdownMessage text={msg.text} />}
                       </div>
                     )
                     return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
