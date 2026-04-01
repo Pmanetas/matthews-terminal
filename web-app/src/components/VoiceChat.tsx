@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File, Settings, Sun, Moon, Keyboard } from 'lucide-react'
+import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pencil, FilePlus, CheckCircle2, ListTodo, Globe, Wrench, LoaderCircle, RotateCcw, FolderOpen, Folder, ChevronLeft, File, Settings, Sun, Moon, Keyboard, Columns2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, onAudioWillPlay } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, lastResultEngine, onAudioWillPlay } from '@/hooks/useBridge'
 import { SplashScreen } from '@/components/SplashScreen'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage } from '@/lib/image-utils'
@@ -35,7 +35,7 @@ function parseDiffStats(lines: string[]): { added: number; removed: number } {
   return { added, removed }
 }
 
-function ToolContent({ text, expanded, lightMode }: { text: string; expanded: boolean; lightMode?: boolean }) {
+function ToolContent({ text, expanded, lightMode, codexMode }: { text: string; expanded: boolean; lightMode?: boolean; codexMode?: boolean }) {
   const lines = text.split('\n')
   const header = lines[0]
   const diffLines = lines.slice(1)
@@ -45,7 +45,7 @@ function ToolContent({ text, expanded, lightMode }: { text: string; expanded: bo
   return (
     <div className="flex flex-col min-w-0 w-full">
       <div className="flex items-center gap-2">
-        <span className="text-[13px] leading-tight" style={{ color: lightMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.5)' }}>{header}</span>
+        <span className="text-[13px] leading-tight" style={{ color: codexMode ? (lightMode ? 'rgba(185, 28, 28, 0.7)' : 'rgba(248, 113, 113, 0.6)') : (lightMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.5)') }}>{header}</span>
         {hasDiff && (
           <span className="flex items-center gap-1.5 text-[11px] shrink-0 ml-auto">
             {added > 0 && <span className="text-emerald-400/70">+{added}</span>}
@@ -222,10 +222,11 @@ function ThinkingDots() {
 
 // ── Mic orb with voice-reactive pulse ────────────────────────────
 
-function MicOrb({ isListening, onClick, disabled }: {
+function MicOrb({ isListening, onClick, disabled, codexMode }: {
   isListening: boolean
   onClick: () => void
   disabled: boolean
+  codexMode?: boolean
 }) {
   const ring1Ref = useRef<HTMLSpanElement>(null)
   const ring2Ref = useRef<HTMLSpanElement>(null)
@@ -313,44 +314,54 @@ function MicOrb({ isListening, onClick, disabled }: {
   }, [isListening])
 
   return (
-    <motion.button
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.8, opacity: 0 }}
-      transition={{ duration: 0.15 }}
-      onClick={onClick}
-      disabled={disabled}
-      whileTap={{ scale: 0.9 }}
-      className={cn(
-        'relative flex items-center justify-center w-16 h-16 rounded-full shrink-0 transition-colors',
-        isListening
-          ? 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
-          : 'bg-white/[0.06] hover:bg-white/[0.1]',
-        disabled && 'opacity-30 cursor-not-allowed',
-      )}
-    >
-      {/* Voice-reactive pulse rings */}
-      <span
-        ref={ring1Ref}
-        className="absolute inset-0 rounded-full bg-violet-500/30 transition-none"
-        style={{ opacity: 0 }}
-      />
-      <span
-        ref={ring2Ref}
-        className="absolute -inset-2 rounded-full border-2 border-violet-400/30 transition-none"
-        style={{ opacity: 0 }}
-      />
-      <span
-        ref={ring3Ref}
-        className="absolute -inset-5 rounded-full border border-violet-400/15 transition-none"
-        style={{ opacity: 0 }}
-      />
-      {isListening ? (
-        <MicOff className="w-6 h-6 text-white relative z-10" />
-      ) : (
-        <Mic className="w-6 h-6 text-white/50 relative z-10" />
-      )}
-    </motion.button>
+    <div className="flex flex-col items-center gap-1">
+      <motion.button
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={onClick}
+        disabled={disabled}
+        whileTap={{ scale: 0.9 }}
+        className={cn(
+          'relative flex items-center justify-center w-14 h-14 rounded-full shrink-0 transition-colors',
+          isListening
+            ? codexMode
+              ? 'bg-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6)]'
+              : 'bg-violet-500 shadow-[0_0_40px_rgba(139,92,246,0.6)]'
+            : codexMode
+              ? 'bg-red-500/15 border-2 border-red-500/30'
+              : 'bg-violet-500/15 border-2 border-violet-500/30',
+          disabled && 'opacity-30 cursor-not-allowed',
+        )}
+      >
+        {/* Voice-reactive pulse rings */}
+        <span
+          ref={ring1Ref}
+          className={cn('absolute inset-0 rounded-full transition-none', codexMode ? 'bg-red-500/30' : 'bg-violet-500/30')}
+          style={{ opacity: 0 }}
+        />
+        <span
+          ref={ring2Ref}
+          className={cn('absolute -inset-2 rounded-full border-2 transition-none', codexMode ? 'border-red-400/30' : 'border-violet-400/30')}
+          style={{ opacity: 0 }}
+        />
+        <span
+          ref={ring3Ref}
+          className={cn('absolute -inset-4 rounded-full border transition-none', codexMode ? 'border-red-400/15' : 'border-violet-400/15')}
+          style={{ opacity: 0 }}
+        />
+        {isListening ? (
+          <MicOff className="w-6 h-6 text-white relative z-10" />
+        ) : (
+          <Mic className={cn('w-6 h-6 relative z-10', codexMode ? 'text-red-400' : 'text-violet-400')} />
+        )}
+      </motion.button>
+      {/* Label under mic */}
+      <span className={cn('text-[9px] font-bold uppercase tracking-wider', codexMode ? 'text-red-400/60' : 'text-violet-400/60')}>
+        {codexMode ? 'Codex' : 'Claude'}
+      </span>
+    </div>
   )
 }
 
@@ -378,9 +389,16 @@ const globalCSS = `
     overflow-wrap: break-word !important;
     word-break: break-word !important;
   }
+  /* Codex panel — red user bubbles */
+  .codex-panel .user-bubble {
+    background: rgb(185, 28, 28) !important;
+  }
   /* Light mode overrides */
   .light-mode .user-bubble {
     background: rgb(91, 33, 182) !important;
+  }
+  .light-mode .codex-panel .user-bubble {
+    background: rgb(185, 28, 28) !important;
   }
   .light-mode .user-bubble p { color: #fff !important; }
   .light-mode .text-white\\/50,
@@ -430,6 +448,18 @@ const globalCSS = `
   .light-mode .border-violet-400\\/40 { border-color: rgba(109, 40, 217, 0.35) !important; }
   .light-mode .bg-black\\/70 { background: rgba(0, 0, 0, 0.06) !important; }
   .light-mode p, .light-mode span { transition: color 0.5s; }
+  /* Codex text — red theme, overrides assistant-text purple */
+  .codex-text, .codex-text * { color: rgb(248, 113, 113) !important; }
+  .codex-text strong { color: rgb(252, 165, 165) !important; font-weight: 700 !important; }
+  .codex-text code { color: rgb(248, 113, 113) !important; background: rgba(248, 113, 113, 0.08) !important; }
+  .light-mode .codex-text, .light-mode .codex-text * { color: rgb(185, 28, 28) !important; }
+  .light-mode .codex-text strong { color: rgb(153, 27, 27) !important; font-weight: 700 !important; }
+  .light-mode .codex-text code { color: rgb(185, 28, 28) !important; background: rgba(185, 28, 28, 0.08) !important; }
+  /* Codex panel — tool icons and tool text override violet to red */
+  .codex-panel .text-violet-400 { color: rgb(248, 113, 113) !important; }
+  .codex-panel .text-amber-400 { color: rgb(248, 113, 113) !important; }
+  .light-mode .codex-panel .text-violet-400 { color: rgb(185, 28, 28) !important; }
+  .light-mode .codex-panel .text-amber-400 { color: rgb(185, 28, 28) !important; }
 `
 
 // Track which result texts have already been animated (survives re-renders and remounts)
@@ -462,7 +492,18 @@ export function VoiceChat() {
 
   const [showTerminal, setShowTerminal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [splitMode, setSplitMode] = useState(false)
+  const [codexPopup, setCodexPopup] = useState(false)
+  const [codexExpandedTools, setCodexExpandedTools] = useState<Set<number>>(new Set())
+  const [splitRatio, setSplitRatio] = useState(0.5) // 0-1, portion for Claude (top)
   const [lightMode, setLightMode] = useState(() => localStorage.getItem('matthews-light-mode') === 'true')
+  const codexEndRef = useRef<HTMLDivElement>(null)
+  const codexScrollRef = useRef<HTMLDivElement>(null)
+  const codexPopupEndRef = useRef<HTMLDivElement>(null)
+  const splitDragRef = useRef({ startY: 0, startRatio: 0.5, dragging: false })
+
+  // Track which mic is active — 'claude' for main, 'codex' for Codex panel
+  const micTargetRef = useRef<'claude' | 'codex'>('claude')
 
   // Sync body/html/theme-color with light mode so safe-area + home bar match
   useEffect(() => {
@@ -484,7 +525,7 @@ export function VoiceChat() {
   }, [lightMode, showSplash])
   const terminalEndRef = useRef<HTMLDivElement>(null)
 
-  const { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, daemonConnected, daemonLogs } = useBridge(() => {
+  const { status, messages, sendCommand, sendStop, sendNewChat, requestFiles, requestFileContent, fileList, filePath, fileContent, workspace, workspacePath, activeFile, isWaiting, isCodexWaiting, daemonConnected, daemonLogs } = useBridge(() => {
     autoListenRef.current?.()
   })
 
@@ -521,6 +562,40 @@ export function VoiceChat() {
   useEffect(() => {
     if (showTerminal) terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [daemonLogs, showTerminal])
+
+  // Split messages by engine for dual-panel display
+  const claudeMessages = messages.filter(m => !m.engine || m.engine === 'claude')
+  const codexMessages = messages.filter(m => m.engine === 'codex')
+
+  // Auto-scroll Codex panel (split + popup)
+  useEffect(() => {
+    if (splitMode) codexEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (codexPopup) codexPopupEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [codexMessages.length, splitMode, codexPopup])
+
+  // Codex-specific processing state
+  const codexIsProcessing = isCodexWaiting || (codexMessages.length > 0 && codexMessages[codexMessages.length - 1].role !== 'assistant')
+  const codexLastNonNarration = (() => {
+    for (let i = codexMessages.length - 1; i >= 0; i--) {
+      if (!codexMessages[i].narration) return codexMessages[i]
+    }
+    return null
+  })()
+  const codexIsThinking = codexIsProcessing && codexMessages.length > 0 && codexLastNonNarration?.role === 'user'
+  const codexLastUserIndex = (() => {
+    for (let i = codexMessages.length - 1; i >= 0; i--) { if (codexMessages[i].role === 'user') return i }
+    return -1
+  })()
+  const codexLastToolIndex = (() => {
+    for (let i = codexMessages.length - 1; i >= 0; i--) { if (codexMessages[i].role === 'tool') return i }
+    return -1
+  })()
+  const codexIsCurrentToolLoading = codexIsProcessing && codexLastToolIndex > codexLastUserIndex
+  const codexLastResultIndex = (() => {
+    for (let i = codexMessages.length - 1; i >= 0; i--) { if (codexMessages[i].role === 'assistant' && !codexMessages[i].narration) return i }
+    return -1
+  })()
+  const codexHasResultAfterTools = codexLastResultIndex > codexLastToolIndex
 
   // Clear stale expanded tools when messages get replaced (replay/clear)
   const prevMsgLenRef = useRef(messages.length)
@@ -593,7 +668,7 @@ export function VoiceChat() {
 
     if (/^(matthew\s+stop|stop|shut up|quiet|be quiet|enough)\s*[.!]?\s*$/i.test(trimmed)) {
       hasSentRef.current = true
-      sendStop()
+      sendStop(micTargetRef.current)
       stopListening()
       setPendingMessage('')
       setTimeout(() => startListening(), 1500)
@@ -605,11 +680,16 @@ export function VoiceChat() {
       if (msg || pendingImages.length > 0) {
         hasSentRef.current = true
         userScrolledRef.current = false
-        setExpandedTools(new Set())
+        if (micTargetRef.current === 'codex') {
+          setCodexExpandedTools(new Set())
+        } else {
+          setExpandedTools(new Set())
+        }
         stopListening()
         sendCommand(
           msg || 'What do you see in this image?',
-          pendingImages.length > 0 ? pendingImages : undefined
+          pendingImages.length > 0 ? pendingImages : undefined,
+          micTargetRef.current
         )
         setPendingMessage('')
         setPendingImages([])
@@ -626,7 +706,8 @@ export function VoiceChat() {
       setExpandedTools(new Set())
       sendCommand(
         pendingMessage || 'What do you see in this image?',
-        pendingImages.length > 0 ? pendingImages : undefined
+        pendingImages.length > 0 ? pendingImages : undefined,
+        'claude'
       )
       setPendingMessage('')
       setPendingImages([])
@@ -651,18 +732,38 @@ export function VoiceChat() {
   }
 
   const handleMicClick = () => {
-    if (isListening) {
+    if (isListening && micTargetRef.current === 'claude') {
       stopListening()
     } else {
+      micTargetRef.current = 'claude'
       stopAllAudio()
       setPendingMessage('')
       hasSentRef.current = false
+      if (isListening) stopListening()
+      setTimeout(() => startListening(), 120)
+    }
+  }
+
+  const handleCodexMicClick = () => {
+    if (isListening && micTargetRef.current === 'codex') {
+      stopListening()
+    } else {
+      micTargetRef.current = 'codex'
+      // Open popup if not already in split mode
+      if (!splitMode) {
+        setCodexPopup(true)
+      }
+      stopAllAudio()
+      setPendingMessage('')
+      hasSentRef.current = false
+      if (isListening) stopListening()
       setTimeout(() => startListening(), 120)
     }
   }
 
   const handleStop = () => {
-    sendStop()
+    sendStop('claude')
+    sendStop('codex')
   }
 
   const toggleToolExpand = (i: number) => {
@@ -674,6 +775,19 @@ export function VoiceChat() {
     })
   }
 
+  const toggleCodexToolExpand = (i: number) => {
+    setCodexExpandedTools(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  // Derived mic states — which mic orb shows as active
+  const mainMicListening = isListening && micTargetRef.current === 'claude'
+  const codexMicListening = isListening && micTargetRef.current === 'codex'
+
   const statusDot = status === 'connected'
     ? (daemonConnected ? 'bg-emerald-400' : 'bg-yellow-400')
     : status === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
@@ -681,7 +795,7 @@ export function VoiceChat() {
     ? (daemonConnected ? 'Connected' : 'Bridge connected — waiting for daemon')
     : status === 'connecting' ? 'Connecting...' : 'Disconnected'
 
-  const showStop = isProcessing || isAudioPlaying
+  const showStop = isProcessing || isAudioPlaying || codexIsProcessing
 
   return (
     <div
@@ -700,8 +814,8 @@ export function VoiceChat() {
 
       {/* Particle wave removed — caused persistent bottom gap on iOS */}
 
-      {/* ── Header ── */}
-      <div
+      {/* ── Header (hidden in split mode — each panel has its own) ── */}
+      {!splitMode && <div
         className="shrink-0 flex flex-col items-center px-8 pt-3 pb-4 relative transition-all duration-400"
         style={{ opacity: introReady ? 1 : 0, transform: introReady ? 'translateY(0)' : 'translateY(-10px)', transitionDelay: '0.1s' }}
       >
@@ -719,7 +833,7 @@ export function VoiceChat() {
           </div>
 
           <div className="flex-1 flex justify-center">
-            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={200} />
+            <VoiceWaveform isActive={isAudioPlaying} getAudioLevel={getAudioLevel} size={200} color={isAudioPlaying && lastResultEngine === 'codex' ? 'red' : 'violet'} />
           </div>
 
           <div className="flex items-center gap-2">
@@ -765,6 +879,7 @@ export function VoiceChat() {
         <div className="flex items-center gap-1.5 mt-1">
           <span className={cn('h-1.5 w-1.5 rounded-full', statusDot)} />
           <span className={cn('text-[10px] truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/30')}>{statusLabel}</span>
+          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
         </div>
         {activeFile && (
           <div className="flex items-center gap-1 mt-0.5">
@@ -772,7 +887,7 @@ export function VoiceChat() {
             <span className="text-[10px] text-violet-300/40 truncate max-w-[220px]">{activeFile}</span>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* ── Terminal overlay ── */}
       <AnimatePresence>
@@ -866,7 +981,7 @@ export function VoiceChat() {
               <span className={cn('text-sm', lightMode ? 'text-black/70' : 'text-white/70')}>{lightMode ? 'Dark Mode' : 'Daylight Mode'}</span>
             </button>
             <div className={cn('px-5 py-2 border-t text-center', lightMode ? 'border-black/[0.06]' : 'border-white/[0.04]')}>
-              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.1</span>
+              <span className={cn('text-[10px]', lightMode ? 'text-black/25' : 'text-white/20')}>v3.3 — Dual Engine</span>
             </div>
           </motion.div>
         )}
@@ -875,6 +990,7 @@ export function VoiceChat() {
       {showSettings && (
         <div className="fixed inset-0 z-[55]" onClick={() => setShowSettings(false)} />
       )}
+
 
       {/* ── File browser overlay ── */}
       <AnimatePresence>
@@ -1023,128 +1139,414 @@ export function VoiceChat() {
         )}
       </AnimatePresence>
 
-      {/* ── Chat messages ── */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
-        style={{ overscrollBehavior: 'none' }}
-      >
-        <div className="flex flex-col gap-3 px-5 py-4 w-full overflow-hidden box-border">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center mt-20 gap-4">
-              <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
-            </div>
-          ) : (
-            messages.map((msg, i) => {
-              const isNextTool = messages[i + 1]?.role === 'tool'
-              const isPrevTool = i > 0 && messages[i - 1]?.role === 'tool'
-              const isLastTool = i === lastToolIndex
-              const defaultExpanded = isLastTool && !hasResultAfterTools
-              const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
-              const isRecent = i >= messages.length - 3
-
-              // Narrations are spoken via TTS but not displayed
-              if (msg.narration) return null
-
-              const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
-
-              const content = msg.role === 'user' ? (
-                /* ── User bubble — flush right ── */
-                <div className="user-bubble">
-                  {msg.images && msg.images.length > 0 && (
-                    <div className="flex gap-2 mb-2 flex-wrap justify-end">
-                      {msg.images.map((img, j) => (
-                        img.data ? (
-                          <img
-                            key={j}
-                            src={`data:${img.mimeType};base64,${img.data}`}
-                            className="w-28 h-28 rounded-lg object-cover border border-white/10"
-                          />
-                        ) : (
-                          <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center">
-                            <Camera className="w-6 h-6 text-white/20" />
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+      {/* ── Chat messages — split or single mode ── */}
+      {splitMode ? (
+        /* ── SPLIT VIEW — Claude top, Codex bottom, draggable divider ── */
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Claude panel (top) */}
+          <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: `${splitRatio} 1 0%` }}>
+            {/* Claude header — matches main header style */}
+            <div className={cn('shrink-0 flex flex-col px-4 py-2 border-b', lightMode ? 'border-black/[0.08] bg-white/80' : 'border-white/[0.06] bg-black/40')}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button onClick={sendNewChat} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                    <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                  </button>
+                  <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{claudeMessages.filter(m => m.role === 'user').length} msgs</span>
                 </div>
-              ) : msg.role === 'tool' ? (
-                /* ── Tool call ── */
-                <div
-                  className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer"
-                  onClick={() => toggleToolExpand(i)}
-                >
-                  <div className="flex flex-col items-center w-5 shrink-0">
-                    <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                    {isLastTool && isCurrentToolLoading ? (
-                      <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" />
-                    ) : (
-                      <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />
-                    )}
-                    <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
-                  </div>
-                  <div
-                    className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200"
-                    style={
-                      toolType === 'read'
-                        ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' }
-                        : toolType === 'edit'
-                        ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' }
-                        : isExpanded
-                        ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' }
-                        : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }
-                    }
+                <div className="flex-1 flex justify-center">
+                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine !== 'codex'} getAudioLevel={getAudioLevel} size={120} color="violet" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
+                  <button
+                    onClick={() => setShowTerminal(prev => !prev)}
+                    className={cn('flex items-center justify-center w-7 h-7 rounded-full transition-colors', showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]')}
                   >
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
-                      <ToolIcon text={msg.text} />
-                    </div>
-                    <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
-                  </div>
+                    <Terminal className={cn('w-3 h-3', showTerminal ? 'text-violet-400' : 'text-white/40')} />
+                  </button>
+                  <button
+                    onClick={() => setShowSettings(prev => !prev)}
+                    className={cn('flex items-center justify-center w-7 h-7 rounded-full transition-colors', showSettings ? 'bg-violet-500/30' : 'bg-white/[0.06]')}
+                  >
+                    <Settings className={cn('w-3 h-3', showSettings ? 'text-violet-400' : 'text-white/40')} />
+                  </button>
                 </div>
-              ) : (
-                /* ── Assistant text ── */
-                <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
-                  {i === lastResultIndex && !msg.replayed ? (
-                    <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} />
-                  ) : (
-                    <MarkdownMessage text={msg.text} />
-                  )}
-                </div>
-              )
-
-              return (
-                <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>
-                  {content}
-                </div>
-              )
-            })
-          )}
-          {isThinking && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="px-1">
-                <ThinkingDots />
               </div>
-            </motion.div>
-          )}
-          <div ref={chatEndRef} />
+              {workspace && daemonConnected && (
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <Terminal className="w-2.5 h-2.5 text-violet-400/60 shrink-0" />
+                  <span className={cn('text-[10px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/40')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
+                </div>
+              )}
+            </div>
+            <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
+              <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
+                {claudeMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-3">
+                    <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the purple mic to talk to Claude</p>
+                  </div>
+                ) : (
+                  claudeMessages.map((msg, i) => {
+                    const isNextTool = claudeMessages[i + 1]?.role === 'tool'
+                    const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
+                    const isLastTool = i === lastToolIndex
+                    const defaultExpanded = isLastTool && !hasResultAfterTools
+                    const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                    const isRecent = i >= claudeMessages.length - 3
+                    if (msg.narration) return null
+                    const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                    const content = msg.role === 'user' ? (
+                      <div className="user-bubble">
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                            {msg.images.map((img, j) => img.data ? <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-20 h-20 rounded-lg object-cover border border-white/10" /> : null)}
+                          </div>
+                        )}
+                        <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                      </div>
+                    ) : msg.role === 'tool' ? (
+                      <div className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer" onClick={() => toggleToolExpand(i)}>
+                        <div className="flex flex-col items-center w-5 shrink-0">
+                          <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                          {isLastTool && isCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />}
+                          <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                        </div>
+                        <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' } : isExpanded ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
+                        {i === lastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
+                      </div>
+                    )
+                    return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+                  })
+                )}
+                {isThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+            {/* Claude transcript in split mode */}
+            {mainMicListening && transcript ? (
+              <div className={cn('shrink-0 border-t px-4 py-1', lightMode ? 'border-black/[0.08]' : 'border-white/[0.06]')}>
+                <p className="text-[11px] text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              </div>
+            ) : null}
+          </div>
+
+          {/* ── Draggable divider ── */}
+          <div
+            className={cn('shrink-0 flex items-center justify-center touch-none cursor-row-resize', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+            style={{ height: 24 }}
+            onTouchStart={(e) => {
+              splitDragRef.current = { startY: e.touches[0].clientY, startRatio: splitRatio, dragging: true }
+            }}
+            onTouchMove={(e) => {
+              if (!splitDragRef.current.dragging) return
+              const container = e.currentTarget.parentElement
+              if (!container) return
+              const containerH = container.clientHeight
+              const dy = e.touches[0].clientY - splitDragRef.current.startY
+              const newRatio = Math.max(0.2, Math.min(0.8, splitDragRef.current.startRatio + dy / containerH))
+              setSplitRatio(newRatio)
+            }}
+            onTouchEnd={() => { splitDragRef.current.dragging = false }}
+          >
+            <div className={cn('w-12 h-1 rounded-full', lightMode ? 'bg-black/20' : 'bg-white/25')} />
+          </div>
+
+          {/* Codex panel (bottom) */}
+          <div className="flex flex-col min-h-0 overflow-hidden codex-panel" style={{ flex: `${1 - splitRatio} 1 0%` }}>
+            {/* Codex header — matches Claude header style but red */}
+            <div className={cn('shrink-0 flex flex-col px-4 py-2 border-b', lightMode ? 'border-red-200/30 bg-white/80' : 'border-red-500/10 bg-black/40')}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                    <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                  </button>
+                  <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{codexMessages.filter(m => m.role === 'user').length} msgs</span>
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={120} color="red" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-red-500/20 text-red-400">Codex</span>
+                </div>
+              </div>
+              {workspace && daemonConnected && (
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
+                  <span className={cn('text-[10px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/40')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
+                </div>
+              )}
+            </div>
+            <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
+              <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
+                {codexMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-3">
+                    <p className={cn('text-sm text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
+                      Tap the red mic to talk to Codex
+                    </p>
+                  </div>
+                ) : (
+                  codexMessages.map((msg, i) => {
+                    const isNextTool = codexMessages[i + 1]?.role === 'tool'
+                    const isPrevTool = i > 0 && codexMessages[i - 1]?.role === 'tool'
+                    const isLastTool = i === codexLastToolIndex
+                    const defaultExpanded = isLastTool && !codexHasResultAfterTools
+                    const isExpanded = codexExpandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                    const isRecent = i >= codexMessages.length - 3
+                    if (msg.narration) return null
+                    const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                    const content = msg.role === 'user' ? (
+                      <div className="user-bubble" style={{ background: 'rgb(185, 28, 28)' }}>
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                            {msg.images.map((img, j) => img.data ? <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-20 h-20 rounded-lg object-cover border border-white/10" /> : null)}
+                          </div>
+                        )}
+                        <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                      </div>
+                    ) : msg.role === 'tool' ? (
+                      <div className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer" onClick={() => toggleCodexToolExpand(i)}>
+                        <div className="flex flex-col items-center w-5 shrink-0">
+                          <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-red-500/15' : 'bg-transparent')} />
+                          {isLastTool && codexIsCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-red-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-red-500/30" />}
+                          <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-red-500/15' : 'bg-transparent')} />
+                        </div>
+                        <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.4)' : '2px solid rgba(248, 113, 113, 0.4)', background: lightMode ? 'rgba(185, 28, 28, 0.08)' : 'rgba(248, 113, 113, 0.1)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} codexMode />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-1 codex-text">
+                        <MarkdownMessage text={msg.text} />
+                      </div>
+                    )
+                    return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+                  })
+                )}
+                {codexIsThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
+                <div ref={codexEndRef} />
+              </div>
+            </div>
+            {/* Codex transcript */}
+            {codexMicListening && transcript ? (
+              <div className={cn('shrink-0 border-t px-4 py-1', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+                <p className="text-[11px] text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ── SINGLE VIEW — Claude only (original layout) ── */
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar"
+          style={{ overscrollBehavior: 'none' }}
+        >
+          <div className="flex flex-col gap-3 px-5 py-4 w-full overflow-hidden box-border">
+            {claudeMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center mt-20 gap-4">
+                <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the mic to start talking</p>
+              </div>
+            ) : (
+              claudeMessages.map((msg, i) => {
+                const isNextTool = claudeMessages[i + 1]?.role === 'tool'
+                const isPrevTool = i > 0 && claudeMessages[i - 1]?.role === 'tool'
+                const isLastTool = i === lastToolIndex
+                const defaultExpanded = isLastTool && !hasResultAfterTools
+                const isExpanded = expandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                const isRecent = i >= claudeMessages.length - 3
+                if (msg.narration) return null
+                const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                const content = msg.role === 'user' ? (
+                  <div className="user-bubble">
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="flex gap-2 mb-2 flex-wrap justify-end">
+                        {msg.images.map((img, j) => (
+                          img.data ? <img key={j} src={`data:${img.mimeType};base64,${img.data}`} className="w-28 h-28 rounded-lg object-cover border border-white/10" /> : (
+                            <div key={j} className="w-28 h-28 rounded-lg bg-white/[0.05] border border-white/10 flex items-center justify-center"><Camera className="w-6 h-6 text-white/20" /></div>
+                          )
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[15px] text-white leading-relaxed">{msg.text}</p>
+                  </div>
+                ) : msg.role === 'tool' ? (
+                  <div className="flex items-stretch gap-2.5 ml-1 mr-1 cursor-pointer" onClick={() => toggleToolExpand(i)}>
+                    <div className="flex flex-col items-center w-5 shrink-0">
+                      <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                      {isLastTool && isCurrentToolLoading ? <LoaderCircle className="w-4 h-4 text-violet-400 animate-spin shrink-0" /> : <div className="w-2 h-2 shrink-0 rounded-full bg-violet-500/30" />}
+                      <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-violet-500/15' : 'bg-transparent')} />
+                    </div>
+                    <div className="flex-1 flex items-start gap-2.5 py-2.5 px-3.5 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(200, 140, 0, 0.6)' : '2px solid rgba(250, 204, 21, 0.5)', background: lightMode ? 'rgba(250, 190, 0, 0.25)' : 'rgba(250, 204, 21, 0.15)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(109, 40, 217, 0.5)' : '2px solid rgba(167, 139, 250, 0.5)', background: lightMode ? 'rgba(109, 40, 217, 0.1)' : 'rgba(139, 92, 246, 0.12)' } : isExpanded ? { border: '1px solid rgba(139, 92, 246, 0.3)', background: 'rgba(139, 92, 246, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                      <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                      <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-1 assistant-text" style={lightMode ? { color: 'rgb(124, 58, 237)' } : undefined}>
+                    {i === lastResultIndex && !msg.replayed ? <TypingMarkdown text={msg.text} animate={true} onUpdate={scrollToBottom} /> : <MarkdownMessage text={msg.text} />}
+                  </div>
+                )
+                return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+              })
+            )}
+            {isThinking && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                <div className="px-1"><ThinkingDots /></div>
+              </motion.div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Codex popup panel ── */}
+      <AnimatePresence>
+        {codexPopup && !splitMode && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="absolute z-[45] flex flex-col codex-panel"
+            style={{
+              bottom: 'calc(5.5rem + env(safe-area-inset-bottom))',
+              right: '1rem',
+              left: '1rem',
+              maxWidth: '400px',
+              marginLeft: 'auto',
+              height: '340px',
+              borderRadius: '1rem',
+              border: lightMode ? '1px solid rgba(185, 28, 28, 0.2)' : '1px solid rgba(248, 113, 113, 0.15)',
+              background: lightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 15, 18, 0.92)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 8px 40px rgba(0, 0, 0, 0.4)',
+            }}
+          >
+            {/* Popup header */}
+            <div className={cn('shrink-0 flex flex-col px-3 py-2 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
+                  <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                  <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
+                </div>
+                <button
+                  onClick={() => setCodexPopup(false)}
+                  className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+                >
+                  <X className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                </button>
+              </div>
+              {workspace && daemonConnected && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
+                  <span className={cn('text-[9px] font-medium truncate max-w-[180px]', lightMode ? 'text-black/40' : 'text-white/40')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
+                </div>
+              )}
+            </div>
+
+            {/* Popup messages */}
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
+              <div className="flex flex-col gap-2.5 px-3 py-2 w-full overflow-hidden box-border">
+                {codexMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-2">
+                    <p className={cn('text-xs text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
+                      Tap the red mic to talk to Codex
+                    </p>
+                  </div>
+                ) : (
+                  codexMessages.map((msg, i) => {
+                    const isNextTool = codexMessages[i + 1]?.role === 'tool'
+                    const isPrevTool = i > 0 && codexMessages[i - 1]?.role === 'tool'
+                    const isLastTool = i === codexLastToolIndex
+                    const defaultExpanded = isLastTool && !codexHasResultAfterTools
+                    const isExpanded = codexExpandedTools.has(i) ? !defaultExpanded : defaultExpanded
+                    const isRecent = i >= codexMessages.length - 3
+                    if (msg.narration) return null
+                    const toolType = msg.role === 'tool' ? msg.text.toLowerCase().startsWith('reading') ? 'read' : msg.text.toLowerCase().startsWith('editing') ? 'edit' : 'other' : 'other'
+                    const content = msg.role === 'user' ? (
+                      <div className="user-bubble" style={{ background: 'rgb(185, 28, 28)' }}>
+                        <p className="text-[13px] text-white leading-relaxed">{msg.text}</p>
+                      </div>
+                    ) : msg.role === 'tool' ? (
+                      <div className="flex items-stretch gap-2 ml-0.5 mr-0.5 cursor-pointer" onClick={() => toggleCodexToolExpand(i)}>
+                        <div className="flex flex-col items-center w-4 shrink-0">
+                          <div className={cn('w-px flex-1 transition-colors', isPrevTool ? 'bg-red-500/15' : 'bg-transparent')} />
+                          {isLastTool && codexIsCurrentToolLoading ? <LoaderCircle className="w-3.5 h-3.5 text-red-400 animate-spin shrink-0" /> : <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-red-500/30" />}
+                          <div className={cn('w-px flex-1 transition-colors', isNextTool ? 'bg-red-500/15' : 'bg-transparent')} />
+                        </div>
+                        <div className="flex-1 flex items-start gap-2 py-2 px-3 rounded-xl min-w-0 overflow-hidden transition-all duration-200" style={toolType === 'read' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.4)' : '2px solid rgba(248, 113, 113, 0.4)', background: lightMode ? 'rgba(185, 28, 28, 0.08)' : 'rgba(248, 113, 113, 0.1)' } : toolType === 'edit' ? { border: lightMode ? '2px solid rgba(185, 28, 28, 0.5)' : '2px solid rgba(248, 113, 113, 0.5)', background: lightMode ? 'rgba(185, 28, 28, 0.1)' : 'rgba(248, 113, 113, 0.12)' } : isExpanded ? { border: '1px solid rgba(248, 113, 113, 0.3)', background: 'rgba(248, 113, 113, 0.06)' } : { border: lightMode ? '1px solid rgba(0, 0, 0, 0.12)' : '1px solid rgba(255, 255, 255, 0.08)', background: lightMode ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.03)' }}>
+                          <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5"><ToolIcon text={msg.text} /></div>
+                          <ToolContent text={msg.text} expanded={isExpanded} lightMode={lightMode} codexMode />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-1 codex-text">
+                        <MarkdownMessage text={msg.text} />
+                      </div>
+                    )
+                    return <div key={i} className={cn('min-w-0 overflow-hidden', isRecent && !msg.replayed && 'msg-fade-in')}>{content}</div>
+                  })
+                )}
+                {codexIsThinking && <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}><div className="px-1"><ThinkingDots /></div></motion.div>}
+                <div ref={codexPopupEndRef} />
+              </div>
+            </div>
+
+            {/* Popup transcript when red mic is active */}
+            {codexMicListening && transcript ? (
+              <div className={cn('shrink-0 border-t px-3 py-1.5 rounded-b-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+                <p className="text-[11px] text-center w-full leading-relaxed line-clamp-2" style={{ color: lightMode ? 'rgb(185, 28, 28)' : 'rgba(252, 165, 165, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
+              </div>
+            ) : null}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Bottom controls ── */}
       <div
-        className="shrink-0 transition-all duration-300"
+        className="shrink-0 relative z-[50] transition-all duration-300"
         style={{ opacity: introReady ? 1 : 0, transitionDelay: '0.2s', background: 'transparent' }}
       >
-        {/* Transcript while listening — max 3 lines, collapses when empty */}
-        {(isListening && transcript) || micError ? (
+        {/* Transcript while listening — only show here for Claude mic in single mode */}
+        {!splitMode && ((mainMicListening && transcript) || micError) ? (
           <div className="max-h-[3.5rem] flex items-end justify-center px-5 overflow-hidden w-full min-w-0 pb-1">
-            {isListening && transcript ? (
+            {mainMicListening && transcript ? (
               <p className="text-xs text-center w-full min-w-0 leading-relaxed line-clamp-3" style={{ color: lightMode ? 'rgb(109, 40, 217)' : 'rgba(196, 181, 253, 0.7)' }}>&ldquo;{transcript}&rdquo;</p>
             ) : micError ? (
               <p className="text-xs text-red-400 text-center">{micError}</p>
@@ -1219,7 +1621,7 @@ export function VoiceChat() {
                 }
                 setShowTyping(false)
               }}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
+              className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 active:scale-90 transition-transform bg-violet-500"
             >
               <ArrowUp className="w-3.5 h-3.5 text-white" />
             </button>
@@ -1227,105 +1629,102 @@ export function VoiceChat() {
         )}
 
         {/* Action row — mic stays dead centre, equal-width sides */}
-        <div className="flex items-center px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
-          {/* Left side — fixed width to balance right side */}
-          <div className="flex items-center justify-start gap-2 flex-1">
-            {!showStop && (
-              <button
-                onClick={() => {
-                  setShowFiles(true)
-                  setFileNavPath(null)
-                  setViewingFile(null)
-                  requestFiles()
-                }}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                  showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-                )}
-              >
-                <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
-              </button>
-            )}
+        <div className="flex items-center justify-center px-2 gap-1" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+          {/* Left side */}
+          <div className="flex items-center justify-start gap-1 flex-1">
+            <button
+              onClick={() => {
+                setShowFiles(true)
+                setFileNavPath(null)
+                setViewingFile(null)
+                requestFiles()
+              }}
+              className={cn(
+                'flex items-center justify-center w-9 h-9 rounded-full shrink-0 active:scale-90 transition-all',
+                showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              <FolderOpen className={cn('w-3.5 h-3.5', showFiles ? 'text-violet-400' : 'text-white/40')} />
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <Camera className="w-3.5 h-3.5 text-white/40" />
+            </button>
           </div>
 
-          {/* Centre — mic orb / stop / send */}
-          <AnimatePresence mode="wait">
-            {showStop ? (
-              <motion.button
-                key="stop"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={handleStop}
-                className="relative flex items-center justify-center w-16 h-16 rounded-full bg-red-500/80 shrink-0 active:scale-90 transition-transform"
-              >
-                <Square className="w-5 h-5 text-white fill-white" />
-              </motion.button>
-            ) : pendingMessage ? (
-              <motion.button
-                key="send"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={handleSend}
-                className="relative flex items-center justify-center w-16 h-16 rounded-full bg-violet-500 shrink-0"
-              >
-                <ArrowUp className="w-6 h-6 text-white" />
-              </motion.button>
-            ) : (
-              <MicOrb
-                key="mic"
-                isListening={isListening}
-                onClick={handleMicClick}
-                disabled={!supported}
-              />
-            )}
-          </AnimatePresence>
+          {/* Centre — dual mics, stop button overlaid (absolute so no layout shift) */}
+          <div className="relative flex items-center gap-2 shrink-0">
+            <MicOrb
+              isListening={mainMicListening}
+              onClick={handleMicClick}
+              disabled={!supported}
+            />
+            <MicOrb
+              isListening={codexMicListening}
+              onClick={handleCodexMicClick}
+              disabled={!supported}
+              codexMode={true}
+            />
+            {/* Stop button — overlaid dead centre between mics, no layout shift */}
+            <AnimatePresence>
+              {showStop && (
+                <motion.button
+                  key="stop"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={handleStop}
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-red-500/90 shrink-0 active:scale-90 transition-transform shadow-lg"
+                >
+                  <Square className="w-3.5 h-3.5 text-white fill-white" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
 
-          {/* Right side — camera + keyboard, same flex-1 as left to keep mic centred */}
-          <div className="flex items-center justify-end gap-2 flex-1">
-            {!showStop && pendingMessage ? (
-              <button
-                onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-              >
-                <X className="w-4 h-4 text-white/40" />
-              </button>
-            ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
-              <motion.button
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={handleSend}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform"
-              >
-                <ArrowUp className="w-4 h-4 text-white" />
-              </motion.button>
-            ) : !showStop ? (
-              <>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-                >
-                  <Camera className="w-4 h-4 text-white/40" />
-                </button>
-                <button
-                  onClick={() => {
-                    setShowTyping(prev => !prev)
-                    setTimeout(() => typingInputRef.current?.focus(), 100)
-                  }}
-                  className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-                  )}
-                >
-                  <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
-                </button>
-              </>
-            ) : null}
+          {/* Right side — CX (cycles: off → popup → split → off) + keyboard */}
+          <div className="flex items-center justify-end gap-1 flex-1">
+            <button
+              onClick={() => {
+                // Cycle: off → popup → split → off
+                if (splitMode) {
+                  setSplitMode(false)
+                  setCodexPopup(false)
+                } else if (codexPopup) {
+                  setCodexPopup(false)
+                  setSplitMode(true)
+                } else {
+                  setCodexPopup(true)
+                }
+              }}
+              className={cn(
+                'flex items-center justify-center w-9 h-9 rounded-full shrink-0 active:scale-90 transition-all',
+                splitMode ? 'bg-red-500/30' : codexPopup ? 'bg-red-500/20' : 'bg-white/[0.06]'
+              )}
+            >
+              {splitMode ? (
+                <Columns2 className="w-3.5 h-3.5 text-red-400" />
+              ) : codexPopup ? (
+                <span className="text-[10px] font-bold text-red-400">CX</span>
+              ) : (
+                <span className="text-[10px] font-bold text-white/40">CX</span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowTyping(prev => !prev)
+                setTimeout(() => typingInputRef.current?.focus(), 100)
+              }}
+              className={cn(
+                'flex items-center justify-center w-9 h-9 rounded-full shrink-0 active:scale-90 transition-all',
+                showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              <Keyboard className={cn('w-3.5 h-3.5', showTyping ? 'text-violet-400' : 'text-white/40')} />
+            </button>
           </div>
         </div>
       </div>
