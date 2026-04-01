@@ -1447,13 +1447,11 @@ export function VoiceChat() {
           >
             {/* Popup header */}
             <div className={cn('shrink-0 flex flex-col px-4 py-2.5 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
-                </div>
+              <div className="flex items-center justify-center relative">
+                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
                 <button
                   onClick={() => setCodexPopup(false)}
-                  className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+                  className={cn('absolute right-0 flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
                 >
                   <X className={cn('w-3.5 h-3.5', lightMode ? 'text-black/40' : 'text-white/40')} />
                 </button>
@@ -1559,14 +1557,14 @@ export function VoiceChat() {
           onChange={handleImageSelect}
         />
 
-        {/* Pending image thumbnails */}
+        {/* Pending image thumbnails + send button */}
         <AnimatePresence>
           {pendingImages.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="flex gap-2 px-4 pb-2 overflow-x-auto no-scrollbar justify-center"
+              className="flex items-center gap-2 px-4 pb-2 overflow-x-auto no-scrollbar justify-center"
             >
               {pendingImages.map((img, i) => (
                 <div key={i} className="relative shrink-0">
@@ -1582,6 +1580,12 @@ export function VoiceChat() {
                   </button>
                 </div>
               ))}
+              <button
+                onClick={() => handleSend()}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500 shrink-0 active:scale-90 transition-transform ml-1"
+              >
+                <ArrowUp className="w-4 h-4 text-white" />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
