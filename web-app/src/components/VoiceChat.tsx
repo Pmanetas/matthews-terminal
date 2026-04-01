@@ -1159,7 +1159,18 @@ export function VoiceChat() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
-                  <span className={cn('text-[9px]', lightMode ? 'text-violet-400/50' : 'text-violet-500/30')}>Opus 4.6</span>
+                  <button
+                    onClick={() => setShowTerminal(prev => !prev)}
+                    className={cn('flex items-center justify-center w-7 h-7 rounded-full transition-colors', showTerminal ? 'bg-violet-500/30' : 'bg-white/[0.06]')}
+                  >
+                    <Terminal className={cn('w-3 h-3', showTerminal ? 'text-violet-400' : 'text-white/40')} />
+                  </button>
+                  <button
+                    onClick={() => setShowSettings(prev => !prev)}
+                    className={cn('flex items-center justify-center w-7 h-7 rounded-full transition-colors', showSettings ? 'bg-violet-500/30' : 'bg-white/[0.06]')}
+                  >
+                    <Settings className={cn('w-3 h-3', showSettings ? 'text-violet-400' : 'text-white/40')} />
+                  </button>
                 </div>
               </div>
               {workspace && daemonConnected && (
@@ -1181,7 +1192,7 @@ export function VoiceChat() {
             <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
                 {claudeMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center mt-8 gap-3">
+                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-3">
                     <p className={cn('text-sm', lightMode ? 'text-black/25' : 'text-white/20')}>Tap the purple mic to talk to Claude</p>
                   </div>
                 ) : (
@@ -1272,7 +1283,6 @@ export function VoiceChat() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-red-500/20 text-red-400">Codex</span>
-                  <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
                 </div>
               </div>
               {workspace && daemonConnected && (
@@ -1294,7 +1304,7 @@ export function VoiceChat() {
             <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
                 {codexMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center mt-8 gap-3">
+                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-3">
                     <p className={cn('text-sm text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
                       Tap the red mic to talk to Codex
                     </p>
@@ -1474,7 +1484,7 @@ export function VoiceChat() {
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
               <div className="flex flex-col gap-2.5 px-3 py-2 w-full overflow-hidden box-border">
                 {codexMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center mt-6 gap-2">
+                  <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-2">
                     <p className={cn('text-xs text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
                       Tap the red mic to talk to Codex
                     </p>
@@ -1622,22 +1632,20 @@ export function VoiceChat() {
         <div className="flex items-center px-4" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
           {/* Left side — fixed width to balance right side */}
           <div className="flex items-center justify-start gap-2 flex-1">
-            {!showStop && (
-              <button
-                onClick={() => {
-                  setShowFiles(true)
-                  setFileNavPath(null)
-                  setViewingFile(null)
-                  requestFiles()
-                }}
-                className={cn(
-                  'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                  showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-                )}
-              >
-                <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
-              </button>
-            )}
+            <button
+              onClick={() => {
+                setShowFiles(true)
+                setFileNavPath(null)
+                setViewingFile(null)
+                requestFiles()
+              }}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                showFiles ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              <FolderOpen className={cn('w-4 h-4', showFiles ? 'text-violet-400' : 'text-white/40')} />
+            </button>
           </div>
 
           {/* Centre — dual mics / stop / send */}
@@ -1690,88 +1698,66 @@ export function VoiceChat() {
             )}
           </AnimatePresence>
 
-          {/* Right side — camera + keyboard, same flex-1 as left to keep mic centred */}
+          {/* Right side — camera + CX + split + keyboard, always visible */}
           <div className="flex items-center justify-end gap-2 flex-1">
-            {!showStop && pendingMessage ? (
-              <button
-                onClick={() => { setPendingMessage(''); setPendingImages([]); setShowTyping(false); }}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-              >
-                <X className="w-4 h-4 text-white/40" />
-              </button>
-            ) : !showStop && !pendingMessage && pendingImages.length > 0 ? (
-              <motion.button
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                onClick={handleSend}
-                className="flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-transform bg-violet-500"
-              >
-                <ArrowUp className="w-4 h-4 text-white" />
-              </motion.button>
-            ) : !showStop ? (
-              <>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
-                >
-                  <Camera className="w-4 h-4 text-white/40" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (splitMode || codexPopup) {
-                      setSplitMode(false)
-                      setCodexPopup(false)
-                    } else {
-                      setCodexPopup(true)
-                    }
-                  }}
-                  className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    (codexPopup || splitMode) ? 'bg-red-500/30' : 'bg-white/[0.06]'
-                  )}
-                >
-                  {(codexPopup || splitMode) ? (
-                    <X className="w-4 h-4 text-red-400" />
-                  ) : (
-                    <span className="text-[11px] font-bold text-white/40">CX</span>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    if (splitMode) {
-                      setSplitMode(false)
-                    } else {
-                      setCodexPopup(false)
-                      setSplitMode(true)
-                    }
-                  }}
-                  className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    splitMode ? 'bg-red-500/30' : 'bg-white/[0.06]'
-                  )}
-                >
-                  {splitMode ? (
-                    <X className="w-4 h-4 text-red-400" />
-                  ) : (
-                    <Columns2 className="w-4 h-4 text-white/40" />
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowTyping(prev => !prev)
-                    setTimeout(() => typingInputRef.current?.focus(), 100)
-                  }}
-                  className={cn(
-                    'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
-                    showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
-                  )}
-                >
-                  <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
-                </button>
-              </>
-            ) : null}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-white/[0.06] shrink-0 active:scale-90 transition-transform"
+            >
+              <Camera className="w-4 h-4 text-white/40" />
+            </button>
+            <button
+              onClick={() => {
+                if (splitMode || codexPopup) {
+                  setSplitMode(false)
+                  setCodexPopup(false)
+                } else {
+                  setCodexPopup(true)
+                }
+              }}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                (codexPopup || splitMode) ? 'bg-red-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              {(codexPopup || splitMode) ? (
+                <X className="w-4 h-4 text-red-400" />
+              ) : (
+                <span className="text-[11px] font-bold text-white/40">CX</span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                if (splitMode) {
+                  setSplitMode(false)
+                } else {
+                  setCodexPopup(false)
+                  setSplitMode(true)
+                }
+              }}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                splitMode ? 'bg-red-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              {splitMode ? (
+                <X className="w-4 h-4 text-red-400" />
+              ) : (
+                <Columns2 className="w-4 h-4 text-white/40" />
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setShowTyping(prev => !prev)
+                setTimeout(() => typingInputRef.current?.focus(), 100)
+              }}
+              className={cn(
+                'flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-90 transition-all',
+                showTyping ? 'bg-violet-500/30' : 'bg-white/[0.06]'
+              )}
+            >
+              <Keyboard className={cn('w-4 h-4', showTyping ? 'text-violet-400' : 'text-white/40')} />
+            </button>
           </div>
         </div>
       </div>
