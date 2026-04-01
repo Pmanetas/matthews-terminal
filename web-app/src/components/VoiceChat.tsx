@@ -384,7 +384,7 @@ function MicOrb({ isListening, onClick, disabled, codexMode }: {
       </motion.button>
       {/* Label under mic */}
       <span className={cn('text-[9px] font-bold uppercase tracking-wider', codexMode ? 'text-red-400/60' : 'text-violet-400/60')}>
-        {codexMode ? 'Codex' : 'Claude'}
+        {codexMode ? 'Sabrina' : 'Claude'}
       </span>
     </div>
   )
@@ -1557,7 +1557,7 @@ export function VoiceChat() {
                 {codexMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center flex-1 min-h-[60%] gap-2">
                     <p className={cn('text-xs text-center leading-relaxed', lightMode ? 'text-black/25' : 'text-white/20')}>
-                      Tap the red mic to talk to Codex
+                      Tap the red mic to talk to Sabrina
                     </p>
                   </div>
                 ) : (

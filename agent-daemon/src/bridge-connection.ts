@@ -6,6 +6,9 @@
  */
 
 import WebSocket from 'ws';
+import * as fs from 'fs';
+import * as path from 'path';
+import { exec } from 'child_process';
 import { AgentManager } from './agent-manager';
 import { AgentSink, BridgeCommand, DaemonMessage } from './types';
 
@@ -148,6 +151,26 @@ export class BridgeConnection {
                     break;
                 }
 
+                // ── Sabrina handoff detection ──
+                // Check if user wants to hand off to Sabrina for review/audit
+                const sabrinaPattern = /\b(pass\s*(it\s*)?(to|over\s*to)\s*sabrina|send\s*(it\s*)?(to|over\s*to)\s*sabrina|get\s*sabrina\s*to|sabrina\s*(audit|review|check|look|have a look))\b/i;
+                if (sabrinaPattern.test(text) && this.codexAgentId) {
+                    console.log('\x1b[35m[Daemon] Sabrina handoff detected — building audit prompt\x1b[0m');
+                    const sabrinaSink = this.createSink(this.codexAgentId);
+                    sabrinaSink.sendSpeak("I'll get Sabrina to have a look at that.");
+
+                    // Build the audit prompt asynchronously
+                    this.buildSabrinaAuditPrompt().then(auditPrompt => {
+                        this.manager.sendCommand(this.codexAgentId!, auditPrompt, msg.images).catch(err => {
+                            console.error(`[Daemon] Error running Sabrina audit:`, err);
+                        });
+                    }).catch(err => {
+                        console.error('[Daemon] Failed to build Sabrina audit prompt:', err);
+                        sabrinaSink.sendResult('Sorry, I had trouble pulling together the context for Sabrina.');
+                    });
+                    break;
+                }
+
                 // Route to the right agent based on engine field
                 const requestedEngine: 'claude' | 'codex' = msg.engine === 'codex' ? 'codex' : 'claude';
                 const agentId = requestedEngine === 'codex' ? this.codexAgentId : this.claudeAgentId;
@@ -246,6 +269,64 @@ export class BridgeConnection {
                 this.send({ type: 'workspace', data: { workspace, repo: dir } });
             },
         };
+    }
+
+    /**
+     * Build a rich audit prompt for Sabrina by gathering recent conversation
+     * history and the latest git diff.
+     */
+    private async buildSabrinaAuditPrompt(): Promise<string> {
+        // 1. Read last ~50 lines of conversation history
+        let conversationContext = '';
+        const convPath = path.join(this.defaultProjectDir, '.matthews', 'conversation.md');
+        try {
+            const content = fs.readFileSync(convPath, 'utf-8');
+            const lines = content.split('\n');
+            const last50 = lines.slice(-50).join('\n');
+            conversationContext = last50;
+        } catch {
+            conversationContext = '(No conversation history found)';
+        }
+
+        // 2. Get the git diff of the last commit
+        let gitDiff = '';
+        try {
+            gitDiff = await new Promise<string>((resolve, reject) => {
+                exec('git diff HEAD~1', { cwd: this.defaultProjectDir, maxBuffer: 1024 * 512 }, (err, stdout) => {
+                    if (err) {
+                        // Fallback: try staged + unstaged diff
+                        exec('git diff', { cwd: this.defaultProjectDir, maxBuffer: 1024 * 512 }, (err2, stdout2) => {
+                            resolve(err2 ? '(Could not get git diff)' : stdout2);
+                        });
+                    } else {
+                        resolve(stdout);
+                    }
+                });
+            });
+        } catch {
+            gitDiff = '(Could not get git diff)';
+        }
+
+        // 3. Construct the full audit prompt
+        return `You've been asked to do a full code audit of the recent changes. Here's the context:
+
+## Recent Conversation History
+${conversationContext}
+
+## Git Diff (Recent Changes)
+\`\`\`diff
+${gitDiff}
+\`\`\`
+
+## Your Task
+Do a thorough audit of these changes. Check every file that was modified. Look for:
+- Bugs or logic errors
+- Missed edge cases
+- Typos or incorrect variable names
+- Anything that looks off or doesn't match the intent described in the conversation
+- Security issues or bad patterns
+
+Read the actual files if you need more context beyond the diff. Be thorough, then give a concise spoken summary of what you found.`;
     }
 
     /** Pick a natural acknowledgment based on what the user said */
