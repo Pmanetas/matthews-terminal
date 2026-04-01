@@ -184,6 +184,7 @@ export function stopAllAudio() {
 }
 
 export let audioStartedForResult = false
+export let resultSkippedTts = false  // True when result has skipTts (narrations already spoke it)
 export let lastResultEngine: 'claude' | 'codex' | undefined
 let _resultReceived = false  // Set when result arrives, cleared on new command
 let _onAudioStarted: (() => void) | null = null
@@ -330,6 +331,7 @@ export function useBridge(onAudioDone?: () => void) {
             // Intermediate streaming text — ignore for visual display
           } else if (data.type === 'result') {
             _resultReceived = true
+            resultSkippedTts = !!data.skipTts
             if (!isReplayingRef.current) {
               audioStartedForResult = false
               startResultFallback(onAudioDoneRef)
@@ -419,6 +421,7 @@ export function useBridge(onAudioDone?: () => void) {
       lastResultEngine = engine
       _resultReceived = false
       audioStartedForResult = false
+      resultSkippedTts = false
       if (engine === 'codex') {
         setIsCodexWaiting(true)
       } else {

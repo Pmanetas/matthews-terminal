@@ -580,8 +580,10 @@ wss.on('connection', (ws) => {
 
       // Send result text IMMEDIATELY so phone shows it right away
       const resultEngine = (msg as any).engine;
+      const skipTts = !!(msg as any).skipTts;
       const resultEntry: Record<string, unknown> = { type: 'result', text: msg.text };
       if (resultEngine) resultEntry.engine = resultEngine;
+      if (skipTts) resultEntry.skipTts = true;
       pushHistory(resultEntry);
       broadcastToRole('phone', resultEntry);
 

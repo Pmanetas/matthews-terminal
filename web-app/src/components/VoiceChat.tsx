@@ -4,7 +4,7 @@ import { Mic, MicOff, ArrowUp, Square, Camera, X, FileText, Terminal, Search, Pe
 import { cn } from '@/lib/utils'
 import { VoiceWaveform } from '@/components/VoiceWaveform'
 import { MarkdownMessage } from '@/components/MarkdownMessage'
-import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, lastResultEngine, onAudioWillPlay } from '@/hooks/useBridge'
+import { useBridge, sharedAudio, getAudioLevel, onAudioPlayingChange, stopAllAudio, audioStartedForResult, resultSkippedTts, lastResultEngine, onAudioWillPlay } from '@/hooks/useBridge'
 import { SplashScreen } from '@/components/SplashScreen'
 import { useVoice } from '@/hooks/useVoice'
 import { resizeImage } from '@/lib/image-utils'
@@ -180,9 +180,14 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         if (revealStart === 0) revealStart = now
         const elapsed = now - revealStart
         newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
+      } else if (resultSkippedTts) {
+        // Narrations already spoke this — reveal text immediately at natural speech pace
+        // ~20 chars/sec ≈ 150 words per minute, feels like someone reading aloud
+        if (revealStart === 0) revealStart = now
+        const elapsed = now - revealStart
+        newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.02)), currentText.length)
       } else {
         // No audio started yet — wait up to 8s for TTS audio to arrive
-        // If it doesn't arrive (skipTts / narration-only flows), reveal text
         if (waitStart === 0) waitStart = now
         const waited = now - waitStart
         if (waited > 8000) {
