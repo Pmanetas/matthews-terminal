@@ -181,11 +181,11 @@ function TypingMarkdown({ text, animate, onUpdate }: { text: string; animate: bo
         const elapsed = now - revealStart
         newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
       } else {
-        // No audio started — wait 1.5s then reveal text at 80 chars/sec
-        // (covers skipTts flows where narrations already spoke the content)
+        // No audio started yet — wait up to 8s for TTS audio to arrive
+        // If it doesn't arrive (skipTts / narration-only flows), reveal text
         if (waitStart === 0) waitStart = now
         const waited = now - waitStart
-        if (waited > 1500) {
+        if (waited > 8000) {
           if (revealStart === 0) revealStart = now
           const elapsed = now - revealStart
           newChars = Math.min(Math.max(currentChars, Math.floor(elapsed * 0.08)), currentText.length)
@@ -1192,6 +1192,21 @@ export function VoiceChat() {
                   </button>
                 </div>
               </div>
+              {workspace && daemonConnected && (
+                <div className="flex items-center justify-center gap-1.5 mt-0.5 mb-1">
+                  <Terminal className="w-2.5 h-2.5 text-violet-400/60 shrink-0" />
+                  <span className={cn('text-[9px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/35' : 'text-white/30')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-0.5', statusDot)} />
+                </div>
+              )}
             </div>
             <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
@@ -1283,6 +1298,21 @@ export function VoiceChat() {
                 <div className="flex items-center gap-1.5" style={{ minWidth: 62 }}>
                 </div>
               </div>
+              {workspace && daemonConnected && (
+                <div className="flex items-center justify-center gap-1.5 mt-0.5 mb-1">
+                  <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
+                  <span className={cn('text-[9px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/35' : 'text-white/30')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-0.5', statusDot)} />
+                </div>
+              )}
             </div>
             <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">

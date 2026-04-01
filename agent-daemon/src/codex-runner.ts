@@ -112,11 +112,13 @@ export class CodexRunner {
             if (this.aborted) {
                 console.log(`[Codex ${this.agentId}] Command was aborted, skipping result`);
             } else {
-                const finalText = result.trim() || 'Done';
-                console.log(`\n${C.green}✅ Codex Result:${C.reset} ${finalText.slice(0, 200)}${finalText.length > 200 ? '...' : ''}`);
-                // If narrations already covered the speech, skip TTS on the result
-                // (narrations already did sendSpeak for each piece). Otherwise TTS normally.
+                // If narrations already covered the speech, use just the last message as result
+                // (avoids repeating all narrations in the final result bubble)
                 const alreadySpoken = this.narratedTexts.length > 0;
+                const finalText = alreadySpoken
+                    ? (this.lastAgentMessage.trim() || result.trim() || 'Done')
+                    : (result.trim() || 'Done');
+                console.log(`\n${C.green}✅ Codex Result:${C.reset} ${finalText.slice(0, 200)}${finalText.length > 200 ? '...' : ''}`);
                 sink.sendResult(finalText, alreadySpoken);
                 this.sessionContext.saveExchange(this.lastUserPrompt, finalText);
                 this.conversationLog.logAssistant(finalText);
@@ -151,9 +153,11 @@ export class CodexRunner {
     // ── Codex CLI ──────────────────────────────────────────
 
     private narratedTexts: string[] = [];
+    private lastAgentMessage: string = '';
 
     private runCodex(prompt: string, sink: AgentSink, imageFiles: string[] = []): Promise<string> {
         this.narratedTexts = [];
+        this.lastAgentMessage = '';
         return new Promise((resolve, reject) => {
             // Build the full prompt with system instructions
             let fullPrompt = `${CODEX_SYSTEM_PROMPT}\n\nUser: ${prompt}`;
@@ -297,7 +301,9 @@ export class CodexRunner {
 
                 if (item.type === 'agent_message' && item.text) {
                     console.log(`${C.cyan}[Codex] Message: ${item.text.slice(0, 150)}${C.reset}`);
-                    appendText(item.text + '\n');
+                    // Don't append to fullResponseText — narrations already display this
+                    // Only track the last message for the final result summary
+                    this.lastAgentMessage = item.text;
                     // Send narration so user sees+hears Codex thinking in real-time
                     sink.sendNarration(item.text);
                     sink.sendSpeak(item.text);
