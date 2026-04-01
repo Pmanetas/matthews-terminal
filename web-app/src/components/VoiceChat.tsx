@@ -1446,18 +1446,19 @@ export function VoiceChat() {
             }}
           >
             {/* Popup header */}
-            <div className={cn('shrink-0 flex flex-col px-5 py-3.5 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
-              <div className="flex items-center justify-center relative">
+            <div className={cn('shrink-0 flex flex-col px-4 py-3 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+              <div className="flex items-center justify-between">
+                <div className="w-8" />
                 <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={48} color="red" />
                 <button
                   onClick={() => setCodexPopup(false)}
-                  className={cn('absolute right-1 flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.08]' : 'bg-white/[0.08]')}
+                  className={cn('flex items-center justify-center w-8 h-8 rounded-full active:scale-90 transition-transform shrink-0', lightMode ? 'bg-black/[0.08]' : 'bg-white/[0.08]')}
                 >
                   <X className={cn('w-4 h-4', lightMode ? 'text-black/50' : 'text-white/50')} />
                 </button>
               </div>
               {workspace && daemonConnected && (
-                <div className="flex items-center justify-center gap-1.5 mt-1">
+                <div className="flex items-center justify-center gap-1.5 mt-1.5">
                   <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
                   <span className={cn('text-[9px] font-medium truncate max-w-[180px]', lightMode ? 'text-black/40' : 'text-white/40')}>
                     {(() => {
