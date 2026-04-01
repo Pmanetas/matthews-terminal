@@ -1433,8 +1433,8 @@ export function VoiceChat() {
             className="absolute z-[45] flex flex-col codex-panel"
             style={{
               bottom: 'calc(5.5rem + env(safe-area-inset-bottom))',
-              right: '0.75rem',
-              left: '0.75rem',
+              right: '1rem',
+              left: '1rem',
               maxWidth: '400px',
               marginLeft: 'auto',
               height: '420px',
@@ -1446,7 +1446,7 @@ export function VoiceChat() {
             }}
           >
             {/* Popup header */}
-            <div className={cn('shrink-0 flex flex-col px-4 py-3 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+            <div className={cn('shrink-0 flex flex-col px-5 py-3 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
               <div className="flex items-center justify-between">
                 <div className="w-8" />
                 <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={48} color="red" />
