@@ -502,7 +502,8 @@ export function VoiceChat() {
   const codexPopupEndRef = useRef<HTMLDivElement>(null)
   const splitDragRef = useRef({ startY: 0, startRatio: 0.5, dragging: false })
   const [codexPopupHeight, setCodexPopupHeight] = useState(420)
-  const popupResizeRef = useRef({ startY: 0, startHeight: 420, dragging: false })
+  const [codexPopupWidth, setCodexPopupWidth] = useState(400)
+  const popupResizeRef = useRef({ startY: 0, startX: 0, startHeight: 420, startWidth: 400, dragging: false })
 
   // Track which mic is active — 'claude' for main, 'codex' for Codex panel
   const micTargetRef = useRef<'claude' | 'codex'>('claude')
@@ -1436,9 +1437,8 @@ export function VoiceChat() {
             style={{
               bottom: 'calc(5.5rem + env(safe-area-inset-bottom))',
               right: '1rem',
-              left: '1rem',
-              maxWidth: '400px',
-              marginLeft: 'auto',
+              width: `${codexPopupWidth}px`,
+              maxWidth: 'calc(100vw - 2rem)',
               height: `${codexPopupHeight}px`,
               borderRadius: '1rem',
               border: lightMode ? '1px solid rgba(185, 28, 28, 0.2)' : '1px solid rgba(248, 113, 113, 0.15)',
@@ -1447,22 +1447,29 @@ export function VoiceChat() {
               boxShadow: '0 8px 40px rgba(0, 0, 0, 0.4)',
             }}
           >
-            {/* Resize handle — top-left corner, drag up/down to resize */}
+            {/* Resize handle — top-left corner, drag to resize height + width */}
             <div
-              className="absolute top-0 left-0 z-10 touch-none cursor-ns-resize flex items-center justify-center"
-              style={{ width: 40, height: 40, borderTopLeftRadius: '1rem' }}
+              className="absolute top-0 left-0 z-10 touch-none cursor-nwse-resize flex items-center justify-center"
+              style={{ width: 44, height: 44, borderTopLeftRadius: '1rem' }}
               onTouchStart={(e) => {
-                popupResizeRef.current = { startY: e.touches[0].clientY, startHeight: codexPopupHeight, dragging: true }
+                popupResizeRef.current = { startY: e.touches[0].clientY, startX: e.touches[0].clientX, startHeight: codexPopupHeight, startWidth: codexPopupWidth, dragging: true }
               }}
               onTouchMove={(e) => {
                 if (!popupResizeRef.current.dragging) return
                 const dy = popupResizeRef.current.startY - e.touches[0].clientY
+                const dx = popupResizeRef.current.startX - e.touches[0].clientX
                 const newH = Math.max(200, Math.min(700, popupResizeRef.current.startHeight + dy))
+                const newW = Math.max(200, Math.min(window.innerWidth - 32, popupResizeRef.current.startWidth + dx))
                 setCodexPopupHeight(newH)
+                setCodexPopupWidth(newW)
               }}
               onTouchEnd={() => { popupResizeRef.current.dragging = false }}
             >
-              <div className={cn('w-4 h-0.5 rounded-full rotate-45', lightMode ? 'bg-black/15' : 'bg-white/20')} />
+              {/* Corner grip lines */}
+              <div className="flex flex-col gap-[3px] -rotate-45">
+                <div className={cn('w-3 h-[1.5px] rounded-full', lightMode ? 'bg-black/20' : 'bg-white/25')} />
+                <div className={cn('w-2 h-[1.5px] rounded-full', lightMode ? 'bg-black/15' : 'bg-white/18')} />
+              </div>
             </div>
 
             {/* Popup header */}
