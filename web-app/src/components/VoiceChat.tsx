@@ -1146,20 +1146,37 @@ export function VoiceChat() {
           {/* Claude panel (top) */}
           <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: `${splitRatio} 1 0%` }}>
             {/* Claude header — matches main header style */}
-            <div className={cn('shrink-0 flex items-center justify-between px-4 py-2 border-b', lightMode ? 'border-black/[0.08] bg-white/80' : 'border-white/[0.06] bg-black/40')}>
-              <div className="flex items-center gap-2">
-                <button onClick={sendNewChat} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
-                  <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
-                </button>
-                <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{claudeMessages.filter(m => m.role === 'user').length} msgs</span>
+            <div className={cn('shrink-0 flex flex-col px-4 py-2 border-b', lightMode ? 'border-black/[0.08] bg-white/80' : 'border-white/[0.06] bg-black/40')}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button onClick={sendNewChat} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                    <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                  </button>
+                  <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{claudeMessages.filter(m => m.role === 'user').length} msgs</span>
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine !== 'codex'} getAudioLevel={getAudioLevel} size={120} color="violet" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
+                  <span className={cn('text-[9px]', lightMode ? 'text-violet-400/50' : 'text-violet-500/30')}>Opus 4.6</span>
+                </div>
               </div>
-              <div className="flex-1 flex justify-center">
-                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine !== 'codex'} getAudioLevel={getAudioLevel} size={120} color="violet" />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-violet-500/20 text-violet-400">Claude</span>
-                <span className={cn('text-[9px]', lightMode ? 'text-violet-400/50' : 'text-violet-500/30')}>Opus 4.6</span>
-              </div>
+              {workspace && daemonConnected && (
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <Terminal className="w-2.5 h-2.5 text-violet-400/60 shrink-0" />
+                  <span className={cn('text-[10px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/40')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
+                </div>
+              )}
             </div>
             <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar" style={{ overscrollBehavior: 'none' }}>
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
@@ -1242,20 +1259,37 @@ export function VoiceChat() {
           {/* Codex panel (bottom) */}
           <div className="flex flex-col min-h-0 overflow-hidden codex-panel" style={{ flex: `${1 - splitRatio} 1 0%` }}>
             {/* Codex header — matches Claude header style but red */}
-            <div className={cn('shrink-0 flex items-center justify-between px-4 py-2 border-b', lightMode ? 'border-red-200/30 bg-white/80' : 'border-red-500/10 bg-black/40')}>
-              <div className="flex items-center gap-2">
-                <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
-                  <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
-                </button>
-                <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{codexMessages.filter(m => m.role === 'user').length} msgs</span>
+            <div className={cn('shrink-0 flex flex-col px-4 py-2 border-b', lightMode ? 'border-red-200/30 bg-white/80' : 'border-red-500/10 bg-black/40')}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { /* TODO: new chat for codex only */ }} className={cn('flex items-center justify-center w-7 h-7 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}>
+                    <RotateCcw className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                  </button>
+                  <span className={cn('text-[10px]', lightMode ? 'text-black/30' : 'text-white/25')}>{codexMessages.filter(m => m.role === 'user').length} msgs</span>
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={120} color="red" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-red-500/20 text-red-400">Codex</span>
+                  <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
+                </div>
               </div>
-              <div className="flex-1 flex justify-center">
-                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={120} color="red" />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-red-500/20 text-red-400">Codex</span>
-                <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
-              </div>
+              {workspace && daemonConnected && (
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
+                  <span className={cn('text-[10px] font-medium truncate max-w-[200px]', lightMode ? 'text-black/40' : 'text-white/40')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
+                </div>
+              )}
             </div>
             <div ref={codexScrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar">
               <div className="flex flex-col gap-3 px-4 py-3 w-full overflow-hidden box-border">
@@ -1405,18 +1439,35 @@ export function VoiceChat() {
             }}
           >
             {/* Popup header */}
-            <div className={cn('shrink-0 flex items-center justify-between px-3 py-2 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
-              <div className="flex items-center gap-2">
-                <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
-                <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
-                <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
+            <div className={cn('shrink-0 flex flex-col px-3 py-2 border-b rounded-t-[1rem]', lightMode ? 'border-red-200/30' : 'border-red-500/10')}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <VoiceWaveform isActive={isAudioPlaying && lastResultEngine === 'codex'} getAudioLevel={getAudioLevel} size={40} color="red" />
+                  <span className={cn('text-xs font-semibold', lightMode ? 'text-red-700' : 'text-red-400')}>Codex</span>
+                  <span className={cn('text-[9px]', lightMode ? 'text-red-400/50' : 'text-red-500/30')}>GPT-5.4</span>
+                </div>
+                <button
+                  onClick={() => setCodexPopup(false)}
+                  className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
+                >
+                  <X className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
+                </button>
               </div>
-              <button
-                onClick={() => setCodexPopup(false)}
-                className={cn('flex items-center justify-center w-6 h-6 rounded-full active:scale-90 transition-transform', lightMode ? 'bg-black/[0.06]' : 'bg-white/[0.06]')}
-              >
-                <X className={cn('w-3 h-3', lightMode ? 'text-black/40' : 'text-white/40')} />
-              </button>
+              {workspace && daemonConnected && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Terminal className="w-2.5 h-2.5 text-red-400/60 shrink-0" />
+                  <span className={cn('text-[9px] font-medium truncate max-w-[180px]', lightMode ? 'text-black/40' : 'text-white/40')}>
+                    {(() => {
+                      const p = workspacePath || workspace
+                      const parts = p.replace(/\\/g, '/').split('/').filter((s: string) => s && !/^[A-Z]:$/i.test(s))
+                      const desktopIdx = parts.findIndex((s: string) => s.toLowerCase() === 'desktop')
+                      const meaningful = desktopIdx >= 0 ? parts.slice(desktopIdx) : parts.slice(-3)
+                      return meaningful.length > 0 ? meaningful.join(' → ') : workspace
+                    })()}
+                  </span>
+                  <span className={cn('h-1.5 w-1.5 rounded-full ml-1', statusDot)} />
+                </div>
+              )}
             </div>
 
             {/* Popup messages */}
