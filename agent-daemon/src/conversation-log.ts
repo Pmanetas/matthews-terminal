@@ -25,9 +25,10 @@ export class ConversationLog {
         }
         this.filePath = path.join(dir, CONVERSATION_FILE);
 
-        // Create file with header if it doesn't exist
+        // Create file with header if it doesn't exist — use the actual project folder name
         if (!fs.existsSync(this.filePath)) {
-            fs.writeFileSync(this.filePath, '# Matthews Terminal — Conversation Log\n\nFull history of all conversations between the user and agents in this repo.\n\n---\n\n', 'utf-8');
+            const projectName = path.basename(projectDir);
+            fs.writeFileSync(this.filePath, `# ${projectName} — Conversation Log\n\nFull history of all conversations between the user and agents in this repo.\n\n---\n\n`, 'utf-8');
         }
     }
 
