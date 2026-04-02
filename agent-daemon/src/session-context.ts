@@ -22,17 +22,20 @@ interface SessionData {
 
 const MAX_EXCHANGES = 20;
 const SESSION_DIR = '.matthews';
-const SESSION_FILE = 'session-context.json';
 
 export class SessionContext {
     private readonly filePath: string;
+    private readonly agentLabel: string;
 
-    constructor(projectDir: string) {
+    constructor(projectDir: string, agentName: string = 'claude') {
         const dir = path.join(projectDir, SESSION_DIR);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        this.filePath = path.join(dir, SESSION_FILE);
+        // Each agent gets its own session file
+        const filename = `${agentName}-session.json`;
+        this.filePath = path.join(dir, filename);
+        this.agentLabel = agentName === 'sabrina' ? 'Sabrina' : 'Matthew';
     }
 
     /** Save a completed exchange (user prompt + assistant response) */
@@ -62,7 +65,7 @@ export class SessionContext {
         let context = '\n\n[SESSION CONTEXT — The daemon was restarted. Here is what we were discussing before the restart. Continue naturally from where we left off.]\n\n';
         for (const ex of data.exchanges) {
             context += `User: ${ex.user}\n`;
-            context += `Matthew: ${ex.assistant}\n\n`;
+            context += `${this.agentLabel}: ${ex.assistant}\n\n`;
         }
         context += '[END OF PREVIOUS CONTEXT — The user is now speaking to you again. Pick up naturally.]\n\n';
         return context;

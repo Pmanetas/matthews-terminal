@@ -90,8 +90,8 @@ export class AgentRunner {
 
         this.lastReportedWorkspace = projectDir;
         this.activeLoggingDir = projectDir;
-        this.sessionContext = new SessionContext(projectDir);
-        this.conversationLog = new ConversationLog(projectDir);
+        this.sessionContext = new SessionContext(projectDir, 'claude');
+        this.conversationLog = new ConversationLog(projectDir, 'claude');
     }
 
     get id(): string { return this.agentId; }
@@ -144,8 +144,8 @@ export class AgentRunner {
 
         // Point logging at the new repo
         this.activeLoggingDir = newDir;
-        this.sessionContext = new SessionContext(newDir);
-        this.conversationLog = new ConversationLog(newDir);
+        this.sessionContext = new SessionContext(newDir, 'claude');
+        this.conversationLog = new ConversationLog(newDir, 'claude');
         this.conversationLog.logSessionStart();
         console.log(`\x1b[36m[Workspace] Logging now targets: ${path.basename(newDir)}\x1b[0m`);
     }

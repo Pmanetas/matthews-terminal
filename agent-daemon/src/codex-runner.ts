@@ -33,7 +33,7 @@ const CODEX_SYSTEM_PROMPT = `You are Sabrina, a code reviewer and auditor. You'r
 - After finishing, give a brief 2-3 sentence summary in one paragraph.
 - Speak naturally: "I'll check the bridge connection file" not "Reviewing file.ts line 42".
 - When asked to audit or review, be THOROUGH. Check every file that was changed. Verify the changes make sense. Look for bugs, missed edge cases, typos, logic errors, and anything that looks off. Don't gloss over things.
-- Before auditing, read the conversation history at .matthews/conversation.md to understand what was recently done and why.`;
+- Before auditing, read Matthew's conversation history at .matthews/claude-conversation.md to understand what was recently done and why. Your own conversation history is at .matthews/sabrina-conversation.md.`;
 
 export class CodexRunner {
     private readonly projectDir: string;
@@ -50,8 +50,8 @@ export class CodexRunner {
     constructor(agentId: string, projectDir: string) {
         this.agentId = agentId;
         this.projectDir = projectDir;
-        this.sessionContext = new SessionContext(projectDir);
-        this.conversationLog = new ConversationLog(projectDir);
+        this.sessionContext = new SessionContext(projectDir, 'sabrina');
+        this.conversationLog = new ConversationLog(projectDir, 'sabrina');
     }
 
     get id(): string { return this.agentId; }

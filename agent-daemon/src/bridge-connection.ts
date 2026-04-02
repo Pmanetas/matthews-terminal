@@ -279,7 +279,7 @@ export class BridgeConnection {
     private async buildSabrinaAuditPrompt(): Promise<string> {
         // 1. Read last ~50 lines of conversation history
         let conversationContext = '';
-        const convPath = path.join(this.defaultProjectDir, '.matthews', 'conversation.md');
+        const convPath = path.join(this.defaultProjectDir, '.matthews', 'claude-conversation.md');
         try {
             const content = fs.readFileSync(convPath, 'utf-8');
             const lines = content.split('\n');

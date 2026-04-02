@@ -12,23 +12,26 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const SESSION_DIR = '.matthews';
-const CONVERSATION_FILE = 'conversation.md';
 const TIMEZONE = 'Australia/Melbourne';
 
 export class ConversationLog {
     private readonly filePath: string;
+    private readonly agentLabel: string;
 
-    constructor(projectDir: string) {
+    constructor(projectDir: string, agentName: string = 'claude') {
         const dir = path.join(projectDir, SESSION_DIR);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        this.filePath = path.join(dir, CONVERSATION_FILE);
+        // Each agent gets its own conversation file
+        const filename = `${agentName}-conversation.md`;
+        this.filePath = path.join(dir, filename);
+        this.agentLabel = agentName === 'sabrina' ? 'Sabrina' : 'Matthew';
 
         // Create file with header if it doesn't exist — use the actual project folder name
         if (!fs.existsSync(this.filePath)) {
             const projectName = path.basename(projectDir);
-            fs.writeFileSync(this.filePath, `# ${projectName} — Conversation Log\n\nFull history of all conversations between the user and agents in this repo.\n\n---\n\n`, 'utf-8');
+            fs.writeFileSync(this.filePath, `# ${projectName} — ${this.agentLabel} Conversation Log\n\nFull history of all conversations between the user and ${this.agentLabel} in this repo.\n\n---\n\n`, 'utf-8');
         }
     }
 
@@ -49,7 +52,7 @@ export class ConversationLog {
     /** Log an assistant response */
     logAssistant(text: string): void {
         const timestamp = this.formatTimestamp();
-        this.append(`**[${timestamp}] Matthew:**\n${text}\n\n`);
+        this.append(`**[${timestamp}] ${this.agentLabel}:**\n${text}\n\n`);
     }
 
     /** Format a timestamp with date and time — always Melbourne time */
@@ -86,7 +89,7 @@ export class ConversationLog {
         let current = '';
 
         for (const line of lines) {
-            if (line.startsWith('**[') && (line.includes('] User:**') || line.includes('] Matthew:**'))) {
+            if (line.startsWith('**[') && (line.includes('] User:**') || line.includes('] Matthew:**') || line.includes('] Sabrina:**'))) {
                 if (current.trim()) entries.push(current.trim());
                 current = line + '\n';
             } else {
