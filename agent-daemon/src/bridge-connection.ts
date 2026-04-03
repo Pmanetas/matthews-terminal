@@ -24,6 +24,7 @@ export class BridgeConnection {
     private claudeAgentId: string | null = null;
     private codexAgentId: string | null = null;
     private defaultProjectDir: string;
+    private isFirstConnect = true;
 
     constructor(bridgeUrl: string, defaultProjectDir: string) {
         this.bridgeUrl = bridgeUrl;
@@ -57,8 +58,12 @@ export class BridgeConnection {
                 const workspace = path.basename(this.defaultProjectDir);
                 this.send({ type: 'workspace', data: { workspace, repo: this.defaultProjectDir } });
 
-                // Clear old chat history from previous session
-                this.send({ type: 'new_session' });
+                // Only clear phone chat on first connect (daemon restart),
+                // not on WebSocket reconnects which are just connection blips
+                if (this.isFirstConnect) {
+                    this.send({ type: 'new_session' });
+                    this.isFirstConnect = false;
+                }
 
                 // Now safe to log (client is identified, daemon_log will be forwarded)
                 console.log('\x1b[32m[Daemon] Connected to bridge\x1b[0m');

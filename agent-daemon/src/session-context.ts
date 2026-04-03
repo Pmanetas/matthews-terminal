@@ -36,6 +36,7 @@ export class SessionContext {
         const filename = `${agentName}-session.json`;
         this.filePath = path.join(dir, filename);
         this.agentLabel = agentName === 'sabrina' ? 'Sabrina' : 'Matthew';
+        this.ensureFileExists();
     }
 
     /** Save a completed exchange (user prompt + assistant response) */
@@ -99,5 +100,13 @@ export class SessionContext {
             }
         } catch {}
         return { exchanges: [] };
+    }
+
+    private ensureFileExists(): void {
+        try {
+            if (!fs.existsSync(this.filePath)) {
+                fs.writeFileSync(this.filePath, JSON.stringify({ exchanges: [] }, null, 2), 'utf-8');
+            }
+        } catch {}
     }
 }
