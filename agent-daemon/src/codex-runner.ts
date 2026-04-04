@@ -58,7 +58,6 @@ export class CodexRunner {
     private conversationLog: ConversationLog;
     private activeLoggingDir: string;
     private lastReportedWorkspace: string;
-    private turnLoggingLocked = false;
     private pendingConversationUser: { text: string; imageCount?: number } | null = null;
     private pendingConversationToolActions: string[] = [];
     private pendingCommands = new Map<string, CommandDescription>();
@@ -204,16 +203,7 @@ export class CodexRunner {
             console.log(`\x1b[36m[Workspace] Codex switching to: ${dir}\x1b[0m`);
             this.lastReportedWorkspace = dir;
             sink.sendWorkspace(dir);
-            const normalizedActive = this.activeLoggingDir.replace(/\\/g, '/').toLowerCase();
-            const shouldSwitchLogging = !this.pendingConversationUser
-                || !this.turnLoggingLocked
-                || normalizedDir === normalizedActive;
-            if (shouldSwitchLogging) {
-                this.switchLogging(dir);
-                if (this.pendingConversationUser) {
-                    this.turnLoggingLocked = true;
-                }
-            }
+            this.switchLogging(dir);
         }
     }
 
@@ -560,7 +550,7 @@ export class CodexRunner {
         }
         this.activeProcess = undefined;
         this.isProcessing = false;
-        this.turnLoggingLocked = false;
+
         this.pendingConversationUser = null;
         this.pendingConversationToolActions = [];
         sink.sendResult('Stopped.');
@@ -576,7 +566,7 @@ export class CodexRunner {
         this.aborted = false;
         this.lastUserPrompt = text;
         this.lastReportedWorkspace = this.activeLoggingDir;
-        this.turnLoggingLocked = false;
+
 
         if (!this.conversationStarted) {
             sink.sendNewSession();
@@ -658,7 +648,7 @@ export class CodexRunner {
         } finally {
             this.isProcessing = false;
             this.activeProcess = undefined;
-            this.turnLoggingLocked = false;
+    
             if (this.aborted) {
                 this.pendingConversationUser = null;
                 this.pendingConversationToolActions = [];
