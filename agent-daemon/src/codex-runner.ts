@@ -188,6 +188,12 @@ export class CodexRunner {
         const currentWorkspace = this.lastReportedWorkspace.replace(/\\/g, '/').toLowerCase();
         if (normalized.startsWith(currentWorkspace + '/') || normalized === currentWorkspace) return;
 
+        // Don't switch workspace for meta/admin files — reading conversation logs
+        // or temp images from another project is context-gathering, not project switching
+        if (normalized.includes('/.matthews/') || normalized.includes('\\.matthews\\')
+            || normalized.includes('/temp/') || normalized.includes('\\temp\\')
+            || normalized.includes('/tmp/') || normalized.includes('\\tmp\\')) return;
+
         const dir = this.findWorkspaceRoot(filePath);
         if (!dir) return;
 
@@ -604,7 +610,27 @@ export class CodexRunner {
         }
 
         try {
-            const result = await this.runCodex(text, sink, imageFiles);
+            let result: string;
+            try {
+                result = await this.runCodex(text, sink, imageFiles);
+            } catch (firstErr: unknown) {
+                // If resume failed, automatically retry with a fresh session
+                if (this.threadId === null && !this.aborted) {
+                    const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+                    console.log(`${C.yellow}[Codex] First attempt failed (${firstMsg}), retrying with fresh session...${C.reset}`);
+                    sink.sendStatus('Retrying...');
+                    result = await this.runCodex(text, sink, imageFiles);
+                } else if (!this.aborted && this.threadId) {
+                    // Resume specifically failed — clear thread and retry fresh
+                    const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+                    console.log(`${C.yellow}[Codex] Resume failed (${firstMsg}), clearing thread and retrying fresh...${C.reset}`);
+                    this.threadId = null;
+                    sink.sendStatus('Retrying with fresh session...');
+                    result = await this.runCodex(text, sink, imageFiles);
+                } else {
+                    throw firstErr;
+                }
+            }
             if (this.aborted) {
                 console.log(`[Codex ${this.agentId}] Command was aborted, skipping result`);
             } else {

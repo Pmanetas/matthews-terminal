@@ -105,6 +105,12 @@ export class AgentRunner {
         const currentWorkspace = this.lastReportedWorkspace.replace(/\\/g, '/').toLowerCase();
         if (normalized.startsWith(currentWorkspace + '/') || normalized === currentWorkspace) return;
 
+        // Don't switch workspace for meta/admin files — reading conversation logs
+        // or temp images from another project is context-gathering, not project switching
+        if (normalized.includes('/.matthews/') || normalized.includes('\\.matthews\\')
+            || normalized.includes('/temp/') || normalized.includes('\\temp\\')
+            || normalized.includes('/tmp/') || normalized.includes('\\tmp\\')) return;
+
         console.log(`[Workspace] File outside current project: ${filePath}`);
         // Walk up to find the project root
         let dir = path.dirname(filePath);

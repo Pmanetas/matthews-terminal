@@ -24,11 +24,13 @@ export class BridgeConnection {
     private claudeAgentId: string | null = null;
     private codexAgentId: string | null = null;
     private defaultProjectDir: string;
+    private lastClaudeWorkspace: string;
     private isFirstConnect = true;
 
     constructor(bridgeUrl: string, defaultProjectDir: string) {
         this.bridgeUrl = bridgeUrl;
         this.defaultProjectDir = defaultProjectDir;
+        this.lastClaudeWorkspace = defaultProjectDir;
         this.manager = new AgentManager((agentId) => this.createSink(agentId));
     }
 
@@ -162,6 +164,17 @@ export class BridgeConnection {
                 const sabrinaPattern = /\b(pass\s+(it\s+)?(to|over\s+to)\s+sabrina|hand\s+(it\s+)?(to|over\s+to)\s+sabrina|send\s+(it\s+)?(to|over\s+to)\s+sabrina|give\s+(it\s+)?to\s+sabrina|sabrina\s+audit\s+this|sabrina\s+review\s+this|sabrina\s+check\s+this)\b/i;
                 if (sabrinaPattern.test(text) && this.codexAgentId) {
                     console.log('\x1b[35m[Daemon] Sabrina handoff detected — building audit prompt\x1b[0m');
+
+                    // If Claude switched workspace, respawn Sabrina in the right project
+                    const auditDir = this.lastClaudeWorkspace || this.defaultProjectDir;
+                    const currentAgent = this.manager.getAgent(this.codexAgentId);
+                    if (currentAgent && currentAgent.projectDir !== auditDir) {
+                        console.log(`\x1b[35m[Daemon] Respawning Sabrina in ${path.basename(auditDir)} for audit\x1b[0m`);
+                        this.manager.killAgent(this.codexAgentId);
+                        const newInfo = this.manager.spawnAgent(auditDir, 'codex', 'codex');
+                        this.codexAgentId = newInfo.agentId;
+                    }
+
                     const sabrinaSink = this.createSink(this.codexAgentId);
                     sabrinaSink.sendSpeak("I'll get Sabrina to have a look at that.");
 
@@ -273,6 +286,10 @@ export class BridgeConnection {
                 const path = require('path');
                 const workspace = path.basename(dir);
                 this.send({ type: 'workspace', data: { workspace, repo: dir } });
+                // Track Claude's current workspace for Sabrina audit context
+                if (engine === 'claude') {
+                    this.lastClaudeWorkspace = dir;
+                }
             },
         };
     }
@@ -282,9 +299,13 @@ export class BridgeConnection {
      * history and the latest git diff.
      */
     private async buildSabrinaAuditPrompt(): Promise<string> {
+        // Use Claude's current workspace, not the daemon's default project dir
+        const auditDir = this.lastClaudeWorkspace || this.defaultProjectDir;
+        console.log(`\x1b[35m[Daemon] Building Sabrina audit for: ${path.basename(auditDir)}\x1b[0m`);
+
         // 1. Read last ~50 lines of conversation history
         let conversationContext = '';
-        const convPath = path.join(this.defaultProjectDir, '.matthews', 'claude-conversation.md');
+        const convPath = path.join(auditDir, '.matthews', 'claude-conversation.md');
         try {
             const content = fs.readFileSync(convPath, 'utf-8');
             const lines = content.split('\n');
@@ -298,10 +319,10 @@ export class BridgeConnection {
         let gitDiff = '';
         try {
             gitDiff = await new Promise<string>((resolve, reject) => {
-                exec('git diff HEAD~1', { cwd: this.defaultProjectDir, maxBuffer: 1024 * 512 }, (err, stdout) => {
+                exec('git diff HEAD~1', { cwd: auditDir, maxBuffer: 1024 * 512 }, (err, stdout) => {
                     if (err) {
                         // Fallback: try staged + unstaged diff
-                        exec('git diff', { cwd: this.defaultProjectDir, maxBuffer: 1024 * 512 }, (err2, stdout2) => {
+                        exec('git diff', { cwd: auditDir, maxBuffer: 1024 * 512 }, (err2, stdout2) => {
                             resolve(err2 ? '(Could not get git diff)' : stdout2);
                         });
                     } else {
@@ -314,7 +335,9 @@ export class BridgeConnection {
         }
 
         // 3. Construct the full audit prompt
-        return `You've been asked to do a full code audit of the recent changes. Here's the context:
+        return `You've been asked to do a full code audit of the recent changes in the project at: ${auditDir}
+
+Here's the context:
 
 ## Recent Conversation History
 ${conversationContext}
